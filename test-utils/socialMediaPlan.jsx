@@ -84,7 +84,7 @@ export const itemPublication = (over = {}) => ({ id: 'pub-1', platform: 'faceboo
 /** The whole GET /social/content-calendar response body (`data`). Pass `status: 'ready'` with `items` for a finished calendar. */
 export function calendarState(over = {}) {
   const items = over.items || []
-  const config = { startDate: '2026-10-06', endDate: '2026-10-12', postsPerWeek: 3, platforms: ['facebook', 'instagram'], distributionMode: 'balanced' }
+  const config = { startDate: '2026-10-06', endDate: '2026-10-12', months: null, postsPerWeek: 3, platforms: ['facebook', 'instagram'], distributionMode: 'balanced' }
   const ready = over.status === 'ready'
   return {
     status: 'none',
@@ -100,10 +100,13 @@ export function calendarState(over = {}) {
     stale: ready ? { strategyChanged: false, currentStrategyVersion: 3, profileChanged: false } : null,
     strategy: { available: true, id: 'strat-3', version: 3, platforms: ['facebook', 'instagram'], hasHooks: true, recommended: { postsPerWeek: 4, range: { min: 3, max: 5 }, days: ['tuesday', 'thursday'] } },
     connectedPlatforms: { facebook: true, instagram: true },
-    limits: { minDays: 7, maxDays: 31, maxPostsPerWeek: 7 },
+    limits: { minDays: 7, maxDays: 184, minMonths: 1, maxMonths: 6, maxPostsPerWeek: 7, maxPosts: 200 },
     ...over,
   }
 }
 
 export const calendarResponse = (over) => ({ success: true, data: calendarState(over) })
-export const calendarGeneration = (o = {}) => ({ id: 'cgen-1', version: 1, status: 'generating', startedAt: '2026-10-05T10:00:00.000Z', finishedAt: null, config: null, failure: null, ...o })
+export const calendarGeneration = (o = {}) => ({
+  id: 'cgen-1', version: 1, status: 'generating', startedAt: '2026-10-05T10:00:00.000Z', finishedAt: null, config: null, failure: null,
+  progress: { plannedPosts: 0, totalPosts: 0, completedBatches: 0, totalBatches: 0 }, retry: null, runAttempts: 1, canResume: false, ...o,
+})

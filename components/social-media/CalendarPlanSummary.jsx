@@ -19,7 +19,7 @@ export function CalendarPlanSummary({ calendar, strategyVersion }) {
         </p>
       </div>
       <p className="mt-1 text-sm text-slate-600" data-testid="plan-facts">
-        <strong>{plan.totalItems} posts</strong> · {formatPlanDate(config.startDate, { year: true })} to {formatPlanDate(config.endDate, { year: true })} · {config.postsPerWeek} per week · {platformsLabel(config.platforms)}
+        <strong>{plan.totalItems} posts</strong> · {formatPlanDate(config.startDate, { year: true })} to {formatPlanDate(config.endDate, { year: true })}{config.months ? ` (${config.months} month${config.months === 1 ? '' : 's'})` : ''} · {config.postsPerWeek} per week · {platformsLabel(config.platforms)}
         {platformCounts.length > 0 && <span className="text-slate-400"> ({platformCounts.map(([p, n]) => `${p === 'facebook' ? 'Facebook' : 'Instagram'} ${n}`).join(', ')})</span>}
       </p>
 

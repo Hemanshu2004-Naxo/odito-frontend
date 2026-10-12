@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import { screen, within, fireEvent, waitFor, act } from '@testing-library/react'
 import { renderWithClient } from '@/test-utils/socialMediaAI'
@@ -66,6 +66,7 @@ beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset())
   api.getSocialAIContentStatus.mockResolvedValue(emptyContent)
 })
+afterEach(() => { vi.useRealTimers() })
 
 // ── opening ──────────────────────────────────────────────────────────────────
 
@@ -495,6 +496,9 @@ describe('Calendar item modal — pillar, objective, KPI, CTA, hook', () => {
   })
 
   it('the planned date is limited to the calendar\'s range and a bad date is explained', async () => {
+    // a controlled clock (Date only): "not in the past" is judged against 5 Oct 2026, whatever day the suite really runs
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-05T12:00:00Z'))
     load()
     await openItem()
     const date = byLabel('Planned date')
@@ -630,28 +634,73 @@ describe('Calendar item modal — approving the PLAN', () => {
 
 // ── generate content ─────────────────────────────────────────────────────────
 
-describe('Calendar item modal — Generate content (the existing generator, linked to this item)', () => {
+describe('Calendar item modal — creating the post from the plan (caption source of truth)', () => {
   const approved = (over = {}) => calendarItem({ ...FB, status: 'plan_approved', effectiveStatus: 'plan_approved', revision: 1, ...over })
+  const REVIEWED = 'The exact caption the owner reviewed.'
+  const created = (item, platform = 'facebook') => ({ success: true, data: { mode: 'plan', status: 'draft_created', item: { ...item, status: 'content_generated', effectiveStatus: 'content_review', revision: item.revision + 2, publications: [itemPublication({ platform })] }, publication: { id: 'pub-1', platform, status: 'draft', content: REVIEWED, generation: { source: 'calendar_plan', planRevision: item.revision } } } })
 
-  it('is offered only for an approved plan, per platform that has no draft yet, and starts the generator for that platform', async () => {
+  it('with a reviewed caption the primary action is "Create post from this plan" - it says the caption is used as written - and it creates the post at once, with the revision that was seen', async () => {
+    const item = approved({ platforms: ['facebook', 'instagram'], caption: REVIEWED })
+    load([item])
+    await openItem()
+    expect(screen.getByTestId('item-generate-facebook')).toHaveTextContent('Create Facebook post from this plan')
+    expect(screen.getByTestId('item-generate-instagram')).toHaveTextContent('Create Instagram post from this plan')
+    expect(screen.getByTestId('item-generate-hint')).toHaveTextContent('exactly as written: the AI does not rewrite it')
+    api.generateSocialCalendarItemContent.mockResolvedValue(created(item))
+    fireEvent.click(screen.getByTestId('item-generate-facebook'))
+    await waitFor(() => expect(api.generateSocialCalendarItemContent).toHaveBeenCalledWith('proj-1', 'i1', 'facebook', { mode: 'plan', expectedRevision: 1 }))
+    expect(await screen.findByTestId('item-banner')).toHaveTextContent('created from this plan. Its caption is exactly what is written here')
+    await waitFor(() => expect(api.getSocialContentCalendar.mock.calls.length).toBeGreaterThanOrEqual(2)) // the calendar is refetched
+  })
+
+  it('a single-platform post says "Create post from this plan"; "Write with AI instead" is a separate, CONFIRMED choice that says the plan caption stays', async () => {
+    load([approved({ caption: REVIEWED })])
+    await openItem()
+    expect(screen.getByTestId('item-generate-facebook')).toHaveTextContent(/^Create post from this plan$/)
+    expect(screen.getByTestId('item-generate-ai-facebook')).toHaveTextContent(/^Write with AI instead$/)
+    fireEvent.click(screen.getByTestId('item-generate-ai-facebook'))
+    expect(await screen.findByText('Have the AI write a different Facebook caption?')).toBeInTheDocument()
+    expect(screen.getByText(/The caption in this plan is not changed or replaced/)).toBeInTheDocument()
+    // keeping the caption sends nothing
+    fireEvent.click(screen.getByRole('button', { name: 'Keep my caption' }))
+    expect(api.generateSocialCalendarItemContent).not.toHaveBeenCalled()
+    // confirming asks the server for the AI mode, and the usual "writing…" follow-up begins
+    api.generateSocialCalendarItemContent.mockResolvedValue({ success: true, data: { mode: 'ai', status: 'generating', generation: { id: 'g1', status: 'generating', calendarItemId: 'i1', request: { platform: 'facebook' } } } })
+    api.getSocialAIContentStatus.mockResolvedValue({ success: true, data: { status: 'generating', generation: { id: 'g1', status: 'generating', calendarItemId: 'i1' }, publication: null } })
+    fireEvent.click(screen.getByTestId('item-generate-ai-facebook'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Write with AI' }))
+    await waitFor(() => expect(api.generateSocialCalendarItemContent).toHaveBeenCalledWith('proj-1', 'i1', 'facebook', { mode: 'ai', expectedRevision: 1 }))
+    expect(await screen.findByTestId('item-generating')).toHaveTextContent('Writing the post from this plan')
+  })
+
+  it('with NO caption in the plan the only thing that can write the post is AI, and the button says so', async () => {
     load([approved({ platforms: ['facebook', 'instagram'] })])
     await openItem()
-    expect(screen.getByTestId('item-generate-facebook')).toHaveTextContent('Generate Facebook content')
-    expect(screen.getByTestId('item-generate-instagram')).toHaveTextContent('Generate Instagram content')
-    api.generateSocialCalendarItemContent.mockResolvedValue({ success: true, data: { status: 'generating', generation: { id: 'g1', status: 'generating', calendarItemId: 'i1', request: { platform: 'facebook' } } } })
+    expect(screen.getByTestId('item-generate-facebook')).toHaveTextContent('Write Facebook post with AI')
+    expect(screen.queryByTestId('item-generate-ai-facebook')).not.toBeInTheDocument()
+    expect(screen.getByTestId('item-generate-hint')).toHaveTextContent('has no caption yet, so the AI will write the post')
+    api.generateSocialCalendarItemContent.mockResolvedValue({ success: true, data: { mode: 'ai', status: 'generating', generation: { id: 'g1', status: 'generating', calendarItemId: 'i1', request: { platform: 'facebook' } } } })
     api.getSocialAIContentStatus.mockResolvedValue({ success: true, data: { status: 'generating', generation: { id: 'g1', status: 'generating', calendarItemId: 'i1' }, publication: null } })
     fireEvent.click(screen.getByTestId('item-generate-facebook'))
-    await waitFor(() => expect(api.generateSocialCalendarItemContent).toHaveBeenCalledWith('proj-1', 'i1', 'facebook'))
+    await waitFor(() => expect(api.generateSocialCalendarItemContent).toHaveBeenCalledWith('proj-1', 'i1', 'facebook', { mode: 'ai', expectedRevision: 1 }))
     expect(await screen.findByTestId('item-generating')).toHaveTextContent('Writing the post from this plan')
     expect(screen.getByTestId('item-generate-instagram')).toBeDisabled()
   })
 
-  it('a single-platform post just says "Generate content"; a platform that already has a draft has no button', async () => {
-    load([approved()])
+  it('a platform uses ITS OWN reviewed copy: Instagram has a caption of its own, Facebook has none and shows the AI choice', async () => {
+    load([approved({ platforms: ['facebook', 'instagram'], platformContent: [{ platform: 'instagram', caption: 'Instagram only.', primaryCta: '', hashtags: [] }] })])
     await openItem()
-    expect(screen.getByTestId('item-generate-facebook')).toHaveTextContent(/^Generate content$/)
-    load([approved({ platforms: ['facebook', 'instagram'], status: 'content_generated', publications: [itemPublication()] })])
-    await act(async () => { await Promise.resolve() })
+    expect(screen.getByTestId('item-generate-instagram')).toHaveTextContent('Create Instagram post from this plan')
+    expect(screen.getByTestId('item-generate-facebook')).toHaveTextContent('Write Facebook post with AI')
+  })
+
+  it('a refused plan-mode request (caption too long, prohibited phrase, a conflict) shows the server\'s reason and creates nothing', async () => {
+    load([approved({ caption: REVIEWED })])
+    await openItem()
+    api.generateSocialCalendarItemContent.mockRejectedValueOnce(Object.assign(new Error('The caption uses "cheapest", which your business profile says never to use. Edit the caption in the plan first.'), { status: 422, details: { code: 'PROHIBITED_PHRASE' } }))
+    fireEvent.click(screen.getByTestId('item-generate-facebook'))
+    expect(await screen.findByTestId('item-banner')).toHaveTextContent('never to use')
+    expect(screen.getByTestId('item-generate-facebook')).toBeEnabled()
   })
 
   it('a platform with a draft has no Generate button; the other one still has', async () => {

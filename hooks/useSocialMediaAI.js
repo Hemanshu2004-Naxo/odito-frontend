@@ -763,6 +763,75 @@ export function useGenerateSocialContentCalendar(projectId) {
   })
 }
 
+export const socialCalendarHistoryKey = (projectId) => [...socialContentCalendarKey(projectId), 'history']
+
+/** The versions of the calendar (current + history) with how much of each was edited / approved / turned into posts. */
+export function useSocialCalendarHistory(projectId, { enabled = true } = {}) {
+  return useQuery({
+    queryKey: socialCalendarHistoryKey(projectId),
+    queryFn: async () => (await apiService.getSocialCalendarHistory(projectId))?.data || null,
+    enabled: !!projectId && enabled,
+  })
+}
+
+/** One version's posts, read-only. */
+export function useSocialCalendarVersion(projectId, calendarId) {
+  return useQuery({
+    queryKey: [...socialCalendarHistoryKey(projectId), calendarId],
+    queryFn: async () => (await apiService.getSocialCalendarVersion(projectId, calendarId))?.data || null,
+    enabled: !!projectId && !!calendarId,
+  })
+}
+
+/** Brings an archived version back as the current calendar. Everything that shows the calendar is refetched. */
+export function useRestoreSocialCalendarVersion(projectId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (calendarId) => apiService.restoreSocialCalendarVersion(projectId, calendarId),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: socialContentCalendarKey(projectId), exact: true })
+      queryClient.invalidateQueries({ queryKey: socialCalendarHistoryKey(projectId) })
+      queryClient.invalidateQueries({ queryKey: socialCalendarOptionsKey(projectId) })
+    },
+  })
+}
+
+/** Continues an unfinished (partial) calendar: only the missing posts are generated. The server answers 202; the page follows its state. */
+export function useResumeSocialContentCalendar(projectId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiService.resumeSocialContentCalendar(projectId),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: socialContentCalendarKey(projectId), exact: true }),
+  })
+}
+
+/** Stops an unfinished calendar and discards what it saved. The last ready calendar stays. */
+export function useCancelSocialContentCalendar(projectId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiService.cancelSocialContentCalendar(projectId),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: socialContentCalendarKey(projectId), exact: true }),
+  })
+}
+
+/**
+ * What a set of planning choices means, from the SERVER (no AI call): the exact end date, day count and post count, and the
+ * weeks that are only partly inside the period. The form shows it before anything is generated. `choices` is
+ * { startDate, months, postsPerWeek }; the query is idle until they are all present. A refusal (e.g. the calendar would be
+ * too large) arrives as the query's error, with the server's own message.
+ */
+export function useSocialContentCalendarPreview(projectId, choices, { enabled = true } = {}) {
+  const { startDate, months, postsPerWeek } = choices || {}
+  return useQuery({
+    queryKey: [...socialContentCalendarKey(projectId), 'preview', startDate || null, months || null, postsPerWeek || null],
+    queryFn: async () => (await apiService.previewSocialContentCalendar(projectId, { startDate, months, postsPerWeek, platforms: ['facebook'] }))?.data || null,
+    enabled: !!projectId && enabled && !!startDate && !!months && !!postsPerWeek,
+    staleTime: 60_000,
+    retry: false,
+    placeholderData: keepPreviousData,
+  })
+}
+
 // ── one planned post (the item workspace) ─────────────────────────────────
 
 export const socialCalendarOptionsKey = (projectId) => [...socialContentCalendarKey(projectId), 'options']
@@ -851,8 +920,15 @@ export function useRegenerateSocialCalendarItem(projectId) {
 export function useGenerateSocialCalendarItemContent(projectId) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ itemId, platform }) => apiService.generateSocialCalendarItemContent(projectId, itemId, platform),
+    mutationFn: ({ itemId, platform, mode, expectedRevision }) => apiService.generateSocialCalendarItemContent(projectId, itemId, platform, { mode, expectedRevision }),
     onSuccess: (res) => {
+      if (res?.data?.mode === 'plan') {
+        // the draft exists already (the plan's caption, verbatim): show the updated item and refresh what lists posts
+        if (res.data.item) putCalendarItemInCache(queryClient, projectId, res.data.item)
+        queryClient.invalidateQueries({ queryKey: socialContentCalendarKey(projectId), exact: true })
+        queryClient.invalidateQueries({ queryKey: publishingKey(projectId) })
+        return
+      }
       const generation = res?.data?.generation
       if (generation) queryClient.setQueryData(socialAIContentKey(projectId), { status: 'generating', generation, publication: null })
     },

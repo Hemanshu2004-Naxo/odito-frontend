@@ -24,7 +24,7 @@ import { StudioEntry } from './StudioEntry'
 import CreativeStudioPage from '@/app/app/social-media/creative-studio/page'
 
 const calendar = (items) => okResponse({ status: 'ready', calendar: { version: 1, strategy: { version: 1 } }, items })
-const item = (over = {}) => ({ id: 'item-1', status: 'plan_approved', platforms: ['facebook'], publications: [], topic: 'Brushing basics', ...over })
+const item = (over = {}) => ({ id: 'item-1', status: 'plan_approved', platforms: ['facebook'], publications: [], topic: 'Brushing basics', revision: 3, ...over })
 const linked = (platform, id) => ({ id, platform, status: 'draft', approvalState: 'content_approved', content: 'x' })
 
 beforeEach(() => {
@@ -81,14 +81,26 @@ describe('Creative Studio entry - which post opens', () => {
     expect(api.getSocialStudio).not.toHaveBeenCalled()
   })
 
-  it('a calendar item with no content yet: "Content has not been generated yet." + Generate Content, which uses the existing calendar generator', async () => {
+  it('a calendar item with no content yet: "Content has not been generated yet." + Generate Content (the plan has no caption, so the AI writes it), through the existing calendar endpoint', async () => {
     api.getSocialContentCalendar.mockResolvedValue(calendar([item()]))
     api.generateSocialCalendarItemContent.mockResolvedValue(contentStartResponse({ generation: contentGenerationDoc({ calendarItemId: 'item-1' }) }))
     renderWithClient(<StudioEntry projectId="proj-1" itemId="item-1" platform="facebook" />)
     expect(await screen.findByText('Content has not been generated yet.')).toBeInTheDocument()
+    expect(screen.getByTestId('generate-content-button')).toHaveTextContent('Generate Content')
+    expect(screen.getByText(/has no caption yet, so Odito will write the post/)).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('generate-content-button'))
-    await waitFor(() => expect(api.generateSocialCalendarItemContent).toHaveBeenCalledWith('proj-1', 'item-1', 'facebook'))
+    await waitFor(() => expect(api.generateSocialCalendarItemContent).toHaveBeenCalledWith('proj-1', 'item-1', 'facebook', { mode: undefined, expectedRevision: 3 }))
     expect(api.getSocialStudio).not.toHaveBeenCalled()
+  })
+
+  it('a plan item WITH a reviewed caption says the post is created from it, exactly as written, and sends no mode (the server uses the caption)', async () => {
+    api.getSocialContentCalendar.mockResolvedValue(calendar([item({ caption: 'The reviewed caption.' })]))
+    api.generateSocialCalendarItemContent.mockResolvedValue({ success: true, data: { mode: 'plan', status: 'draft_created', item: item({ caption: 'The reviewed caption.' }), publication: { id: 'pub-1' } } })
+    renderWithClient(<StudioEntry projectId="proj-1" itemId="item-1" platform="facebook" />)
+    expect(await screen.findByText(/exactly as it is/)).toBeInTheDocument()
+    expect(screen.getByTestId('generate-content-button')).toHaveTextContent('Create post from plan')
+    fireEvent.click(screen.getByTestId('generate-content-button'))
+    await waitFor(() => expect(api.generateSocialCalendarItemContent).toHaveBeenCalledWith('proj-1', 'item-1', 'facebook', { mode: undefined, expectedRevision: 3 }))
   })
 
   it('an item whose plan is not approved cannot generate from here: it points to the Content Calendar', async () => {

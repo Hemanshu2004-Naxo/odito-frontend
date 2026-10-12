@@ -2,14 +2,16 @@
 
 import { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, List, Loader2, Plus, RefreshCw, Sparkles, XCircle } from 'lucide-react'
+import { CalendarDays, History, List, Loader2, Plus, RefreshCw, Sparkles, XCircle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmActionDialog } from './ConfirmActionDialog'
 import { CalendarPlanForm } from './CalendarPlanForm'
 import { CalendarPlanTable, CalendarPlanGrid } from './CalendarPlanItems'
 import { CalendarItemModal } from './CalendarItemModal'
 import { CalendarPlanSummary, CalendarStaleBanner } from './CalendarPlanSummary'
-import { useSocialContentCalendar, useGenerateSocialContentCalendar, useCalendarContentGenerationSync, useSocialCalendarOptions } from '@/hooks/useSocialMediaAI'
+import { GeneratingBanner, PartialCalendarCard } from './CalendarGenerationStatus'
+import { CalendarHistoryPanel, versionFacts } from './CalendarHistoryPanel'
+import { useSocialContentCalendar, useGenerateSocialContentCalendar, useResumeSocialContentCalendar, useCancelSocialContentCalendar, useCalendarContentGenerationSync, useSocialCalendarOptions } from '@/hooks/useSocialMediaAI'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
 import { formatDateTime } from '@/lib/socialMedia/aiStrategy'
 
@@ -28,11 +30,14 @@ const VIEWS = [{ id: 'table', label: 'Table', icon: List }, { id: 'calendar', la
 export function ContentPlanSection({ projectId }) {
   const query = useSocialContentCalendar(projectId)
   const generate = useGenerateSocialContentCalendar(projectId)
+  const resume = useResumeSocialContentCalendar(projectId)
+  const cancel = useCancelSocialContentCalendar(projectId)
   const [formOpen, setFormOpen] = useState(false)
   const [pendingChoices, setPendingChoices] = useState(null) // choices waiting for the "replace current calendar" confirmation
   const [view, setView] = useState('table')
   const [selectedId, setSelectedId] = useState(null)
   const [adding, setAdding] = useState(false) // the "add a post to the plan" window (a manual item)
+  const [historyOpen, setHistoryOpen] = useState(false)
   // when a post written from a plan item finishes, the calendar (status, linked drafts) is refetched even if its window was closed
   useCalendarContentGenerationSync(projectId)
   // the editor's options (strategy pillars, live catalog, connections) are fetched as soon as a calendar exists, so a post opens instantly
@@ -42,6 +47,13 @@ export function ContentPlanSection({ projectId }) {
 
   const state = query.data
   const items = useMemo(() => state?.items || [], [state])
+  // what a regeneration would move into the history - said before the person confirms, from the posts on screen
+  const replaced = useMemo(() => ({
+    total: items.length,
+    edited: items.filter((i) => (i.editedFields || []).length > 0).length,
+    approvedPlans: items.filter((i) => !!i.planApprovedAt).length,
+    withPosts: items.filter((i) => (i.publications || []).length > 0).length,
+  }), [items])
   const selected = useMemo(() => items.find((i) => i.id === selectedId) || null, [items, selectedId])
 
   if (query.isLoading) {
@@ -100,6 +112,7 @@ export function ContentPlanSection({ projectId }) {
   const form = (
     <CalendarPlanForm
       key={calendar ? `v${calendar.version}` : 'new'}
+      projectId={projectId}
       strategy={strategy}
       connectedPlatforms={connectedPlatforms}
       limits={limits}
@@ -113,17 +126,19 @@ export function ContentPlanSection({ projectId }) {
 
   return (
     <div className="space-y-5" data-testid="content-plan">
-      {serverGenerating && (
-        <div role="status" data-testid="plan-generating" className="flex items-start gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-5">
-          <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-violet-600" />
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Planning and writing your content calendar from your strategy…</p>
-            <p className="mt-0.5 text-sm text-slate-600">
-              This runs on the server and can take a minute or two. You can leave this page — it will be here when it&apos;s done.
-              {generation?.startedAt ? ` Started ${formatDateTime(generation.startedAt)}.` : ''}
-            </p>
-          </div>
-        </div>
+      {serverGenerating && <GeneratingBanner generation={generation} onStop={() => cancel.mutate()} stopping={cancel.isPending} />}
+
+      {state.status === 'partial' && (
+        <PartialCalendarCard
+          generation={generation}
+          partial={state.partial}
+          hasReadyCalendar={!!calendar}
+          onResume={() => { resume.reset(); resume.mutate() }}
+          onDiscard={() => { cancel.reset(); cancel.mutate() }}
+          resuming={resume.isPending}
+          discarding={cancel.isPending}
+          error={resume.isError ? describeApiError(resume.error, 'Could not resume the calendar.').message : (cancel.isError ? describeApiError(cancel.error, 'Could not discard the calendar.').message : null)}
+        />
       )}
 
       {failed && (
@@ -145,7 +160,7 @@ export function ContentPlanSection({ projectId }) {
         </p>
       )}
 
-      {!calendar && !serverGenerating && form}
+      {!calendar && !serverGenerating && state.status !== 'partial' && form}
       {calendar && formOpen && !serverGenerating && form}
 
       {calendar && (
@@ -162,6 +177,9 @@ export function ContentPlanSection({ projectId }) {
               <button type="button" onClick={() => setAdding(true)} disabled={busy} data-testid="add-plan-item" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
                 <Plus className="h-4 w-4" /> Add post to plan
               </button>
+              <button type="button" onClick={() => setHistoryOpen((open) => !open)} aria-expanded={historyOpen} data-testid="open-history" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
+                <History className="h-4 w-4" /> Version history
+              </button>
               {!formOpen && (
                 <button type="button" onClick={openRegenerate} disabled={busy} data-testid="regenerate-calendar" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
                   <RefreshCw className="h-4 w-4" /> Regenerate calendar
@@ -169,6 +187,8 @@ export function ContentPlanSection({ projectId }) {
               )}
             </div>
           </div>
+
+          {historyOpen && <CalendarHistoryPanel projectId={projectId} onClose={() => setHistoryOpen(false)} busy={busy} />}
 
           <CalendarPlanSummary calendar={calendar} strategyVersion={strategy.version} />
 
@@ -190,7 +210,7 @@ export function ContentPlanSection({ projectId }) {
         open={!!pendingChoices}
         onOpenChange={(open) => { if (!open) setPendingChoices(null) }}
         title="Regenerate the content calendar?"
-        description={calendar ? `This plans a new calendar (version ${calendar.version + 1}) from your current strategy and makes it the current one. Version ${calendar.version} is kept in history, and posts already created from it are not changed.` : ''}
+        description={calendar ? `This plans a new calendar (version ${calendar.version + 1}) from your current strategy and makes it the current one.${state.status === 'partial' ? ' The unfinished calendar below is discarded.' : ''} Version ${calendar.version} moves into Version history with everything in it (${versionFacts(replaced)}), and you can restore it later. Posts already created from it are not changed.` : ''}
         confirmLabel="Regenerate calendar"
         cancelLabel="Keep current calendar"
         pending={busy}

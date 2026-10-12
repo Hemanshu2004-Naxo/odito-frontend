@@ -6,6 +6,9 @@ import apiService from '@/lib/apiService';
 import BusinessResultsList from '@/components/business/BusinessResultsList.jsx';
 import ButtonGroup from './ButtonGroup';
 import KeywordRecommendationCard from './KeywordRecommendationCard';
+import WebsiteFallbackForm from './WebsiteFallbackForm';
+import { parseWebsiteUrl, detectWebsiteInput } from '@/lib/onboarding/websiteUrl';
+import { classifyBusinessSearchError } from '@/lib/onboarding/businessSearchError';
 import { renderInlineMarkdown } from '@/lib/security/sanitize';
 import { useSubscription } from '@/hooks/useDashboardQueries';
 import { ONBOARDING_UPGRADE_PENDING_KEY, ONBOARDING_UPGRADE_RESUME_KEY } from '@/lib/onboardingResume';
@@ -149,7 +152,11 @@ const ARIAChat = ({ onComplete }) => {
     // Website Manual Fallback fields
     onboardingMode: 'google_places',
     extractedMetadata: null,
-    resolvedCity: null
+    resolvedCity: null,
+    // What the user typed themselves on the manual path. These win over
+    // anything scraped from the website, and are never invented when blank.
+    manualBusinessName: '',
+    manualLocation: ''
   });
 
   const chatEndRef = useRef(null);
@@ -180,6 +187,16 @@ const ARIAChat = ({ onComplete }) => {
   // prevents a fast double-click from calling startProjectAndRankingFlow()
   // twice and creating two projects.
   const proceedInFlightRef = useRef(false);
+  // Same idea for project creation as a whole: every path into
+  // startProjectAndRankingFlow() (keyword confirm, custom keywords, Proceed,
+  // post-checkout resume) goes through this one guard, so a fast double
+  // click can never create two projects. Released on every non-redirect exit.
+  const creationInFlightRef = useRef(false);
+  // Synchronous guards for the search-failure fallback form (Continue / Try
+  // Again) so a double click can't post duplicate chat messages or fire two
+  // extractions/searches before React re-renders the disabled state.
+  const fallbackSubmitRef = useRef(false);
+  const retrySearchInFlightRef = useRef(false);
   // Set once, on mount, if we're returning from a Stripe Checkout redirect
   // that started from this zero-credit CTA — triggers the auto-resume
   // effect below once projectData has been restored.
@@ -335,8 +352,21 @@ const ARIAChat = ({ onComplete }) => {
         throw new Error(response.message || 'Failed to search');
       }
     } catch (error) {
-      setMessages(m => [...m, { type: "ai", text: `I had trouble searching: ${error.message}. What's your business name?` }]);
-      setFlowState(FLOW_STATES.ASK_BUSINESS_NAME);
+      // A FAILED search is not a search with no results, and it must never
+      // loop the user back to "what's your business name?" (the old
+      // behaviour: it reset flowState to ASK_BUSINESS_NAME with the raw error
+      // text, so the same question was asked again no matter what). Keep
+      // every input already collected, say what kind of failure it was, and
+      // put the manual-website form in front of the user right away.
+      const failure = classifyBusinessSearchError(error);
+      console.warn('[ONBOARDING] Business search failed', { kind: failure.kind, status: error?.status ?? null, code: error?.code ?? null });
+      setMessages(m => [...m, {
+        type: "ai",
+        text: `**Business search is temporarily unavailable**\n\n${failure.message}\n\nYou can continue by entering your website manually. You can connect your Google Business Profile later.`,
+        showSearchFailureForm: true,
+        canRetry: failure.retryable,
+      }]);
+      setFlowState(FLOW_STATES.WEBSITE_MANUAL_MODE);
     } finally {
       setIsSearchingBusiness(false);
     }
@@ -352,21 +382,26 @@ const ARIAChat = ({ onComplete }) => {
         lng: business.lng ?? null
       }
     };
+    // A website the user already gave us (e.g. before a failed search, then a
+    // successful retry) must survive picking a listing that has no website of
+    // its own - never overwrite known data with an empty value.
+    const knownWebsite = business.website || projectData.websiteUrl || '';
+
     setProjectData(prev => ({
       ...prev,
       verifiedBusiness: normalizedBusiness,
-      websiteUrl: normalizedBusiness.website || '',
+      websiteUrl: normalizedBusiness.website || prev.websiteUrl || '',
       location: normalizedBusiness.address || prev.location,
       // Capture country from Google Places so Local SEO path has it
       country: normalizedBusiness.countryCode || prev.country,
       countryName: normalizedBusiness.country || prev.countryName
     }));
 
-    if (business.website) {
+    if (knownWebsite) {
       // Has website → skip website step, go straight to business type
       setMessages(m => [...m, {
         type: "ai",
-        text: `Great! I found **${business.name}**${business.website ? ` with website ${business.website}` : ''}. Now let's understand your business better.\n\n**What type of business is it?**`
+        text: `Great! I found **${business.name}**${knownWebsite ? ` with website ${knownWebsite}` : ''}. Now let's understand your business better.\n\n**What type of business is it?**`
       }]);
       setFlowState(FLOW_STATES.ASK_BUSINESS_TYPE);
     } else {
@@ -391,6 +426,17 @@ const ARIAChat = ({ onComplete }) => {
 
   // ── Website Manual Fallback: Enter manual mode ──────────────────────
   const handleContinueWithWebsite = () => {
+    // The user may already have given us a website (typed it into the chat, or
+    // entered it before a failed search) - use it instead of asking again.
+    const known = parseWebsiteUrl(projectData.websiteUrl);
+    if (known.ok) {
+      setMessages(m => [...m, { type: "user", text: "Continue with website" }]);
+      handleWebsiteExtraction(known.url, {
+        businessName: projectData.manualBusinessName || projectData.businessName,
+        location: projectData.manualLocation || projectData.businessLocation,
+      });
+      return;
+    }
     setMessages(m => [...m, {
       type: "user", text: "Continue with website"
     }, {
@@ -399,15 +445,109 @@ const ARIAChat = ({ onComplete }) => {
     setFlowState(FLOW_STATES.ASK_MANUAL_WEBSITE);
   };
 
+  // A chat message that is (or contains) a website address. Routed here from
+  // every text-input step so a URL is never stored as a business name or
+  // location. `site` is the result of detectWebsiteInput(): a rejected one gets
+  // an explanation and leaves the flow exactly where it was.
+  const handleWebsiteFromChat = (site) => {
+    if (!site.ok) {
+      setMessages(m => [...m, { type: "ai", text: site.message }]);
+      return;
+    }
+    handleWebsiteExtraction(site.url, {
+      businessName: projectData.manualBusinessName || projectData.businessName,
+      location: projectData.manualLocation || projectData.businessLocation,
+    });
+  };
+
+  // "Continue with Website" on the search-failure form. websiteUrl arrives
+  // already validated/normalized by the form; name and location are optional
+  // and stay empty rather than being invented.
+  const handleWebsiteFallbackContinue = async ({ websiteUrl, businessName, location }) => {
+    if (fallbackSubmitRef.current) return;
+    const parsed = parseWebsiteUrl(websiteUrl);
+    if (!parsed.ok) return;
+    fallbackSubmitRef.current = true;
+    try {
+      setMessages(m => [...m, { type: "user", text: `Continue with ${parsed.hostname}` }]);
+      await handleWebsiteExtraction(parsed.url, { businessName, location });
+    } finally {
+      fallbackSubmitRef.current = false;
+    }
+  };
+
+  // "Try Again" on the search-failure form. Whatever the user entered in the
+  // form is kept (never reset); the search re-runs only if it has both a name
+  // and a location to search with, otherwise the one missing value is asked
+  // for once - explaining why - and the saved website is left untouched.
+  const handleWebsiteFallbackRetry = async ({ websiteUrl, businessName, location }) => {
+    if (retrySearchInFlightRef.current) return;
+    retrySearchInFlightRef.current = true;
+    try {
+      const parsed = parseWebsiteUrl(websiteUrl);
+      const name = businessName || projectData.businessName;
+      const where = location || projectData.businessLocation;
+      setProjectData(prev => ({
+        ...prev,
+        websiteUrl: parsed.ok ? parsed.url : prev.websiteUrl,
+        businessName: name || prev.businessName,
+        businessLocation: where || prev.businessLocation,
+      }));
+      setMessages(m => [...m, { type: "user", text: "Try again" }]);
+
+      if (name && where) {
+        await searchBusiness(name, where);
+      } else if (!name) {
+        setMessages(m => [...m, { type: "ai", text: "To search Google listings I need your business name. What's your business name? (Your website is saved.)" }]);
+        setFlowState(FLOW_STATES.ASK_BUSINESS_NAME);
+      } else {
+        setMessages(m => [...m, { type: "ai", text: "To search Google listings I also need your city or area. Where is your business located? (Your website is saved.)" }]);
+        setFlowState(FLOW_STATES.ASK_BUSINESS_LOCATION);
+      }
+    } finally {
+      retrySearchInFlightRef.current = false;
+    }
+  };
+
+  // Website analysis failed (site blocks bots, is down, times out, ...). That
+  // must not strand onboarding: carry on with exactly what the user told us.
+  // Nothing is fabricated - no extracted metadata, no verified business.
+  const handleContinueWithoutAnalysis = () => {
+    setMessages(m => [...m, {
+      type: "user", text: "Continue without analysis"
+    }, {
+      type: "ai",
+      text: "No problem — I'll use the website and details you entered. Now let's understand your business better.\n\n**What type of business is it?**"
+    }]);
+    setProjectData(prev => ({ ...prev, onboardingMode: 'website_manual', extractedMetadata: null }));
+    setFlowState(FLOW_STATES.ASK_BUSINESS_TYPE);
+  };
+
   const handleTrySearchAgain = () => {
     setMessages(m => [...m, { type: "ai", text: "Sure! What's your business name?" }]);
     setFlowState(FLOW_STATES.ASK_BUSINESS_NAME);
   };
 
   // ── Website Manual Fallback: Scrape and extract ─────────────────────
-  const handleWebsiteExtraction = async (websiteUrl) => {
+  // manual = what the user typed themselves ({ businessName, location }, both
+  // optional). It is saved up front - so it survives a failed analysis or a
+  // retry - and wins over anything scraped from the site.
+  const handleWebsiteExtraction = async (websiteUrl, manual = {}) => {
+    const manualName = (manual.businessName || '').trim();
+    const manualLocation = (manual.location || '').trim();
+
     setIsScrapingWebsite(true);
     setFlowState(FLOW_STATES.SCRAPING_WEBSITE);
+    setProjectData(prev => ({
+      ...prev,
+      websiteUrl,
+      onboardingMode: 'website_manual',
+      businessName: manualName || prev.businessName,
+      businessLocation: manualLocation || prev.businessLocation,
+      manualBusinessName: manualName || prev.manualBusinessName,
+      manualLocation: manualLocation || prev.manualLocation,
+      location: manualLocation || prev.location,
+    }));
     setMessages(m => [...m, {
       type: "ai",
       text: "🔍 Analyzing your website...",
@@ -418,10 +558,16 @@ const ARIAChat = ({ onComplete }) => {
       const response = await apiService.extractFromWebsite(websiteUrl);
 
       if (response.success && response.data) {
-        const data = response.data;
+        // What the confirmation card shows is what will actually be used:
+        // the user's own name/location first, then what the site said.
+        const data = {
+          ...response.data,
+          businessName: manualName || response.data.businessName,
+          address: manualLocation || response.data.address,
+          scrapedAddress: response.data.address,
+        };
         setExtractedData(data);
 
-        // Store the website URL
         setProjectData(prev => ({
           ...prev,
           websiteUrl: websiteUrl,
@@ -439,10 +585,16 @@ const ARIAChat = ({ onComplete }) => {
         throw new Error(response.message || 'Extraction failed');
       }
     } catch (error) {
-      console.error('Website extraction failed:', error);
+      console.warn('Website extraction failed:', error?.message);
+      // 400/429 messages are written by our backend for the user ("This URL is
+      // not allowed...", "Too many requests..."); anything else stays generic.
+      const safe = error?.status === 400 || error?.status === 429;
+      // A rejected address (400) can't be rescued by skipping analysis.
+      const canContinueWithout = error?.status !== 400;
       setMessages(m => [...m, {
         type: "ai",
-        text: `⚠️ I had trouble analyzing that website: ${error.message}\n\nPlease check the URL and try again, or enter a different website.`
+        text: `⚠️ I couldn't analyze that website${safe && error.message ? `: ${error.message}` : ''}.\n\n${canContinueWithout ? 'You can enter a different website address, or continue without website analysis — I\'ll use the details you\'ve given me.' : 'Please check the address and try again, or enter a different website.'}`,
+        ...(canContinueWithout && { showExtractionFailureCTA: true })
       }]);
       setFlowState(FLOW_STATES.ASK_MANUAL_WEBSITE);
     } finally {
@@ -458,9 +610,10 @@ const ARIAChat = ({ onComplete }) => {
     // Populate projectData with extracted info
     setProjectData(prev => ({
       ...prev,
-      businessName: data.businessName || prev.businessName,
-      location: data.address || prev.location,
-      websiteUrl: data.website || prev.websiteUrl,
+      // The user's own entries outrank scraped values; blanks never overwrite.
+      businessName: prev.manualBusinessName || data.businessName || prev.businessName,
+      location: prev.manualLocation || data.address || prev.location,
+      websiteUrl: prev.websiteUrl || data.website,
       onboardingMode: 'website_manual',
       extractedMetadata: {
         title: data.title,
@@ -471,7 +624,8 @@ const ARIAChat = ({ onComplete }) => {
         contact_info: {
           email: data.email,
           phone: data.phone,
-          address: data.address
+          // the address the SITE reported, not the user's city override
+          address: data.scrapedAddress ?? data.address
         },
         confidence: data.confidence,
         extracted_at: new Date().toISOString()
@@ -702,6 +856,17 @@ const ARIAChat = ({ onComplete }) => {
     const cameFromFlowState = flowState;
     const finalKeywords = overrideKeywords || activeProjectData.selectedKeywords || [];
 
+    // Synchronous guard (React state is too slow for a fast double click):
+    // a second call while one is running is dropped, never a second project.
+    if (creationInFlightRef.current) return;
+    creationInFlightRef.current = true;
+    const releaseCreation = () => {
+      creationInFlightRef.current = false;
+      // A failed attempt that came from the Proceed button must leave it usable.
+      proceedInFlightRef.current = false;
+      setIsCreating(false);
+    };
+
     setIsCreating(true); // disable input immediately, same as before
 
     // Phase 15.5: fresh, authoritative credit check BEFORE attempting
@@ -716,7 +881,7 @@ const ARIAChat = ({ onComplete }) => {
       if (typeof remaining === 'number' && remaining <= 0) {
         pendingAttemptRef.current = { overrideKeywords: finalKeywords, projectData: activeProjectData };
         previousFlowStateRef.current = cameFromFlowState;
-        setIsCreating(false);
+        releaseCreation();
         setMessages(m => [...m, {
           type: 'ai',
           text: 'You have no project credits remaining.\n\nUpgrade to continue creating projects.',
@@ -736,7 +901,7 @@ const ARIAChat = ({ onComplete }) => {
       if (!finalKeywords || finalKeywords.length === 0) {
         console.warn("❌ No keywords found for project creation");
         setMessages(m => [...m, { type: "ai", text: "❌ No keywords available. Please start over." }]);
-        setIsCreating(false);
+        releaseCreation();
         setFlowState(FLOW_STATES.ASK_BUSINESS_NAME);
         return;
       }
@@ -745,10 +910,21 @@ const ARIAChat = ({ onComplete }) => {
       console.log("🚨 KEYWORDS SOURCE:", overrideKeywords ? "CUSTOM (override)" : "STATE (fallback)");
 
       // STEP 1: Validate & create the project
-      const websiteUrl = activeProjectData.websiteUrl;
-      try { new URL(websiteUrl); } catch {
-        setMessages(m => [...m, { type: "ai", text: "❌ Invalid website URL. Please check and try again." }]);
-        setIsCreating(false);
+      // Typed/normalized URLs pass the strict parser. A website that came from a
+      // Google listing (not typed by the user) is trusted a little more - e.g.
+      // it may carry a port - so fall back to a plain http(s) check for those.
+      // The backend re-validates main_url either way.
+      const parsedSite = parseWebsiteUrl(activeProjectData.websiteUrl);
+      let websiteUrl = parsedSite.ok ? parsedSite.url : null;
+      if (!websiteUrl && activeProjectData.verifiedBusiness) {
+        try {
+          const u = new URL(activeProjectData.websiteUrl);
+          if (u.protocol === 'http:' || u.protocol === 'https:') websiteUrl = activeProjectData.websiteUrl;
+        } catch { /* falls through to the error below */ }
+      }
+      if (!websiteUrl) {
+        setMessages(m => [...m, { type: "ai", text: `❌ ${parsedSite.message || 'Invalid website URL. Please check and try again.'}` }]);
+        releaseCreation();
         setFlowState(FLOW_STATES.ASK_WEBSITE_URL);
         return;
       }
@@ -786,8 +962,17 @@ const ARIAChat = ({ onComplete }) => {
         seo_scope: activeProjectData.targetLevel === 'local' ? 'local' : 'national',
         // Website Manual Fallback fields
         onboarding_mode: activeProjectData.onboardingMode || 'google_places',
-        discovery_source: activeProjectData.onboardingMode === 'website_manual' ? 'website_scrape' : 'google_places',
+        // 'website_scrape' only when we really analyzed the site; when the user
+        // skipped analysis the details are purely user-entered ('manual_entry').
+        discovery_source: activeProjectData.onboardingMode === 'website_manual'
+          ? (activeProjectData.extractedMetadata ? 'website_scrape' : 'manual_entry')
+          : 'google_places',
         source: activeProjectData.onboardingMode === 'website_manual' ? 'website_manual' : 'web',
+        // The name the customer entered or confirmed - unverified, so it is
+        // stored separately and never stands in for verified_business.
+        ...(activeProjectData.onboardingMode === 'website_manual' && activeProjectData.businessName && {
+          business_name: activeProjectData.businessName
+        }),
         ...(activeProjectData.extractedMetadata && {
           extracted_metadata: activeProjectData.extractedMetadata
         }),
@@ -894,7 +1079,7 @@ const ARIAChat = ({ onComplete }) => {
           showUpgradeCTA: true,
         }]);
         setFlowState(FLOW_STATES.NEEDS_UPGRADE);
-        setIsCreating(false);
+        releaseCreation();
         return;
       }
       console.error('Project creation error:', error);
@@ -902,7 +1087,10 @@ const ARIAChat = ({ onComplete }) => {
         type: "ai",
         text: `❌ Error: ${error.message}. Please try again.`
       }]);
-      setIsCreating(false);
+      releaseCreation();
+      // Return to the step the user was on. Without this the flow stayed in
+      // CREATING_PROJECT: spinner forever, no input, nothing to click.
+      setFlowState(cameFromFlowState);
     }
   };
 
@@ -1000,38 +1188,52 @@ const ARIAChat = ({ onComplete }) => {
     setTimeout(() => {
       switch (flowState) {
         case FLOW_STATES.ASK_BUSINESS_NAME:
-          setProjectData(prev => ({ ...prev, businessName: userResponse }));
-          setMessages(m => [...m, { type: "ai", text: "What's your business location? (city or area)" }]);
-          setFlowState(FLOW_STATES.ASK_BUSINESS_LOCATION);
+        case FLOW_STATES.ASK_BUSINESS_LOCATION: {
+          // A website pasted where a name/location is expected is a website,
+          // not a business name or a place: route it to the website step.
+          const site = detectWebsiteInput(userResponse);
+          if (site) {
+            handleWebsiteFromChat(site);
+            break;
+          }
+          if (flowState === FLOW_STATES.ASK_BUSINESS_NAME) {
+            setProjectData(prev => ({ ...prev, businessName: userResponse }));
+            setMessages(m => [...m, { type: "ai", text: "What's your business location? (city or area)" }]);
+            setFlowState(FLOW_STATES.ASK_BUSINESS_LOCATION);
+          } else {
+            setProjectData(prev => ({ ...prev, businessLocation: userResponse }));
+            searchBusiness(projectData.businessName, userResponse);
+          }
           break;
+        }
 
-        case FLOW_STATES.ASK_BUSINESS_LOCATION:
-          setProjectData(prev => ({ ...prev, businessLocation: userResponse }));
-          searchBusiness(projectData.businessName, userResponse);
-          break;
-
-        case FLOW_STATES.ASK_WEBSITE_URL:
-          setProjectData(prev => ({ ...prev, websiteUrl: userResponse }));
+        case FLOW_STATES.ASK_WEBSITE_URL: {
+          // Validate here - an unchecked value used to be stored as-is and only
+          // rejected much later, at project creation.
+          const site = detectWebsiteInput(userResponse) || parseWebsiteUrl(userResponse);
+          if (!site.ok) {
+            setMessages(m => [...m, { type: "ai", text: site.message }]);
+            return;
+          }
+          setProjectData(prev => ({ ...prev, websiteUrl: site.url }));
           setMessages(m => [...m, {
             type: "ai",
             text: "Got it! Now let's understand your business better.\n\n**What type of business is it?**"
           }]);
           setFlowState(FLOW_STATES.ASK_BUSINESS_TYPE);
           break;
+        }
 
+        case FLOW_STATES.WEBSITE_MANUAL_MODE:
         case FLOW_STATES.ASK_MANUAL_WEBSITE: {
-          // Validate URL format
-          let cleanUrl = userResponse;
-          if (!/^https?:\/\//i.test(cleanUrl)) {
-            cleanUrl = `https://${cleanUrl}`;
-          }
-          try {
-            new URL(cleanUrl);
-          } catch {
-            setMessages(m => [...m, { type: "ai", text: "That doesn't look like a valid URL. Please enter a full website address (e.g., https://yourbusiness.com)" }]);
+          // Scheme-less input is normalized to https:// after validation; the
+          // address is never fetched from the browser.
+          const site = detectWebsiteInput(userResponse) || parseWebsiteUrl(userResponse);
+          if (!site.ok) {
+            setMessages(m => [...m, { type: "ai", text: site.message }]);
             return;
           }
-          handleWebsiteExtraction(cleanUrl);
+          handleWebsiteFromChat(site);
           break;
         }
 
@@ -1314,7 +1516,19 @@ const ARIAChat = ({ onComplete }) => {
     );
   };
 
+  // Only the NEWEST search-failure / extraction-failure message gets its
+  // interactive controls, so repeated failures don't stack duplicate forms.
+  const lastIndexWhere = (pred) => {
+    for (let i = messages.length - 1; i >= 0; i--) if (pred(messages[i])) return i;
+    return -1;
+  };
+  const lastSearchFailureIdx = lastIndexWhere(m => m.showSearchFailureForm);
+  const lastExtractionFailureIdx = lastIndexWhere(m => m.showExtractionFailureCTA);
+
   // ── Determine which states hide the text input ──────────────────────
+  // WEBSITE_MANUAL_MODE is deliberately NOT hidden: with the input visible a
+  // user can simply paste their website into the chat instead of using the
+  // form/buttons (send() routes it through the same validation + extraction).
   const hideInputStates = [
     FLOW_STATES.SEARCHING_BUSINESS,
     FLOW_STATES.SHOW_BUSINESS_RESULTS,
@@ -1325,7 +1539,6 @@ const ARIAChat = ({ onComplete }) => {
     FLOW_STATES.CONFIRM_KEYWORDS,
     FLOW_STATES.CREATING_PROJECT,
     // Website Manual Fallback states
-    FLOW_STATES.WEBSITE_MANUAL_MODE,
     FLOW_STATES.SCRAPING_WEBSITE,
     FLOW_STATES.CONFIRM_EXTRACTED_DATA,
     // Phase 15.5
@@ -1377,6 +1590,32 @@ const ARIAChat = ({ onComplete }) => {
 
               {/* Website fallback CTA buttons (NEW) */}
               {m.showWebsiteFallbackCTA && flowState === FLOW_STATES.WEBSITE_MANUAL_MODE && renderWebsiteFallbackCTA()}
+
+              {/* Business search FAILED: manual website entry (form), newest message only */}
+              {m.showSearchFailureForm && flowState === FLOW_STATES.WEBSITE_MANUAL_MODE && i === lastSearchFailureIdx && (
+                <WebsiteFallbackForm
+                  key={i}
+                  initialValues={{
+                    websiteUrl: projectData.websiteUrl,
+                    businessName: projectData.manualBusinessName || projectData.businessName,
+                    location: projectData.manualLocation || projectData.businessLocation,
+                  }}
+                  canRetry={m.canRetry !== false}
+                  disabled={isSearchingBusiness || isScrapingWebsite || isCreating}
+                  onContinue={handleWebsiteFallbackContinue}
+                  onRetry={handleWebsiteFallbackRetry}
+                />
+              )}
+
+              {/* Website analysis failed: let the user carry on with what they entered */}
+              {m.showExtractionFailureCTA && flowState === FLOW_STATES.ASK_MANUAL_WEBSITE && i === lastExtractionFailureIdx && (
+                <ButtonGroup
+                  stack
+                  buttons={[
+                    { key: 'continue-without-analysis', label: 'Continue without analysis', icon: '➡️', variant: 'primary', onClick: handleContinueWithoutAnalysis },
+                  ]}
+                />
+              )}
 
               {/* Zero-credit Upgrade CTA (Phase 15.5) */}
               {m.showUpgradeCTA && flowState === FLOW_STATES.NEEDS_UPGRADE && renderUpgradeCTA()}
@@ -1437,6 +1676,7 @@ const ARIAChat = ({ onComplete }) => {
               flowState === FLOW_STATES.ASK_BUSINESS_LOCATION ? "Enter city or area..." :
               flowState === FLOW_STATES.ASK_WEBSITE_URL ? "https://yourwebsite.com" :
               flowState === FLOW_STATES.ASK_MANUAL_WEBSITE ? "https://yourbusiness.com" :
+              flowState === FLOW_STATES.WEBSITE_MANUAL_MODE ? "Or paste your website, e.g. https://yourbusiness.com" :
               flowState === FLOW_STATES.ASK_SUB_TYPE ? "e.g., IT services, digital marketing..." :
               flowState === FLOW_STATES.ASK_LOCAL_CITY ? "e.g., Nashik, New York, London..." :
               flowState === FLOW_STATES.ASK_CUSTOM_KEYWORDS ? "keyword1, keyword2, keyword3..." :

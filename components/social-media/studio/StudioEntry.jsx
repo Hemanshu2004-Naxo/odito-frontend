@@ -7,6 +7,7 @@ import {
   useSocialContentCalendar, useCalendarContentGenerationSync, useGenerateSocialCalendarItemContent, useSocialPublicationList,
 } from '@/hooks/useSocialMediaAI'
 import { mapPublicationToPost } from '@/lib/socialMedia/postMapper'
+import { plannedCopyFor } from '@/lib/socialMedia/contentCalendar'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StudioWorkspace } from './StudioWorkspace'
@@ -54,18 +55,20 @@ function CalendarItemEntry({ projectId, itemId, platform }) {
   const failed = content.data?.status === 'failed' && content.data.generation?.calendarItemId === itemId ? content.data.generation.failure : null
   const target = platform || item.platforms?.[0]
   const planApproved = item.status === 'plan_approved' || item.status === 'content_generated'
+  const hasPlanCaption = !!plannedCopyFor(item, target).caption
   const error = generate.isError ? describeApiError(generate.error, 'Could not start writing the content.').message : null
 
   function start() {
     if (inFlight.current || writing) return
     inFlight.current = true
-    generate.mutate({ itemId, platform: target }, { onSettled: () => { inFlight.current = false } })
+    // no mode: the server uses the caption written in the plan when there is one (exactly as written, no AI), and AI only when there is none
+    generate.mutate({ itemId, platform: target, expectedRevision: item.revision }, { onSettled: () => { inFlight.current = false } })
   }
 
   return (
-    <StudioNoContent detail={planApproved ? 'Odito can write the caption and hashtags for this plan item. Once the content is approved, you can design it here.' : 'This plan item has not been approved yet. Approve it in the Content Calendar, then generate its content.'}>
+    <StudioNoContent detail={planApproved ? (hasPlanCaption ? 'Odito will create the post from the caption written in this plan item, exactly as it is. Once the content is approved, you can design it here.' : 'This plan item has no caption yet, so Odito will write the post. Once the content is approved, you can design it here.') : 'This plan item has not been approved yet. Approve it in the Content Calendar, then generate its content.'}>
       {planApproved
-        ? <button type="button" onClick={start} disabled={writing || generate.isPending} data-testid="generate-content-button" className={buttonClass}>{(writing || generate.isPending) && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{writing ? 'Writing the post…' : 'Generate Content'}</button>
+        ? <button type="button" onClick={start} disabled={writing || generate.isPending} data-testid="generate-content-button" className={buttonClass}>{(writing || generate.isPending) && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{writing ? 'Writing the post…' : (hasPlanCaption ? 'Create post from plan' : 'Generate Content')}</button>
         : <Link href={CALENDAR_HREF} className={buttonClass}>Open Content Calendar</Link>}
       {(error || failed) && <p role="alert" className="w-full text-sm text-red-600" data-testid="generate-content-error">{error || failed.message}</p>}
     </StudioNoContent>

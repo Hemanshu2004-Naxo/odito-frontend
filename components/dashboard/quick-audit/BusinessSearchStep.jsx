@@ -21,11 +21,35 @@ import apiService from "@/lib/apiService";
  *   onConfirm  – (auditBusinessContext) => void
  *   onSkip     – () => void  (start audit with no business context)
  */
+export const SEARCH_DEBOUNCE_MS = 350;
+
+// A failed search is NOT "no results": say what happened, keep manual/skip open.
+function describeSearchError(err) {
+  if (!err?.status) {
+    return "We couldn't reach the server to search for your business. Check your connection and try again.";
+  }
+  switch (err.code) {
+    case "PLACES_RATE_LIMITED":
+    case "RATE_LIMIT_EXCEEDED":
+      return "Too many searches in a short time. Please wait a moment and try again.";
+    case "PLACES_TIMEOUT":
+      return "The business search timed out. Please try again.";
+    case "PLACES_NOT_CONFIGURED":
+    case "PLACES_KEY_INVALID":
+    case "PLACES_ACCESS_DENIED":
+    case "PLACES_BILLING_REQUIRED":
+      return "Business search is unavailable right now. You can add your business manually or skip this step.";
+    default:
+      return err.message || "Business search failed. Please try again.";
+  }
+}
+
 export default function BusinessSearchStep({ url, onConfirm, onSkip }) {
   const [query, setQuery]           = useState("");
   const [results, setResults]       = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState(null);
 
   const [showManual, setShowManual] = useState(false);
   const [manualName, setManualName]         = useState("");
@@ -34,19 +58,33 @@ export default function BusinessSearchStep({ url, onConfirm, onSkip }) {
   const timerRef = useRef(null);
   // Generation counter — discard responses from superseded requests
   const genRef = useRef(0);
+  // Cancels the in-flight request when a newer search (or unmount) supersedes it
+  const abortRef = useRef(null);
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    abortRef.current?.abort();
+  }, []);
 
   // ── Search ──────────────────────────────────────────────────────────────
 
   const execSearch = useCallback(async (q, gen) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
-      const res = await apiService.searchBusinessCandidates(q);
+      const res = await apiService.searchBusinessCandidates(q, "", { signal: controller.signal });
       if (genRef.current !== gen) return;                   // stale — discard
-      setResults(res?.success ? (res.data || []) : []);
-    } catch {
-      if (genRef.current !== gen) return;
+      if (!res?.success || !Array.isArray(res.data)) {
+        throw Object.assign(new Error("Unexpected response"), { status: 502 });
+      }
+      setSearchError(null);
+      setResults(res.data);
+    } catch (err) {
+      if (genRef.current !== gen || err?.name === "AbortError") return;
       setResults([]);
+      setSearchError({ message: describeSearchError(err), code: err?.code || null });
     } finally {
       if (genRef.current === gen) {
         setIsSearching(false);
@@ -55,32 +93,50 @@ export default function BusinessSearchStep({ url, onConfirm, onSkip }) {
     }
   }, []);
 
+  const startSearch = (q) => {
+    setIsSearching(true);
+    setHasSearched(false);
+    setSearchError(null);
+    const gen = ++genRef.current;
+    abortRef.current?.abort();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => execSearch(q, gen), SEARCH_DEBOUNCE_MS);
+  };
+
   const handleQueryChange = (val) => {
     setQuery(val);
     if (timerRef.current) clearTimeout(timerRef.current);
 
     if (!val.trim() || val.trim().length < 2) {
       genRef.current++;              // invalidate any in-flight request
+      abortRef.current?.abort();
       setResults([]);
+      setSearchError(null);
       setHasSearched(false);
       setIsSearching(false);
       return;
     }
 
-    setIsSearching(true);
-    setHasSearched(false);
-    const gen = ++genRef.current;
-    timerRef.current = setTimeout(() => execSearch(val.trim(), gen), 350);
+    startSearch(val.trim());
+  };
+
+  const handleRetry = () => {
+    if (query.trim().length >= 2) startSearch(query.trim());
   };
 
   // ── Actions ─────────────────────────────────────────────────────────────
 
   const handleSelectResult = (biz) => {
+    const address = biz.formattedAddress || biz.address || "";
     onConfirm({
       url,
       businessName: biz.name,
-      location: biz.address || "",
+      location: address,
       source: "search",
+      // Places-sourced details, kept only for results the user explicitly picked.
+      placeId: biz.placeId || null,
+      formattedAddress: address,
+      coordinates: biz.location || null,
     });
   };
 
@@ -103,8 +159,10 @@ export default function BusinessSearchStep({ url, onConfirm, onSkip }) {
 
   // ── Derived visibility flags ────────────────────────────────────────────
 
-  const showResults    = !isSearching && results.length > 0;
-  const showEmpty      = !isSearching && hasSearched && results.length === 0;
+  const showResults    = !isSearching && !searchError && results.length > 0;
+  const showError      = !isSearching && !!searchError;
+  // "No results" is only for a search that SUCCEEDED with zero matches.
+  const showEmpty      = !isSearching && hasSearched && !searchError && results.length === 0;
   const showManualHint = query.trim().length >= 2 || showManual;
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -140,7 +198,7 @@ export default function BusinessSearchStep({ url, onConfirm, onSkip }) {
               className="w-full pl-10 pr-10 py-3 text-sm text-white bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-400/50 focus:bg-white/[0.07] transition-all placeholder-slate-600"
             />
             {isSearching && (
-              <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+              <div className="absolute right-3.5 top-1/2 -translate-y-1/2" role="status" aria-label="Searching">
                 <div className="w-4 h-4 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
               </div>
             )}
@@ -152,7 +210,7 @@ export default function BusinessSearchStep({ url, onConfirm, onSkip }) {
           <div className="mx-5 mb-3 border border-white/[0.07] rounded-xl overflow-hidden divide-y divide-white/[0.05]">
             {results.map((biz, i) => (
               <button
-                key={i}
+                key={biz.placeId || i}
                 type="button"
                 onClick={() => handleSelectResult(biz)}
                 className="w-full px-4 py-3.5 text-left hover:bg-white/[0.06] active:bg-white/10 transition-colors flex items-start gap-3 group"
@@ -164,16 +222,38 @@ export default function BusinessSearchStep({ url, onConfirm, onSkip }) {
                   <p className="text-sm font-semibold text-white group-hover:text-cyan-100 transition-colors truncate">
                     {biz.name}
                   </p>
-                  {biz.address && (
+                  {(biz.formattedAddress || biz.address) && (
                     <p className="text-[11px] text-slate-400 mt-0.5 truncate flex items-center gap-1">
                       <MapPin className="w-3 h-3 flex-shrink-0" />
-                      {biz.address}
+                      {biz.formattedAddress || biz.address}
                     </p>
                   )}
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0 mt-1.5" />
               </button>
             ))}
+          </div>
+        )}
+
+        {/* ── Error state (search failed — distinct from "no results") ──── */}
+        {showError && (
+          <div
+            role="alert"
+            className="mx-5 mb-3 px-4 py-4 rounded-xl bg-red-500/5 border border-red-500/20 text-center"
+          >
+            <p className="text-sm text-red-300">{searchError.message}</p>
+            <div className="mt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleRetry}
+                className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+              >
+                Try again
+              </button>
+              <span className="text-xs text-slate-500">
+                or add your business manually below.
+              </span>
+            </div>
           </div>
         )}
 
@@ -279,7 +359,7 @@ export default function BusinessSearchStep({ url, onConfirm, onSkip }) {
         )}
 
         {/* Bottom padding when nothing is visible below the input yet */}
-        {!showManualHint && !showResults && !showEmpty && (
+        {!showManualHint && !showResults && !showEmpty && !showError && (
           <div className="pb-4" />
         )}
       </div>

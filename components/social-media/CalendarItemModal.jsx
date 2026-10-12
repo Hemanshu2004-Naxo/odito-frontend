@@ -14,7 +14,7 @@ import {
   useGenerateSocialCalendarItemContent, useSocialAIContent,
 } from '@/hooks/useSocialMediaAI'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
-import { FORMAT_LABELS, OBJECTIVE_LABELS, KPI_LABELS, ASSET_LABELS, ITEM_STATUS_LABELS, ITEM_STATUS_TONE, formatPlanDate, weekdayName } from '@/lib/socialMedia/contentCalendar'
+import { FORMAT_LABELS, OBJECTIVE_LABELS, KPI_LABELS, ASSET_LABELS, ITEM_STATUS_LABELS, ITEM_STATUS_TONE, formatPlanDate, weekdayName, plannedCopyFor } from '@/lib/socialMedia/contentCalendar'
 import {
   PLATFORM_LABEL, itemToForm, newItemForm, formToPatch, isDirty, validateForm, serverFieldErrors, supportedFormats, textLength, hookIndexOf,
 } from '@/lib/socialMedia/calendarItemForm'
@@ -109,6 +109,7 @@ function ItemEditor({ projectId, item, options, onClose }) {
   const [regenOpen, setRegenOpen] = useState(false)
   const [regenError, setRegenError] = useState(null)
   const [platformTab, setPlatformTab] = useState('shared')
+  const [aiConfirm, setAiConfirm] = useState(null) // the platform whose AI-written alternative the person is being asked to confirm
 
   const dirty = isDirty(form, base)
   const patch = useMemo(() => formToPatch(form, base), [form, base])
@@ -228,10 +229,18 @@ function ItemEditor({ projectId, item, options, onClose }) {
     })
   }
 
-  function startContent(platform) {
+  /**
+   * mode 'plan': the post is made from the caption in this plan, exactly as written (no AI, answered at once).
+   * mode 'ai':   the AI writes a NEW caption as a separate draft; this plan's caption is not changed.
+   */
+  function startContent(platform, mode) {
     setBanner(null)
-    generate.mutate({ itemId: item.id, platform }, {
-      onError: (error) => failMessage(error, 'Could not start the content generation.'),
+    generate.mutate({ itemId: item.id, platform, mode, expectedRevision: item.revision }, {
+      onSuccess: (res) => {
+        setAiConfirm(null)
+        if (res?.data?.mode === 'plan') setBanner({ kind: 'success', text: `The ${PLATFORM_LABEL[platform]} post was created from this plan. Its caption is exactly what is written here. It is waiting in Content Approvals.` })
+      },
+      onError: (error) => { setAiConfirm(null); failMessage(error, 'Could not create the post.') },
     })
   }
 
@@ -572,6 +581,13 @@ function ItemEditor({ projectId, item, options, onClose }) {
               {generatingForThis && <span role="status" data-testid="item-generating" className="inline-flex items-center gap-2 text-sm text-violet-700"><Loader2 className="h-4 w-4 animate-spin" />Writing the post from this plan…</span>}
               {failedForThis && <span role="alert" data-testid="item-generation-failed" className="text-sm text-red-600">{failedForThis}</span>}
               {generating && !generatingForThis && <span className="text-xs text-slate-500">Another post is being written. Try again in a moment.</span>}
+              {canGenerate && (
+                <p className="basis-full text-xs text-slate-500" data-testid="item-generate-hint">
+                  {pendingPlatforms.some((p) => plannedCopyFor(item, p).caption)
+                    ? 'Creating the post uses the caption in this plan exactly as written: the AI does not rewrite it. You review it in Content Approvals before anything is used.'
+                    : 'This plan has no caption yet, so the AI will write the post. You review it in Content Approvals before anything is used.'}
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <button type="button" onClick={requestClose} disabled={busy} data-testid="item-cancel" className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60">{locked ? 'Close' : 'Cancel'}</button>
@@ -588,12 +604,30 @@ function ItemEditor({ projectId, item, options, onClose }) {
               {canRevoke && (
                 <button type="button" onClick={() => approve(true)} disabled={busy || dirty} data-testid="item-revoke" className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60">Withdraw approval</button>
               )}
-              {canGenerate && pendingPlatforms.map((platform) => (
-                <button key={platform} type="button" onClick={() => startContent(platform)} disabled={busy || dirty || generating} title={dirty ? 'Save your changes first' : `Write the ${PLATFORM_LABEL[platform]} post from this plan`} data-testid={`item-generate-${platform}`} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
-                  {generate.isPending && generate.variables?.platform === platform ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {item.platforms.length > 1 ? `Generate ${PLATFORM_LABEL[platform]} content` : 'Generate content'}
-                </button>
-              ))}
+              {canGenerate && pendingPlatforms.map((platform) => {
+                const label = PLATFORM_LABEL[platform]
+                const several = item.platforms.length > 1
+                const working = generate.isPending && generate.variables?.platform === platform
+                const hasCaption = !!plannedCopyFor(item, platform).caption
+                const primary = 'inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+                return hasCaption ? (
+                  <span key={platform} className="inline-flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => startContent(platform, 'plan')} disabled={busy || dirty || generating} title={dirty ? 'Save your changes first' : `Create the ${label} post with the caption written in this plan, exactly as it is`} data-testid={`item-generate-${platform}`} className={primary}>
+                      {working && generate.variables?.mode === 'plan' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      {several ? `Create ${label} post from this plan` : 'Create post from this plan'}
+                    </button>
+                    <button type="button" onClick={() => setAiConfirm(platform)} disabled={busy || dirty || generating} title={dirty ? 'Save your changes first' : 'Have the AI write a different caption (this plan is not changed)'} data-testid={`item-generate-ai-${platform}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                      {working && generate.variables?.mode === 'ai' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {several ? `Write ${label} caption with AI instead` : 'Write with AI instead'}
+                    </button>
+                  </span>
+                ) : (
+                  <button key={platform} type="button" onClick={() => startContent(platform, 'ai')} disabled={busy || dirty || generating} title={dirty ? 'Save your changes first' : `This plan has no ${label} caption yet, so the AI will write the post`} data-testid={`item-generate-${platform}`} className={primary}>
+                    {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {several ? `Write ${label} post with AI` : 'Write post with AI'}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </DialogContent>
@@ -602,6 +636,16 @@ function ItemEditor({ projectId, item, options, onClose }) {
       {regenOpen && (
         <CalendarRegenerateDialog editedFields={item.editedFields} pending={regenerate.isPending} error={regenError} onCancel={() => setRegenOpen(false)} onConfirm={confirmRegenerate} />
       )}
+      <ConfirmActionDialog
+        open={!!aiConfirm}
+        onOpenChange={(open) => { if (!open) setAiConfirm(null) }}
+        title={`Have the AI write a different ${aiConfirm ? PLATFORM_LABEL[aiConfirm] : ''} caption?`}
+        description="The AI writes a NEW caption as a separate draft in Content Approvals. The caption in this plan is not changed or replaced, and nothing is used until you approve it there."
+        confirmLabel="Write with AI"
+        cancelLabel="Keep my caption"
+        pending={generate.isPending}
+        onConfirm={() => startContent(aiConfirm, 'ai')}
+      />
       <ConfirmActionDialog
         open={confirmDiscard}
         onOpenChange={setConfirmDiscard}

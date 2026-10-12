@@ -55,6 +55,14 @@ export function PostBrief({ post }) {
             {post.generation.strategyVersion != null && <BriefRow label="Strategy version" value={post.generation.strategyVersion} />}
           </>
         )}
+        {post.plan && (
+          <>
+            <BriefRow label="Source" value="Your content plan (caption used as written)" />
+            {post.plan.planRevision != null && <BriefRow label="Plan revision" value={post.plan.planRevision} />}
+            {post.plan.contentPillar && <BriefRow label="Content pillar" value={post.plan.contentPillar} />}
+            {post.plan.strategyVersion != null && <BriefRow label="Strategy version" value={post.plan.strategyVersion} />}
+          </>
+        )}
         {a.managed && (
           <>
             <BriefRow label="Content version" value={a.contentVersion} />

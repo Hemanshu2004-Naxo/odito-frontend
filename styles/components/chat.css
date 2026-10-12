@@ -474,3 +474,61 @@
   color: var(--color-text-secondary);
   line-height: var(--leading-normal, 1.55);
 }
+
+/* ── Search-failure fallback card (manual website entry) ──────────
+   Sits inside the AI bubble group, below the explanation bubble. Reuses
+   .chat-input and .chat-button-group so it matches every other onboarding
+   control; only the card chrome and field labels are new. */
+
+.chat-fallback-card {
+  width: 100%;
+  min-width: 330px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-4, 16px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  margin-top: var(--space-2_5, 10px);
+}
+
+.chat-fallback-card .chat-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chat-fallback-card .chat-field label {
+  font-size: var(--text-sm, 12px);
+  color: var(--color-text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.chat-fallback-card .chat-field .chat-input {
+  width: 100%;
+  flex: none;
+}
+
+.chat-fallback-card .chat-input[aria-invalid="true"] {
+  border-color: #ef4444;
+}
+
+.chat-fallback-card .chat-field-error {
+  font-size: var(--text-sm, 12px);
+  color: #f87171;
+  margin: 0;
+}
+
+.chat-fallback-card .chat-field-hint {
+  font-size: 11px;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.45));
+  margin: 0;
+}
+
+@media (max-width: 699px) {
+  .chat-fallback-card {
+    min-width: 0;
+  }
+}

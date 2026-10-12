@@ -24,7 +24,7 @@ beforeEach(() => {
   mobile = false
   // the page opens on the content PLAN; these tests are about the scheduled / published view, which the helper opens
   api.getSocialAIContentStatus.mockResolvedValue({ success: true, data: { status: 'none', generation: null, publication: null } })
-  api.getSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'none', calendar: null, items: [], generation: null, stale: null, strategy: { available: false }, connectedPlatforms: { facebook: false, instagram: false }, limits: { minDays: 7, maxDays: 31, maxPostsPerWeek: 7 } } })
+  api.getSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'none', calendar: null, items: [], generation: null, stale: null, strategy: { available: false }, connectedPlatforms: { facebook: false, instagram: false }, limits: { minDays: 7, maxDays: 184, minMonths: 1, maxMonths: 6, maxPostsPerWeek: 7, maxPosts: 200 } } })
 })
 
 // A day of the CURRENT week (the calendar opens on today's week), at midday UTC so the
