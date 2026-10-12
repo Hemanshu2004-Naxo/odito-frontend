@@ -968,6 +968,8 @@ export function useSyncBusinessProfileReviews(projectId) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.businessProfile.rating(projectId) })
       queryClient.invalidateQueries({ queryKey: ['business-profile', projectId, 'reviews'] })
+      // The Insights page reads the same synced reviews - refresh every cached range.
+      queryClient.invalidateQueries({ queryKey: ['business-profile', projectId, 'review-analytics'] })
     },
   })
 }
@@ -1036,6 +1038,7 @@ export function useSyncBusinessProfile(projectId) {
       queryClient.invalidateQueries({ queryKey: queryKeys.businessProfile.details(projectId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.businessProfile.rating(projectId) })
       queryClient.invalidateQueries({ queryKey: ['business-profile', projectId, 'reviews'] })
+      queryClient.invalidateQueries({ queryKey: ['business-profile', projectId, 'review-analytics'] })
       queryClient.invalidateQueries({ queryKey: ['business-profile', projectId, 'trends'] })
       queryClient.invalidateQueries({ queryKey: ['business-profile', projectId, 'media'] })
       queryClient.invalidateQueries({ queryKey: ['business-profile', projectId, 'posts'] })

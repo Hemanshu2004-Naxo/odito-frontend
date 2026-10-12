@@ -48,26 +48,27 @@ export default function ReviewInsightCards({ overview, rangeKey }) {
           icon={<GoogleG />}
           label="Google Reviews"
           value={fmtInt(lifetime.totalReviews)}
-          caption={googleDiffers ? `Google reports ${fmtInt(google.totalReviewCount)} · ${fmtInt(period.totalReviews)} in ${periodText}` : `${fmtInt(period.totalReviews)} in ${periodText}`}
+          title="Lifetime total of the reviews stored for this location"
+          caption={googleDiffers ? `Lifetime · Google reports ${fmtInt(google.totalReviewCount)} · ${fmtInt(period.totalReviews)} in ${periodText}` : `Lifetime · ${fmtInt(period.totalReviews)} in ${periodText}`}
         />
         <Metric
           icon={<Star className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}
           label="Avg Google Rating"
           value={lifetime.averageRating === null ? '—' : fmtRating(lifetime.averageRating)}
           title={lifetime.averageRating === null ? undefined : `${lifetime.averageRating} (average of stored reviews)`}
-          caption={period.averageRating === null ? `No reviews in ${periodText}` : `${fmtRating(period.averageRating)} in ${periodText}`}
+          caption={period.averageRating === null ? `Lifetime · no reviews in ${periodText}` : `Lifetime · ${fmtRating(period.averageRating)} in ${periodText}`}
         />
         <Metric
           icon={<FilePenLine className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}
           label="With Text"
           value={fmtInt(lifetime.withText)}
-          caption={`${fmtInt(period.withText)} in ${periodText}`}
+          caption={`Lifetime · ${fmtInt(period.withText)} in ${periodText}`}
         />
         <Metric
           icon={<FileX2 className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}
           label="Without Text"
           value={fmtInt(lifetime.withoutText)}
-          caption={`${fmtInt(period.withoutText)} in ${periodText}`}
+          caption={`Lifetime · ${fmtInt(period.withoutText)} in ${periodText}`}
         />
         <Metric
           icon={<Trash2 className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}

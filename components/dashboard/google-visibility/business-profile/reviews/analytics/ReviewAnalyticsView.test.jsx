@@ -53,7 +53,7 @@ describe('ReviewAnalyticsView (reference layout)', () => {
       const cell = within(strip).getByText(label).closest('div').parentElement
       expect(cell).toHaveTextContent(value)
     }
-    expect(strip).toHaveTextContent('Google reports 1,053 · 101 in last 90 days')
+    expect(strip).toHaveTextContent('Lifetime · Google reports 1,053 · 101 in last 90 days')
     expect(strip).toHaveTextContent('87 in last 90 days')
     expect(strip).toHaveTextContent('Not tracked yet')
   })
@@ -167,7 +167,7 @@ describe('ReviewAnalyticsView (reference layout)', () => {
     p.sentiment.period = { positive: 0, neutral: 0, negative: 0, total: 0, positivePercent: 0, neutralPercent: 0, negativePercent: 0 }
     setup(ok(p), { range: '7d' })
     expect(card('Review Insight Count Cards')).toHaveTextContent('1,052')
-    expect(card('Review Insight Count Cards')).toHaveTextContent('No reviews in last 90 days')
+    expect(card('Review Insight Count Cards')).toHaveTextContent('Lifetime · no reviews in last 90 days')
     expect(within(card('Reviews Rating')).getByText('No reviews available for this period.')).toBeInTheDocument()
     expect(within(card('Reviews Distribution')).getByText('No reviews available for this period.')).toBeInTheDocument()
     // the sentiment card has two halves (score + timeline), each states it
