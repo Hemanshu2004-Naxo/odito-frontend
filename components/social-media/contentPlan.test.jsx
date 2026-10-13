@@ -7,7 +7,7 @@ import { calendarItem, calendarState, calendarResponse, calendarGeneration, cale
 
 vi.mock('next/link', async () => (await import('@/test-utils/socialMediaAI')).nextLinkMock())
 
-const api = vi.hoisted(() => ({ getSocialContentCalendar: vi.fn(), getSocialContentCalendarStatus: vi.fn(), generateSocialContentCalendar: vi.fn(), previewSocialContentCalendar: vi.fn(), resumeSocialContentCalendar: vi.fn(), cancelSocialContentCalendar: vi.fn(), getSocialCalendarHistory: vi.fn(), getSocialCalendarVersion: vi.fn(), restoreSocialCalendarVersion: vi.fn(), getSocialAIContentStatus: vi.fn(), getSocialCalendarOptions: vi.fn() }))
+const api = vi.hoisted(() => ({ getSocialContentCalendar: vi.fn(), getSocialContentCalendarStatus: vi.fn(), generateSocialContentCalendar: vi.fn(), previewSocialContentCalendar: vi.fn(), resumeSocialContentCalendar: vi.fn(), cancelSocialContentCalendar: vi.fn(), getMetaConnectUrl: vi.fn(), getSocialCalendarHistory: vi.fn(), getSocialCalendarVersion: vi.fn(), restoreSocialCalendarVersion: vi.fn(), getSocialAIContentStatus: vi.fn(), getSocialCalendarOptions: vi.fn() }))
 vi.mock('@/lib/apiService', () => ({ default: api }))
 
 import { ContentPlanSection } from './ContentPlanSection'
@@ -102,6 +102,28 @@ describe('Content plan — the planning form', () => {
     expect(within(f).queryByTestId('distribution')).not.toBeInTheDocument() // one platform: nothing to distribute
   })
 
+  it('an EXPIRED connection offers Reconnect (the real Meta flow), not "Not connected"; a never-connected platform still offers Connect', async () => {
+    load(none({ connectedPlatforms: { facebook: true, instagram: false }, platformStates: { facebook: 'connected', instagram: 'expired' } }))
+    api.getMetaConnectUrl.mockResolvedValue({ success: true, data: { url: 'about:blank' } })
+    mount()
+    const f = await screen.findByTestId('calendar-plan-form')
+    expect(within(f).getByTestId('expired-instagram')).toHaveTextContent('Connection expired or revoked')
+    expect(within(f).queryByText(/Not connected/)).not.toBeInTheDocument()
+    const [, ig] = within(within(f).getByTestId('platforms')).getAllByRole('checkbox')
+    expect(ig).toBeDisabled()
+    fireEvent.click(within(f).getByTestId('reconnect-instagram'))
+    await waitFor(() => expect(api.getMetaConnectUrl).toHaveBeenCalledWith('proj-1', 'social-media', true))
+  })
+
+  it('a platform that was never connected says Not connected and links to Connect', async () => {
+    load(none({ connectedPlatforms: { facebook: true, instagram: false }, platformStates: { facebook: 'connected', instagram: 'none' } }))
+    mount()
+    const f = await screen.findByTestId('calendar-plan-form')
+    expect(within(f).getByText(/Not connected/)).toBeInTheDocument()
+    expect(within(f).getByRole('link', { name: 'Connect' })).toHaveAttribute('href', '/app/social-media/connect-accounts')
+    expect(within(f).queryByTestId('reconnect-instagram')).not.toBeInTheDocument()
+  })
+
   it('a connected platform that the strategy does not cover cannot be chosen either', async () => {
     const f = await form(none({ strategy: { ...calendarState().strategy, platforms: ['facebook'] } }))
     const [, ig] = within(within(f).getByTestId('platforms')).getAllByRole('checkbox')
@@ -116,6 +138,65 @@ describe('Content plan — the planning form', () => {
     expect(within(dist).getByRole('radio', { name: /AI optimized/ })).toBeChecked()
     fireEvent.click(within(within(f).getByTestId('platforms')).getAllByRole('checkbox')[1])
     expect(within(f).queryByTestId('distribution')).not.toBeInTheDocument()
+  })
+
+  describe("starting from the strategy's saved choice (the wizard's handoff)", () => {
+    const withPlanning = (planning, over = {}) => none({ strategy: { available: true, id: 'strat-3', version: 3, platforms: ['facebook', 'instagram'], hasHooks: true, planning, recommended: { postsPerWeek: 4, range: { min: 3, max: 5 }, days: ['tuesday'] } }, ...over })
+    const saved = { postsPerWeek: 5, months: 6, platforms: ['facebook'], estimatedPosts: 130, confirmedAt: '2026-10-09T10:00:00.000Z' }
+    const posts = (f) => within(within(f).getByTestId('posts-per-week')).getAllByRole('radio').find((o) => o.checked).value
+    const monthsChecked = (f) => within(within(f).getByTestId('duration-months')).getAllByRole('radio').find((o) => o.checked).getAttribute('aria-label')
+
+    it("the form starts from the strategy's frequency, months and platforms (not the recommendation), and says so", async () => {
+      const f = await form(withPlanning(saved))
+      expect(posts(f)).toBe('5')
+      expect(monthsChecked(f)).toBe('6 months')
+      expect(within(within(f).getByTestId('platforms')).getByRole('checkbox', { name: /Facebook/ })).toBeChecked()
+      expect(within(within(f).getByTestId('platforms')).getByRole('checkbox', { name: /Instagram/ })).not.toBeChecked()
+      expect(within(f).getByTestId('plan-strategy-note')).toHaveTextContent('Using the settings from your strategy: 5 posts per week for 6 months. You only need to choose a start date.')
+    })
+
+    it("the first submit sends the strategy's values as they are, with only a start date chosen", async () => {
+      api.generateSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'generating' } })
+      const f = await form(withPlanning(saved))
+      fireEvent.click(within(f).getByTestId('generate-calendar-button'))
+      await waitFor(() => expect(api.generateSocialContentCalendar).toHaveBeenCalledTimes(1))
+      expect(api.generateSocialContentCalendar.mock.calls[0][1]).toMatchObject({ postsPerWeek: 5, months: 6, platforms: ['facebook'] })
+    })
+
+    it('changing a value explains that THIS calendar uses the new settings and the strategy is not changed; changing it back restores the plain note', async () => {
+      const f = await form(withPlanning(saved))
+      fireEvent.click(within(f).getByRole('radio', { name: '3 posts per week' }))
+      const note = within(f).getByTestId('plan-strategy-note')
+      expect(note).toHaveTextContent('You changed the settings from your strategy (5 per week, 6 months). This calendar will use your new settings. Your strategy is not changed.')
+      fireEvent.click(within(f).getByRole('radio', { name: '5 posts per week' }))
+      expect(within(f).getByTestId('plan-strategy-note')).toHaveTextContent('Using the settings from your strategy')
+    })
+
+    it('a strategy saved before the wizard has no saved choice: the recommendation and 1 month as before, and no strategy note', async () => {
+      const f = await form(withPlanning(null))
+      expect(posts(f)).toBe('4')
+      expect(monthsChecked(f)).toBe('1 month')
+      expect(within(f).queryByTestId('plan-strategy-note')).not.toBeInTheDocument()
+    })
+
+    it('a saved platform that is no longer connected is not pre-selected (the connected ones are)', async () => {
+      const f = await form(withPlanning({ ...saved, platforms: ['instagram'] }, { connectedPlatforms: { facebook: true, instagram: false } }))
+      expect(within(within(f).getByTestId('platforms')).getByRole('checkbox', { name: /Facebook/ })).toBeChecked()
+    })
+  })
+
+  it('opens the form at once for an existing calendar when the page is reached with ?plan=new, and not otherwise', async () => {
+    window.history.pushState({}, '', '/app/social-media/content-calendar?plan=new')
+    load(ready())
+    const first = mount()
+    expect(await screen.findByTestId('calendar-plan-form')).toBeInTheDocument()
+    first.unmount()
+    window.history.pushState({}, '', '/app/social-media/content-calendar')
+    load(ready())
+    mount()
+    await screen.findByTestId('content-plan')
+    await screen.findByRole('button', { name: /Regenerate calendar|Regenerate/ })
+    expect(screen.queryByTestId('calendar-plan-form')).not.toBeInTheDocument()
   })
 
   it('offers 1 to 6 months and a start date - and no end date to type', async () => {
@@ -156,6 +237,23 @@ describe('Content plan — the planning form', () => {
     fireEvent.change(within(f).getByLabelText('Start date'), { target: { value: '2027-01-10' } })
     await waitFor(() => expect(within(f).getByTestId('plan-period')).toHaveTextContent('to Tue 9 Feb 2027 (31 days)'))
     expect(within(f).getByTestId('plan-summary')).toHaveTextContent('14 posts over 1 month (31 days)')
+  })
+
+  it("shows this month's allowance when a limit applies, and says nothing when there is none", async () => {
+    api.previewSocialContentCalendar.mockResolvedValue({ success: true, data: { startDate: '2026-10-13', endDate: '2026-11-12', months: 1, days: 31, totalPosts: 14, partialWeeks: [], steps: 4, quota: { period: '2026-10', resetsAt: '2026-11-01T00:00:00.000Z', user: { limit: 150, used: 40, remaining: 110 }, project: { limit: null, used: 40, remaining: null } } } })
+    const f = await form()
+    await waitFor(() => expect(within(f).getByTestId('plan-quota')).toHaveTextContent('This month you have used 40 of 150 calendar posts on your account. The allowance resets on'))
+    expect(within(f).getByTestId('plan-quota')).toHaveTextContent('1 Nov 2026')
+    api.previewSocialContentCalendar.mockResolvedValue({ success: true, data: { startDate: '2026-10-14', endDate: '2026-11-13', months: 1, days: 31, totalPosts: 14, partialWeeks: [], steps: 4, quota: { period: '2026-10', resetsAt: '2026-11-01T00:00:00.000Z', user: { limit: null, used: 0, remaining: null }, project: { limit: null, used: 0, remaining: null } } } })
+    fireEvent.change(within(f).getByLabelText('Start date'), { target: { value: '2027-02-01' } })
+    await waitFor(() => expect(within(f).queryByTestId('plan-quota')).not.toBeInTheDocument())
+  })
+
+  it('an allowance refusal from the server is shown with its numbers and blocks generating', async () => {
+    api.previewSocialContentCalendar.mockRejectedValue(Object.assign(new Error('Your calendar needs 40 posts, but this project has 12 of 30 calendar posts left this month (18 used). The allowance resets on 1 Nov 2026.'), { status: 429, details: { code: 'QUOTA_EXCEEDED' } }))
+    const f = await form()
+    await waitFor(() => expect(within(f).getByTestId('plan-problems')).toHaveTextContent('12 of 30 calendar posts left this month'))
+    expect(within(f).getByTestId('generate-calendar-button')).toBeDisabled()
   })
 
   it('validates: no platform and a past start are explained and block generating', async () => {

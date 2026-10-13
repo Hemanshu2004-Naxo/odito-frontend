@@ -249,8 +249,14 @@ function ItemEditor({ projectId, item, options, onClose }) {
     regenerate.mutate({ itemId: item.id, expectedRevision: item.revision, fields, overwriteEdited }, {
       onSuccess: (res) => {
         setRegenOpen(false)
-        const warnings = res?.data?.warnings || []
-        setBanner({ kind: 'success', text: `Regenerated: ${(res?.data?.regenerated || []).length} field${(res?.data?.regenerated || []).length === 1 ? '' : 's'} rewritten.${warnings.length ? ` ${warnings.join(' ')}` : ''}` })
+        const data = res?.data || {}
+        const warnings = data.warnings || []
+        const count = (data.regenerated || []).length
+        // say what happened to the approval - the person approved the OLD words
+        const lead = data.unchanged
+          ? `The AI wrote the same words as before, so nothing changed.${data.approvalStatus === 'approved' ? ' The plan stays approved.' : ''}`
+          : `Regenerated: ${count} field${count === 1 ? '' : 's'} rewritten.${data.approvalRevoked ? ' The approval was withdrawn: review the new plan and approve it again before creating a post from it.' : ''}`
+        setBanner({ kind: 'success', text: `${lead}${warnings.length ? ` ${warnings.join(' ')}` : ''}` })
       },
       onError: (error) => setRegenError(describeApiError(error, 'Could not regenerate the plan.').message),
     })
@@ -265,6 +271,9 @@ function ItemEditor({ projectId, item, options, onClose }) {
   const generatingForThis = generating && content.data?.generation?.calendarItemId === item?.id
   const failedForThis = content.data?.status === 'failed' && content.data?.generation?.calendarItemId === item?.id ? content.data.generation.failure?.message : null
   const pendingPlatforms = item ? item.platforms.filter((p) => !publications.some((pub) => pub.platform === p)) : []
+  // a plan item has a DAY; the time of day is chosen when the post is scheduled (after its approvals), in the account's own time zone
+  const sched = options?.scheduling
+  const dateHint = `This is the day it is planned for, not a posting time: you choose the exact time when the post is scheduled${sched?.timezone ? ` (in your time zone, ${sched.timezone})` : ''}.${sched?.timeWindows?.length ? ` Your strategy suggests: ${sched.timeWindows.join('; ')}.` : ''}`
   const canGenerate = mode === 'edit' && ['plan_approved', 'content_generated'].includes(item.status) && !locked && pendingPlatforms.length > 0
   const canApprove = mode === 'edit' && !locked && ['planned', 'edited', 'draft'].includes(item.status)
   const canRevoke = mode === 'edit' && !locked && item.status === 'plan_approved' && publications.length === 0
@@ -335,7 +344,7 @@ function ItemEditor({ projectId, item, options, onClose }) {
                       <div><p className="mb-1 text-xs font-semibold text-slate-600">Day</p><p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600" data-testid="item-day">{weekdayName(form.date) || '—'}</p></div>
                     </>
                   )}
-                  <Field label="Planned date" error={errorFor('date')}>
+                  <Field label="Planned date" error={errorFor('date')} hint={dateHint}>
                     {(p) => <TextInput {...p} type="date" value={form.date} min={options.calendar.startDate} max={options.calendar.endDate} onChange={(e) => set('date', e.target.value)} error={errorFor('date')} />}
                   </Field>
                   <Field label="Format" error={errorFor('format')} hint={form.platforms.length ? 'Only formats every selected platform supports.' : null}>
@@ -634,7 +643,7 @@ function ItemEditor({ projectId, item, options, onClose }) {
       </Dialog>
 
       {regenOpen && (
-        <CalendarRegenerateDialog editedFields={item.editedFields} pending={regenerate.isPending} error={regenError} onCancel={() => setRegenOpen(false)} onConfirm={confirmRegenerate} />
+        <CalendarRegenerateDialog editedFields={item.editedFields} approved={item.status === 'plan_approved' && !publications.length} contentLinked={publications.length > 0} pending={regenerate.isPending} error={regenError} onCancel={() => setRegenOpen(false)} onConfirm={confirmRegenerate} />
       )}
       <ConfirmActionDialog
         open={!!aiConfirm}

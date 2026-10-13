@@ -298,10 +298,12 @@ export function strategyBody(overrides = {}) {
   }
 }
 
-export function strategyDoc({ version = 1, strategy = {}, strategyGaps = [], snapshot = {} } = {}) {
+export function strategyDoc({ version = 1, strategy = {}, strategyGaps = [], snapshot = {}, planning = null } = {}) {
   return {
     id: `strat-${version}`, version, status: 'ready', generatedAt: '2026-10-09T10:00:00.000Z',
     strategy: strategyBody(strategy), strategyGaps,
+    // the planning choice saved with the version; null = a strategy saved before the wizard existed
+    planning,
     profileSnapshot: {
       generatedAt: '2026-10-09T09:59:00.000Z',
       data: {
@@ -324,7 +326,23 @@ export function strategyResponse({ status = 'none', strategy = null, generation 
   }
 }
 
-export const generationDoc = (o = {}) => ({ id: 'gen-1', version: 1, status: 'generating', startedAt: '2026-10-09T10:00:00.000Z', finishedAt: null, failure: null, ...o })
+export const generationDoc = (o = {}) => ({ id: 'gen-1', version: 1, status: 'generating', startedAt: '2026-10-09T10:00:00.000Z', finishedAt: null, planning: null, failure: null, ...o })
+
+/** A saved planning choice as the API returns it (toApiPlanning). */
+export const planningDoc = (o = {}) => ({ postsPerWeek: 3, months: 3, platforms: ['facebook'], estimatedPosts: 39, confirmedAt: '2026-10-09T10:00:00.000Z', ...o })
+
+/** POST /social/ai-strategy/plan-preview: the SERVER's planner answer (the number below is the fixture's, never computed by the UI). */
+export const planPreviewResponse = (o = {}) => ({
+  success: true,
+  data: {
+    postsPerWeek: 3, months: 3, platforms: ['facebook'], estimatedPosts: 39,
+    basis: { startDate: '2026-10-14', endDate: '2027-01-13', partialWeeks: [] },
+    platformStates: { facebook: 'connected', instagram: 'none' },
+    quota: { period: '2026-10', user: { limit: null, used: 0, committed: 0, reserved: 0, remaining: null }, project: { limit: null }, unavailable: null },
+    quotaCheck: { fits: true },
+    ...o,
+  },
+})
 
 // ── single-post AI content (GET /social/ai-content/status, POST .../generate) ──
 

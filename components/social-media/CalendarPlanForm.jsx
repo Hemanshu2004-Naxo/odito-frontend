@@ -7,9 +7,9 @@ import { CalendarPlus, Loader2 } from 'lucide-react'
 import { PLATFORM_LABELS } from '@/lib/socialMedia/aiStrategy'
 import {
   POSTS_PER_WEEK_OPTIONS, DURATION_OPTIONS, MIN_MONTHS, MAX_MONTHS, DISTRIBUTION_OPTIONS, defaultStartDate, periodEndDate, dayCount, estimatePosts,
-  defaultPostsPerWeek, recommendedLabel, formatPlanDate, platformsLabel,
+  defaultPostsPerWeek, recommendedLabel, formatPlanDate, platformsLabel, describeQuota,
 } from '@/lib/socialMedia/contentCalendar'
-import { useSocialContentCalendarPreview } from '@/hooks/useSocialMediaAI'
+import { useSocialContentCalendarPreview, useStartMetaConnection } from '@/hooks/useSocialMediaAI'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
 
 const ORDER = ['facebook', 'instagram']
@@ -23,12 +23,16 @@ const INPUT = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tex
  * "Posts per week" is the TOTAL number of posts, not a number per platform. The exact number of posts comes from the server's
  * preview (no AI involved) before anything is generated. Only platforms that are connected AND covered by the strategy can be chosen.
  */
-export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, limits, pending = false, submitLabel = 'Generate calendar', onSubmit, onCancel = null, error = null }) {
+export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, platformStates = null, limits, pending = false, submitLabel = 'Generate calendar', onSubmit, onCancel = null, error = null }) {
   const available = useMemo(() => ORDER.filter((p) => (strategy?.platforms || []).includes(p) && connectedPlatforms?.[p]), [strategy, connectedPlatforms])
-  const [postsPerWeek, setPostsPerWeek] = useState(() => defaultPostsPerWeek(strategy?.recommended))
-  const [platforms, setPlatforms] = useState(() => new Set(available))
+  // The choice made when the strategy was created is where the first calendar starts (the person changes it only if they want to). A strategy
+  // saved before the wizard has none, and the form falls back to the strategy's recommendation as before.
+  const saved = strategy?.planning || null
+  const [postsPerWeek, setPostsPerWeek] = useState(() => saved?.postsPerWeek ?? defaultPostsPerWeek(strategy?.recommended))
+  const [platforms, setPlatforms] = useState(() => { const wanted = (saved?.platforms || []).filter((p) => available.includes(p)); return new Set(wanted.length ? wanted : available) })
+  const reconnect = useStartMetaConnection(projectId)
   const [startDate, setStartDate] = useState(() => defaultStartDate())
-  const [months, setMonths] = useState(MIN_MONTHS)
+  const [months, setMonths] = useState(() => (saved && saved.months >= (limits?.minMonths ?? MIN_MONTHS) && saved.months <= (limits?.maxMonths ?? MAX_MONTHS) ? saved.months : MIN_MONTHS))
   const [mode, setMode] = useState('ai_optimized')
 
   const minMonths = limits?.minMonths ?? MIN_MONTHS
@@ -55,6 +59,11 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, limi
   const posts = exact ?? estimatePosts(postsPerWeek, days)
   const partialWeeks = previewData?.partialWeeks || []
   const calculating = preview.isFetching && !previewError
+  // this month's allowance, only when a limit applies (no limit = nothing to say)
+  const quota = previewData?.quota
+  const quotaLine = describeQuota(quota)
+
+  const sameAsStrategy = !!saved && saved.postsPerWeek === postsPerWeek && saved.months === months && [...saved.platforms].sort().join() === selected.join()
 
   function submit(e) {
     e.preventDefault()
@@ -66,6 +75,14 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, limi
     <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" data-testid="calendar-plan-form" aria-label="Plan a content calendar">
       <h2 className="text-base font-bold text-slate-900">Plan your content calendar</h2>
       <p className="mt-0.5 text-sm text-slate-500">Choose how much to post and where. Odito plans and writes every post from your strategy: topic, hook, caption, hashtags, call to action and creative direction, with a version for each platform. Nothing is published.</p>
+
+      {saved && (
+        <p role="note" data-testid="plan-strategy-note" className={`mt-3 rounded-lg border px-3 py-2 text-sm ${sameAsStrategy ? 'border-violet-200 bg-violet-50 text-violet-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+          {sameAsStrategy
+            ? `Using the settings from your strategy: ${saved.postsPerWeek} post${saved.postsPerWeek === 1 ? '' : 's'} per week for ${saved.months} month${saved.months === 1 ? '' : 's'}. You only need to choose a start date.`
+            : `You changed the settings from your strategy (${saved.postsPerWeek} per week, ${saved.months} month${saved.months === 1 ? '' : 's'}). This calendar will use your new settings. Your strategy is not changed.`}
+        </p>
+      )}
 
       <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <fieldset>
@@ -93,7 +110,15 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, limi
                 <label key={p} className={`flex items-center gap-2.5 text-sm ${usable ? 'cursor-pointer text-slate-800' : 'cursor-not-allowed text-slate-400'}`}>
                   <input type="checkbox" checked={usable && platforms.has(p)} disabled={!usable} onChange={() => togglePlatform(p)} className="h-4 w-4 rounded border-slate-300 accent-violet-600" />
                   <span className="font-medium">{PLATFORM_LABELS[p]}</span>
-                  {!connected && <span className="text-xs">Not connected · <Link href="/app/social-media/connect-accounts" className="font-semibold text-violet-600 hover:text-violet-700">Connect</Link></span>}
+                  {!connected && platformStates?.[p] === 'expired' && (
+                    <span className="text-xs text-amber-700" data-testid={`expired-${p}`}>
+                      Connection expired or revoked ·{' '}
+                      <button type="button" onClick={() => reconnect.mutate({ reconnect: true })} disabled={reconnect.isPending} data-testid={`reconnect-${p}`} className="font-semibold text-violet-600 underline hover:text-violet-700 disabled:opacity-60">
+                        {reconnect.isPending ? 'Redirecting…' : 'Reconnect'}
+                      </button>
+                    </span>
+                  )}
+                  {!connected && platformStates?.[p] !== 'expired' && <span className="text-xs">Not connected · <Link href="/app/social-media/connect-accounts" className="font-semibold text-violet-600 hover:text-violet-700">Connect</Link></span>}
                   {connected && !inStrategy && <span className="text-xs">Not in your strategy. Regenerate the strategy to include it.</span>}
                 </label>
               )
@@ -149,6 +174,7 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, limi
               {partialWeeks.length > 0 && ` The ${partialWeeks.length === 1 ? 'week' : 'weeks'} at the ${partialWeeks.length === 1 ? 'edge' : 'edges'} of the period that only partly fall inside it get a proportional share (${partialWeeks.map((w) => `${w.posts} for ${w.days} day${w.days === 1 ? '' : 's'}`).join(', ')}).`}
               {previewData?.steps > 1 && ` Long calendars are planned in ${previewData.steps} steps, so they take longer to finish; you can leave the page meanwhile.`}
             </p>
+            {quotaLine && <p className="mt-1 text-xs text-slate-500" data-testid="plan-quota">{quotaLine}</p>}
           </>
         ) : 'Choose your start date and platforms to see how many posts to expect.'}
       </div>

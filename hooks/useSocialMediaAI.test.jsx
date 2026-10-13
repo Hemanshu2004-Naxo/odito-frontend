@@ -43,7 +43,7 @@ import {
   useApprovalSummary, useApprovalPosts, useSubmitContentForReview, useApproveContent, useRequestContentChanges, useSubmitDesignForReview,
   useApproveDesign, useRequestDesignChanges, useUpdatePostContent, useApprovalSettings, useUpdateApprovalSettings,
   useSocialBusinessProfile, useUpdateSocialBusinessProfile, socialBusinessProfileKey,
-  useSocialAIStrategy, useGenerateSocialAIStrategy, socialAIStrategyKey, STRATEGY_POLL_MS,
+  useSocialAIStrategy, useGenerateSocialAIStrategy, socialAIStrategyKey, socialContentCalendarKey, STRATEGY_POLL_MS,
 } from './useSocialMediaAI'
 
 const PID = 'proj-1'
@@ -507,6 +507,23 @@ describe('AI strategy hooks', () => {
     spy.mockClear()
     await act(async () => { await expect(result.current.mutateAsync()).rejects.toThrow('not available') })
     expect(invalidatedKeys(spy)).toContainEqual(socialAIStrategyKey(PID))
+  })
+
+  it('when a strategy generation finishes the calendar state is refreshed too (a cached "no strategy yet" must not outlive it)', async () => {
+    api.getSocialAIStrategy.mockResolvedValueOnce({ success: true, data: { status: 'generating', strategy: null, generation: { id: 'g1' } } }).mockResolvedValue({ success: true, data: { status: 'ready', strategy: { id: 's1' }, generation: null } })
+    api.getSocialAIStrategyStatus.mockResolvedValue({ success: true, data: { status: 'ready', currentVersion: 1, generation: null } })
+    const { wrapper, spy } = setup()
+    renderHook(() => useSocialAIStrategy(PID), { wrapper })
+    await waitFor(() => expect(invalidatedKeys(spy)).toContainEqual(socialContentCalendarKey(PID)))
+  })
+
+  it('generate passes the wizard options through untouched (planning, expectedVersion, requestId)', async () => {
+    api.generateSocialAIStrategy.mockResolvedValue({ success: true, data: { status: 'generating' } })
+    const { wrapper } = setup()
+    const { result } = renderHook(() => useGenerateSocialAIStrategy(PID), { wrapper })
+    const options = { planning: { postsPerWeek: 3, months: 3, platforms: ['facebook'] }, expectedVersion: 2, requestId: 'wiz_abcdefgh' }
+    await act(async () => { await result.current.mutateAsync(options) })
+    expect(api.generateSocialAIStrategy).toHaveBeenCalledWith(PID, options)
   })
 
   it('saving the Business Profile also refreshes the AI strategy (so "profile changed" appears without a reload)', async () => {

@@ -71,6 +71,7 @@ export function calendarOptions(over = {}) {
     services: [{ id: 'svc-1', name: 'Family check-up' }, { id: 'svc-2', name: 'Teeth whitening' }],
     products: [],
     assetTypes: ['product_image', 'logo', 'team_photo', 'customer_photo', 'testimonial', 'screenshot', 'stock_photo', 'video_clip', 'infographic'],
+    scheduling: { timeWindows: ['Weekday mornings, 8-10am', 'Early evening, 6-8pm'], timezone: 'Asia/Kolkata' },
     limits: { fields: { topic: 150, angle: 200, hook: 200, caption: 3000, primaryCta: 80 }, caption: { facebook: 3000, instagram: 2200 }, hashtags: { facebook: 10, instagram: 30 } },
     ...over,
   }

@@ -207,7 +207,7 @@ describe('AI Strategy — strategies saved before v2 still render, and say what 
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-const api = vi.hoisted(() => ({ getSocialAIStrategy: vi.fn(), getSocialAIStrategyStatus: vi.fn(), generateSocialAIStrategy: vi.fn(), getSocialAIContentStatus: vi.fn(), generateSocialAIContent: vi.fn() }))
+const api = vi.hoisted(() => ({ getSocialContentCalendar: vi.fn(), previewSocialAIStrategyPlan: vi.fn(), getSocialAIStrategy: vi.fn(), getSocialAIStrategyStatus: vi.fn(), generateSocialAIStrategy: vi.fn(), getSocialAIContentStatus: vi.fn(), generateSocialAIContent: vi.fn() }))
 vi.mock('@/lib/apiService', () => ({ default: api }))
 vi.mock('@/contexts/ProjectContext', () => ({
   useProject: () => ({ activeProject: { _id: 'proj-1' }, activeProjectId: 'proj-1', projects: [], setActiveProject: vi.fn() }),
@@ -217,6 +217,7 @@ describe('AI Strategy page — calendar hand-off', () => {
   beforeEach(() => {
     Object.values(api).forEach((fn) => fn.mockReset())
     api.getSocialAIContentStatus.mockResolvedValue({ success: true, data: { status: 'none', generation: null, publication: null } })
+    api.getSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'none', calendar: null } })
   })
 
   const load = async (strategy) => {
@@ -229,8 +230,8 @@ describe('AI Strategy page — calendar hand-off', () => {
     await load(strategyBodyV2())
     const cta = await screen.findByTestId('create-calendar-cta')
     expect(cta).toHaveAttribute('href', '/app/social-media/content-calendar')
-    expect(cta).toHaveTextContent('Create content calendar')
-    expect(screen.getByTestId('generate-button')).toHaveTextContent('Regenerate strategy')
+    expect(cta).toHaveTextContent('Generate Content Calendar')
+    expect(screen.getByTestId('regenerate-strategy')).toHaveTextContent('Regenerate strategy')
   })
 
   it('has no calendar CTA without a strategy', async () => {

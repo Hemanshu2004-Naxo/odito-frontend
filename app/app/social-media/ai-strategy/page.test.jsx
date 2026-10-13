@@ -2,9 +2,9 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import { screen, waitFor, fireEvent, within, act } from '@testing-library/react'
-import { renderWithClient, strategyResponse, strategyDoc, generationDoc, apiError } from '@/test-utils/socialMediaAI'
+import { renderWithClient, strategyResponse, strategyDoc, generationDoc, planningDoc, planPreviewResponse, apiError } from '@/test-utils/socialMediaAI'
 
-const api = vi.hoisted(() => ({ getSocialAIStrategy: vi.fn(), getSocialAIStrategyStatus: vi.fn(), generateSocialAIStrategy: vi.fn(), getSocialAIContentStatus: vi.fn(), generateSocialAIContent: vi.fn() }))
+const api = vi.hoisted(() => ({ previewSocialAIStrategyPlan: vi.fn(), getSocialContentCalendar: vi.fn(), getSocialAIStrategy: vi.fn(), getSocialAIStrategyStatus: vi.fn(), generateSocialAIStrategy: vi.fn(), getSocialAIContentStatus: vi.fn(), generateSocialAIContent: vi.fn() }))
 vi.mock('@/lib/apiService', () => ({ default: api }))
 
 let project = { _id: 'proj-1', project_name: 'Acme' }
@@ -18,12 +18,31 @@ import AIStrategyPage from './page'
 beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset())
   api.getSocialAIContentStatus.mockResolvedValue({ success: true, data: { status: 'none', generation: null, publication: null } })
+  api.getSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'none', calendar: null } })
+  api.previewSocialAIStrategyPlan.mockResolvedValue(planPreviewResponse())
   project = { _id: 'proj-1', project_name: 'Acme' }
 })
 afterEach(() => { vi.useRealTimers() })
 
 const renderPage = () => renderWithClient(<AIStrategyPage />)
 const ready = (opts = {}) => strategyResponse({ status: 'ready', strategy: strategyDoc(opts.doc), profile: opts.profile })
+
+/** Walks the wizard: platforms -> frequency -> duration -> review, then (optionally) confirms. */
+async function runWizard({ frequency, months, confirm = true } = {}) {
+  const wizard = await screen.findByTestId('strategy-wizard')
+  fireEvent.click(within(wizard).getByTestId('wizard-next'))
+  if (frequency) fireEvent.click(within(wizard).getByTestId(`wizard-frequency-${frequency}`).querySelector('input'))
+  fireEvent.click(within(wizard).getByTestId('wizard-next'))
+  if (months) fireEvent.click(within(wizard).getByTestId(`wizard-months-${months}`).querySelector('input'))
+  fireEvent.click(within(wizard).getByTestId('wizard-next'))
+  await within(wizard).findByTestId('wizard-review')
+  if (confirm) {
+    await waitFor(() => expect(within(wizard).getByTestId('wizard-generate')).toBeEnabled())
+    fireEvent.click(within(wizard).getByTestId('wizard-generate'))
+  }
+  return wizard
+}
+const openDetails = (id) => { fireEvent.click(screen.getByTestId(`details-toggle-${id}`)) }
 
 describe('AI Strategy — loading real strategy state', () => {
   it('LOADING: skeletons, then content', async () => {
@@ -57,8 +76,9 @@ describe('AI Strategy — loading real strategy state', () => {
     expect(await screen.findByTestId('strategy-empty')).toHaveTextContent("You don't have an AI strategy yet")
     expect(api.getSocialAIStrategy).toHaveBeenCalledWith('proj-1')
     expect(screen.getByTestId('strategy-status-title')).toHaveTextContent('No strategy yet')
-    expect(screen.getByTestId('generate-button')).toHaveTextContent('Generate strategy')
+    expect(screen.getByTestId('generate-button')).toHaveTextContent('Create AI Strategy')
     expect(screen.getByTestId('generate-button')).toBeEnabled()
+    expect(api.generateSocialAIStrategy).not.toHaveBeenCalled()
     expect(within(screen.getByTestId('strategy-gaps')).getByTestId('gap-audience')).toHaveTextContent('No primary audience has been defined.')
     expect(screen.queryByTestId('strategy-summary')).not.toBeInTheDocument()
   })
@@ -78,19 +98,26 @@ describe('AI Strategy — a ready strategy', () => {
     renderPage()
     expect(await screen.findByTestId('strategy-summary')).toHaveTextContent('Build local trust with practical dental education')
     expect(screen.getByTestId('strategy-status-title')).toHaveTextContent('Strategy v1 ready')
+    expect(screen.getByTestId('strategy-ready-title')).toHaveTextContent('Your AI strategy is ready.')
+    openDetails('voice')
     expect(screen.getByTestId('section-positioning')).toHaveTextContent('A friendly neighbourhood dental practice.')
     expect(screen.getByTestId('section-audience')).toHaveTextContent('Young families nearby')
     expect(screen.getByTestId('section-goals')).toHaveTextContent('More bookings')
     expect(screen.getAllByTestId('pillar-card').map((c) => c.textContent)).toEqual([expect.stringContaining('Dental tips'), expect.stringContaining('Meet the team')])
+    openDetails('content')
     expect(screen.getByTestId('mix-educational')).toHaveTextContent('50%')
     expect(screen.getByTestId('mix-behind_the_scenes')).toHaveTextContent('Behind the scenes')
+    openDetails('platforms')
     expect(within(screen.getByTestId('platform-facebook')).getByText('Connected')).toBeInTheDocument()
     expect(within(screen.getByTestId('platform-instagram')).getByText('Not connected')).toBeInTheDocument()
     expect(screen.getByTestId('section-posting')).toHaveTextContent('4 posts per week')
     expect(screen.getByTestId('section-tone')).toHaveTextContent('Warm and professional')
+    openDetails('hashtags')
     expect(screen.getByTestId('section-hashtags')).toHaveTextContent('A few local tags.')
     expect(screen.getByTestId('section-cta')).toHaveTextContent('Book a check-up')
+    openDetails('rules')
     expect(screen.getByTestId('section-brand')).toHaveTextContent('cheapest')
+    openDetails('more')
     expect(screen.getByTestId('section-recommendations')).toHaveTextContent('Post consistently for 8 weeks')
     expect(screen.queryByTestId('section-assumptions')).not.toBeInTheDocument()
     expect(screen.queryByTestId('profile-changed')).not.toBeInTheDocument()
@@ -99,6 +126,8 @@ describe('AI Strategy — a ready strategy', () => {
   it('shows the business profile the strategy was generated from (the stored snapshot), not the live one', async () => {
     api.getSocialAIStrategy.mockResolvedValue(ready())
     renderPage()
+    await screen.findByTestId('strategy-summary')
+    openDetails('basis')
     const ctx = await screen.findByTestId('strategy-context')
     expect(ctx).toHaveTextContent('Acme Dental')
     expect(ctx).toHaveTextContent('Pune, Maharashtra, India')
@@ -123,6 +152,8 @@ describe('AI Strategy — a ready strategy', () => {
   it('assumptions the AI reported are shown for the user to check', async () => {
     api.getSocialAIStrategy.mockResolvedValue(ready({ doc: { strategy: { assumptions: ['Assumed a small team posts 3-4 times a week.'] } } }))
     renderPage()
+    await screen.findByTestId('strategy-summary')
+    openDetails('more')
     expect(await screen.findByTestId('section-assumptions')).toHaveTextContent('Assumed a small team')
   })
 
@@ -136,7 +167,7 @@ describe('AI Strategy — a ready strategy', () => {
     }
   })
 
-  it('the strategy is read-only: no inputs, sliders or edit controls (the only form controls are the post generator\'s three selects)', async () => {
+  it('the strategy text is read-only: no inputs, sliders or edit fields on the page itself (the wizard is a separate dialog that is closed; the only controls are the post generator\'s three selects)', async () => {
     api.getSocialAIStrategy.mockResolvedValue(ready())
     renderPage()
     await screen.findByTestId('strategy-summary')
@@ -167,11 +198,17 @@ describe('AI Strategy — generating', () => {
     api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'generating', generation: generationDoc() }))
     api.getSocialAIStrategyStatus.mockResolvedValue({ success: true, data: { status: 'generating', currentVersion: null, generation: generationDoc() } })
     fireEvent.click(button)
-    await waitFor(() => expect(api.generateSocialAIStrategy).toHaveBeenCalledWith('proj-1'))
+    await runWizard({ frequency: 5, months: 6 })
+    await waitFor(() => expect(api.generateSocialAIStrategy).toHaveBeenCalledTimes(1))
+    const [pid, options] = api.generateSocialAIStrategy.mock.calls[0]
+    expect(pid).toBe('proj-1')
+    expect(options.planning).toEqual({ postsPerWeek: 5, months: 6, platforms: ['facebook'] })
+    expect(options.expectedVersion).toBe(0)
+    expect(options.requestId).toMatch(/^wiz_/)
+    expect(Object.keys(options.planning)).not.toContain('estimatedPosts')
     expect(await screen.findByTestId('strategy-generating')).toHaveTextContent('Generating your strategy')
     expect(screen.getByTestId('strategy-status-title')).toHaveTextContent('Generating your strategy')
-    expect(screen.getByTestId('generate-button')).toBeDisabled()
-    expect(screen.getByTestId('generate-button')).toHaveTextContent('Generating…')
+    await waitFor(() => expect(screen.queryByTestId('strategy-wizard')).not.toBeInTheDocument())
   })
 
   it('NO fake progress: no percentage, progress bar or invented steps while generating', async () => {
@@ -187,10 +224,13 @@ describe('AI Strategy — generating', () => {
     api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'none' }))
     api.generateSocialAIStrategy.mockReturnValue(new Promise(() => {}))
     renderPage()
-    const button = await screen.findByTestId('generate-button')
-    fireEvent.click(button)
-    fireEvent.click(button)
-    await waitFor(() => expect(button).toBeDisabled())
+    fireEvent.click(await screen.findByTestId('generate-button'))
+    const wizard = await runWizard({ confirm: false })
+    const confirmButton = within(wizard).getByTestId('wizard-generate')
+    await waitFor(() => expect(confirmButton).toBeEnabled())
+    fireEvent.click(confirmButton)
+    fireEvent.click(confirmButton)
+    await waitFor(() => expect(confirmButton).toBeDisabled())
     expect(api.generateSocialAIStrategy).toHaveBeenCalledTimes(1)
   })
 
@@ -227,9 +267,13 @@ describe('AI Strategy — failures and regeneration', () => {
     api.generateSocialAIStrategy.mockRejectedValue(apiError('AI strategy generation is not available right now. Please try again later.', { status: 503, code: 'AI_UNAVAILABLE' }))
     renderPage()
     fireEvent.click(await screen.findByTestId('generate-button'))
-    expect(await screen.findByTestId('strategy-start-error')).toHaveTextContent('not available right now')
+    const wizard = await runWizard({ frequency: 5, months: 6 })
+    expect(await within(wizard).findByTestId('wizard-error')).toHaveTextContent('not available right now')
+    // the selections are still there: nothing was lost, and the person can simply try again
+    expect(within(wizard).getByTestId('review-frequency')).toHaveTextContent('5 posts per week')
+    expect(within(wizard).getByTestId('review-months')).toHaveTextContent('6 months')
+    expect(within(wizard).getByTestId('wizard-generate')).toBeEnabled()
     expect(screen.getByTestId('strategy-empty')).toBeInTheDocument()
-    expect(screen.getByTestId('generate-button')).toBeEnabled()
   })
 
   it('a FAILED generation shows the real, safe failure message — and no fake strategy', async () => {
@@ -242,23 +286,44 @@ describe('AI Strategy — failures and regeneration', () => {
     expect(screen.getByTestId('generate-button')).toBeEnabled()
   })
 
+  it('a FAILED generation keeps the person\'s choices and "Try again" re-opens the review with them (no new choices to make, nothing generated until confirmed)', async () => {
+    api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'failed', generation: generationDoc({ status: 'failed', planning: planningDoc({ postsPerWeek: 5, months: 6, platforms: ['facebook', 'instagram'] }), failure: { code: 'AI_BUSY', message: 'The AI service is busy right now. Please try again in a few minutes.' } }) }))
+    api.generateSocialAIStrategy.mockResolvedValue({ success: true, data: { status: 'generating', generation: generationDoc({ version: 2 }) } })
+    renderPage()
+    expect(await screen.findByTestId('strategy-failed-choice')).toHaveTextContent('5 posts per week for 6 months')
+    fireEvent.click(screen.getByTestId('retry-strategy'))
+    const wizard = await screen.findByTestId('strategy-wizard')
+    expect(await within(wizard).findByTestId('review-frequency')).toHaveTextContent('5 posts per week')
+    expect(within(wizard).getByTestId('review-months')).toHaveTextContent('6 months')
+    expect(within(wizard).getByTestId('review-platforms')).toHaveTextContent('Facebook + Instagram')
+    expect(api.generateSocialAIStrategy).not.toHaveBeenCalled()
+    await waitFor(() => expect(within(wizard).getByTestId('wizard-generate')).toBeEnabled())
+    fireEvent.click(within(wizard).getByTestId('wizard-generate'))
+    await waitFor(() => expect(api.generateSocialAIStrategy).toHaveBeenCalledTimes(1))
+    expect(api.generateSocialAIStrategy.mock.calls[0][1].planning).toEqual({ postsPerWeek: 5, months: 6, platforms: ['facebook', 'instagram'] })
+  })
+
   it('a failed REGENERATION keeps the last good strategy visible and says so', async () => {
     api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'failed', strategy: strategyDoc(), generation: generationDoc({ version: 2, status: 'failed', failure: { code: 'AI_BUSY', message: 'The AI service is busy right now. Please try again in a few minutes.' } }) }))
     renderPage()
     expect(await screen.findByTestId('strategy-summary')).toBeInTheDocument()
     expect(screen.getByTestId('strategy-failed')).toHaveTextContent('busy right now')
     expect(screen.getByTestId('strategy-failed')).toHaveTextContent('version 1) is shown below and is unchanged')
-    expect(screen.getByTestId('generate-button')).toHaveTextContent('Regenerate strategy')
+    expect(screen.getByTestId('regenerate-strategy')).toHaveTextContent('Regenerate strategy')
   })
 
-  it('REGENERATE calls generate again and the invalidation refetches the state', async () => {
-    api.getSocialAIStrategy.mockResolvedValue(ready())
+  it('REGENERATE opens the review with the saved choices, calls generate only after confirmation, and the invalidation refetches the state', async () => {
+    api.getSocialAIStrategy.mockResolvedValue(ready({ doc: { planning: planningDoc() } }))
     api.generateSocialAIStrategy.mockResolvedValue({ success: true, data: { status: 'generating', alreadyRunning: false, generation: generationDoc({ version: 2 }) } })
     renderPage()
-    const button = await screen.findByTestId('generate-button')
+    const button = await screen.findByTestId('regenerate-strategy')
     expect(button).toHaveTextContent('Regenerate strategy')
     const before = api.getSocialAIStrategy.mock.calls.length
     fireEvent.click(button)
+    const wizard = await screen.findByTestId('strategy-wizard')
+    await within(wizard).findByTestId('wizard-review')
+    await waitFor(() => expect(within(wizard).getByTestId('wizard-generate')).toBeEnabled())
+    fireEvent.click(within(wizard).getByTestId('wizard-generate'))
     await waitFor(() => expect(api.generateSocialAIStrategy).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(api.getSocialAIStrategy.mock.calls.length).toBeGreaterThan(before))
   })
@@ -283,7 +348,12 @@ describe('AI Strategy — Business Profile changed', () => {
     renderPage()
     const banner = await screen.findByTestId('profile-changed')
     fireEvent.click(within(banner).getByRole('button', { name: 'Regenerate strategy' }))
-    await waitFor(() => expect(api.generateSocialAIStrategy).toHaveBeenCalledWith('proj-1'))
+    const wizard = await screen.findByTestId('strategy-wizard')
+    expect(api.generateSocialAIStrategy).not.toHaveBeenCalled()
+    await runWizard({ confirm: false })
+    await waitFor(() => expect(within(wizard).getByTestId('wizard-generate')).toBeEnabled())
+    fireEvent.click(within(wizard).getByTestId('wizard-generate'))
+    await waitFor(() => expect(api.generateSocialAIStrategy).toHaveBeenCalledTimes(1))
   })
 
   it('no warning when the profile is unchanged', async () => {

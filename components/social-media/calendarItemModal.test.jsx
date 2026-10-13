@@ -495,6 +495,14 @@ describe('Calendar item modal — pillar, objective, KPI, CTA, hook', () => {
     expect([...document.querySelectorAll('#cta-suggestions option')].map((o) => o.value)).toEqual(['Save this', 'Comment below', 'Book a check-up'])
   })
 
+  it("the planned date says it is a planning day, not a posting time, and shows the strategy's suggested windows and the account's time zone", async () => {
+    load()
+    await openItem()
+    const hint = await screen.findByText(/not a posting time/)
+    expect(hint).toHaveTextContent('you choose the exact time when the post is scheduled (in your time zone, Asia/Kolkata)')
+    expect(hint).toHaveTextContent('Your strategy suggests: Weekday mornings, 8-10am; Early evening, 6-8pm.')
+  })
+
   it('the planned date is limited to the calendar\'s range and a bad date is explained', async () => {
     // a controlled clock (Date only): "not in the past" is judged against 5 Oct 2026, whatever day the suite really runs
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -837,6 +845,82 @@ describe('Calendar item modal — Regenerate with AI', () => {
     fireEvent.click(await screen.findByTestId('regenerate-confirm'))
     expect(await screen.findByTestId('regenerate-error')).toHaveTextContent('did not meet')
     expect(within(modal()).getByLabelText('Topic')).toHaveValue('Common digital marketing mistakes')
+  })
+
+  describe('approval is explained before and after', () => {
+    const approved = (over = {}) => calendarItem({ ...FB, status: 'plan_approved', effectiveStatus: 'plan_approved', revision: 1, ...over })
+
+    it('an APPROVED plan: the dialog says the approval will be withdrawn and the new plan must be approved again; the button says so; the result is reported', async () => {
+      load([approved(), OTHER])
+      await openItem()
+      expect(screen.getByTestId('item-status')).toHaveTextContent('Plan approved')
+      fireEvent.click(screen.getByTestId('item-regenerate'))
+      const dialog = await screen.findByTestId('regenerate-dialog')
+      const warning = within(dialog).getByTestId('regenerate-approval-warning')
+      expect(warning).toHaveTextContent('withdraws the approval')
+      expect(warning).toHaveTextContent('approve it again before a post can be created')
+      expect(within(dialog).queryByTestId('regenerate-content-note')).not.toBeInTheDocument()
+      expect(within(dialog).getByTestId('regenerate-confirm')).toHaveTextContent('Regenerate and withdraw approval')
+      expect(api.regenerateSocialCalendarItem).not.toHaveBeenCalled()
+
+      api.regenerateSocialCalendarItem.mockImplementation(async () => {
+        state = { ...state, data: { ...state.data, items: state.data.items.map((i) => (i.id === 'i1' ? { ...i, caption: 'New AI caption', status: 'planned', effectiveStatus: 'planned', revision: 2 } : i)) } }
+        return { success: true, data: { item: state.data.items[0], regenerated: ['caption'], warnings: [], approvalStatus: 'not_approved', approvalRevoked: true, requiresReapproval: true, contentLinked: false } }
+      })
+      fireEvent.click(within(dialog).getByTestId('regenerate-confirm'))
+      await waitFor(() => expect(api.regenerateSocialCalendarItem).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(screen.queryByTestId('regenerate-dialog')).not.toBeInTheDocument())
+      const banner = screen.getByTestId('item-banner')
+      expect(banner).toHaveTextContent('Regenerated: 1 field rewritten.')
+      expect(banner).toHaveTextContent('The approval was withdrawn: review the new plan and approve it again')
+      await waitFor(() => expect(screen.getByTestId('item-status')).toHaveTextContent('Planned'))
+      expect(screen.getByTestId('item-approve')).toBeInTheDocument()
+    })
+
+    it('a plan that is NOT approved gets no approval warning and the plain button', async () => {
+      load()
+      await openItem()
+      fireEvent.click(screen.getByTestId('item-regenerate'))
+      const dialog = await screen.findByTestId('regenerate-dialog')
+      expect(within(dialog).queryByTestId('regenerate-approval-warning')).not.toBeInTheDocument()
+      expect(within(dialog).getByTestId('regenerate-confirm')).toHaveTextContent(/^Regenerate$/)
+    })
+
+    it('when the AI wrote exactly the same words the banner says nothing changed and the approval stays (no withdrawal is claimed)', async () => {
+      load([approved(), OTHER])
+      await openItem()
+      api.regenerateSocialCalendarItem.mockResolvedValue({ success: true, data: { item: state.data.items[0], regenerated: [], unchanged: true, warnings: [], approvalStatus: 'approved', approvalRevoked: false, requiresReapproval: false, contentLinked: false } })
+      fireEvent.click(screen.getByTestId('item-regenerate'))
+      fireEvent.click(await screen.findByTestId('regenerate-confirm'))
+      await waitFor(() => expect(api.regenerateSocialCalendarItem).toHaveBeenCalledTimes(1))
+      const banner = await screen.findByTestId('item-banner')
+      expect(banner).toHaveTextContent('nothing changed')
+      expect(banner).toHaveTextContent('The plan stays approved')
+      expect(banner).not.toHaveTextContent('withdrawn')
+      expect(screen.getByTestId('item-status')).toHaveTextContent('Plan approved')
+    })
+
+    it('a plan that already has a post: the dialog explains the post keeps its own caption and the approval stays; there is no withdrawal warning', async () => {
+      load([approved({ status: 'content_generated', effectiveStatus: 'content_review', revision: 2, publicationIds: ['pub-1'], publications: [itemPublication()] }), OTHER])
+      await openItem()
+      fireEvent.click(screen.getByTestId('item-regenerate'))
+      const dialog = await screen.findByTestId('regenerate-dialog')
+      expect(within(dialog).getByTestId('regenerate-content-note')).toHaveTextContent('keeps its own reviewed caption')
+      expect(within(dialog).queryByTestId('regenerate-approval-warning')).not.toBeInTheDocument()
+      expect(within(dialog).getByTestId('regenerate-confirm')).toHaveTextContent(/^Regenerate$/)
+    })
+
+    it('a stale revision (changed in another tab) is refused by the server: the dialog shows why, nothing is applied and the plan is still approved here', async () => {
+      load([approved(), OTHER])
+      await openItem()
+      api.regenerateSocialCalendarItem.mockRejectedValueOnce(Object.assign(new Error('This item was changed somewhere else (another tab or person). Review the latest version and try again.'), { status: 409, details: { code: 'ITEM_CONFLICT' } }))
+      fireEvent.click(screen.getByTestId('item-regenerate'))
+      fireEvent.click(await screen.findByTestId('regenerate-confirm'))
+      expect(await screen.findByTestId('regenerate-error')).toHaveTextContent('changed somewhere else')
+      expect(screen.getByTestId('regenerate-dialog')).toBeInTheDocument()
+      expect(screen.getByTestId('item-status')).toHaveTextContent('Plan approved')
+      expect(api.regenerateSocialCalendarItem.mock.calls[0][2].expectedRevision).toBe(approved().revision)
+    })
   })
 
   it('is disabled while there are unsaved edits (it works from the saved post), with the reason', async () => {

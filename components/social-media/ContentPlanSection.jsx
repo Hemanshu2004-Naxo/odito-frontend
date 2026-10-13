@@ -32,7 +32,9 @@ export function ContentPlanSection({ projectId }) {
   const generate = useGenerateSocialContentCalendar(projectId)
   const resume = useResumeSocialContentCalendar(projectId)
   const cancel = useCancelSocialContentCalendar(projectId)
-  const [formOpen, setFormOpen] = useState(false)
+  // "Generate Content Calendar" on the strategy page links here with ?plan=new when the existing calendar belongs to an older strategy: the form
+  // (already filled from the strategy) opens at once instead of the person having to find "Regenerate calendar" first.
+  const [formOpen, setFormOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plan') === 'new')
   const [pendingChoices, setPendingChoices] = useState(null) // choices waiting for the "replace current calendar" confirmation
   const [view, setView] = useState('table')
   const [selectedId, setSelectedId] = useState(null)
@@ -115,6 +117,7 @@ export function ContentPlanSection({ projectId }) {
       projectId={projectId}
       strategy={strategy}
       connectedPlatforms={connectedPlatforms}
+      platformStates={state.platformStates}
       limits={limits}
       pending={busy}
       submitLabel={calendar ? 'Regenerate calendar' : 'Generate calendar'}

@@ -693,6 +693,8 @@ export function useSocialAIStrategy(projectId) {
   useEffect(() => {
     if (generating && polledStatus && polledStatus !== 'generating') {
       queryClient.invalidateQueries({ queryKey: socialAIStrategyKey(projectId), exact: true })
+      // The calendar page asks "is there a strategy?" and may have cached "no" while this one was still being made. A finished strategy changes that answer.
+      queryClient.invalidateQueries({ queryKey: socialContentCalendarKey(projectId), exact: true })
     }
   }, [generating, polledStatus, projectId, queryClient])
 
@@ -703,13 +705,31 @@ export function useSocialAIStrategy(projectId) {
 export function useGenerateSocialAIStrategy(projectId) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => apiService.generateSocialAIStrategy(projectId),
+    // `options` = { planning, expectedVersion, requestId } from the wizard; none = the old one-click regeneration
+    mutationFn: (options) => (options ? apiService.generateSocialAIStrategy(projectId, options) : apiService.generateSocialAIStrategy(projectId)),
     // settled, not success: a refusal (INSUFFICIENT_PROFILE / AI_UNAVAILABLE) should also refresh what the page knows
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: socialAIStrategyKey(projectId), exact: true })
       // a new strategy version makes an existing calendar "planned from an older strategy"
       queryClient.invalidateQueries({ queryKey: socialContentCalendarKey(projectId), exact: true })
     },
+  })
+}
+
+/**
+ * What a planning choice means, from the SERVER's calendar planner (no AI, nothing saved): `{ estimatedPosts, basis, platformStates, quota, quotaCheck }`.
+ * The wizard shows the count from here and never computes it. A refusal (unsupported value) is the query's error with the server's own message.
+ */
+export function useStrategyPlanPreview(projectId, choice, { enabled = true } = {}) {
+  const { postsPerWeek, months } = choice || {}
+  const platforms = (choice?.platforms || []).join(',')
+  return useQuery({
+    queryKey: [...socialAIStrategyKey(projectId), 'plan-preview', postsPerWeek || null, months || null, platforms],
+    queryFn: async () => (await apiService.previewSocialAIStrategyPlan(projectId, { postsPerWeek, months, platforms: choice.platforms }))?.data || null,
+    enabled: !!projectId && enabled && !!postsPerWeek && !!months && !!platforms,
+    staleTime: 30_000,
+    retry: false,
+    placeholderData: keepPreviousData,
   })
 }
 

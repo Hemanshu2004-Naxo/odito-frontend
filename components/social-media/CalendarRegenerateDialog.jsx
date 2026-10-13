@@ -9,8 +9,12 @@ import { REGEN_FIELDS, REGEN_FIELD_LABELS } from '@/lib/socialMedia/calendarItem
  * "Regenerate this plan?" - asks which planning fields Odito may rewrite for ONE post. Fields the user has edited are never
  * pre-selected, and choosing one is an explicit, visible decision to replace it (the server enforces the same rule, so a
  * stale client cannot overwrite an edit by accident). It rewrites planning fields only: no caption, design or post is created.
+ *
+ * It also says, BEFORE the click, what happens to the plan's approval: an approved plan that is rewritten is no longer approved (the new content
+ * has to be reviewed and approved again before a post can be made from it), unless a post already exists for it (then the post keeps its own
+ * reviewed caption and the approval stays).
  */
-export function CalendarRegenerateDialog({ editedFields = [], pending = false, error = null, onCancel, onConfirm }) {
+export function CalendarRegenerateDialog({ editedFields = [], approved = false, contentLinked = false, pending = false, error = null, onCancel, onConfirm }) {
   const [selected, setSelected] = useState(() => REGEN_FIELDS.filter((f) => !editedFields.includes(f)))
   const overwrites = selected.filter((f) => editedFields.includes(f))
 
@@ -42,6 +46,16 @@ export function CalendarRegenerateDialog({ editedFields = [], pending = false, e
           })}
         </fieldset>
 
+        {approved && (
+          <p role="note" data-testid="regenerate-approval-warning" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            This plan is approved. Regenerating replaces the fields you chose with new AI content and <strong>withdraws the approval</strong>: you will need to review the new plan and approve it again before a post can be created from it. If the AI writes exactly what is there now, nothing changes and the approval stays.
+          </p>
+        )}
+        {contentLinked && (
+          <p role="note" data-testid="regenerate-content-note" className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            A post was already created from this plan. It keeps its own reviewed caption and is not changed; only the plan is updated, and the approval stays.
+          </p>
+        )}
         {overwrites.length > 0 && (
           <p role="alert" data-testid="regenerate-overwrite-warning" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             This will replace your edits to the {overwrites.map((f) => REGEN_FIELD_LABELS[f].toLowerCase()).join(', ')}.
@@ -58,7 +72,7 @@ export function CalendarRegenerateDialog({ editedFields = [], pending = false, e
             data-testid="regenerate-confirm"
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {pending && <Loader2 className="h-4 w-4 animate-spin" />}Regenerate
+            {pending && <Loader2 className="h-4 w-4 animate-spin" />}{approved ? 'Regenerate and withdraw approval' : 'Regenerate'}
           </button>
         </DialogFooter>
       </DialogContent>

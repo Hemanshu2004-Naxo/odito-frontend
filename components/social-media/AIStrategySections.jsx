@@ -46,7 +46,7 @@ function Overview({ s }) {
   )
 }
 
-function BrandAnalysis({ b }) {
+export function BrandAnalysis({ b }) {
   if (!b || !hasAny(b.strengths, b.opportunities, b.risks, b.weaknesses, b.differentiators, b.personality, b.communicationStyle)) return null
   return (
     <StrategyCard icon={Eye} title="Brand analysis" subtitle="Based on your business, brand and offer" testId="section-brand-analysis">
@@ -93,7 +93,7 @@ function Audience({ a }) {
   )
 }
 
-function Positioning({ p }) {
+export function Positioning({ p }) {
   return (
     <StrategyCard icon={Compass} title="Positioning" testId="section-positioning">
       <div className="flex flex-col gap-3">
@@ -130,7 +130,7 @@ function Goals({ goals }) {
   )
 }
 
-function Pillars({ pillars }) {
+export function Pillars({ pillars }) {
   return (
     <StrategyCard icon={Layers} title="Content pillars" subtitle="The themes to keep returning to, and each one's share of your content" testId="section-pillars">
       <ul className="flex flex-col gap-3">
@@ -151,7 +151,7 @@ function Pillars({ pillars }) {
   )
 }
 
-function Mix({ mix }) {
+export function Mix({ mix }) {
   return (
     <StrategyCard icon={Layers} title="Content mix" subtitle="The balance of post types" testId="section-mix">
       <ul className="flex flex-col gap-2.5">
@@ -167,7 +167,7 @@ function Mix({ mix }) {
   )
 }
 
-function TrendingTopics({ topics }) {
+export function TrendingTopics({ topics }) {
   return (
     <StrategyCard
       icon={Flame}
@@ -196,7 +196,7 @@ function TrendingTopics({ topics }) {
   )
 }
 
-function Hooks({ hooks }) {
+export function Hooks({ hooks }) {
   const categories = [...new Set(hooks.map((h) => h.category))]
   return (
     <StrategyCard icon={Anchor} title="Working hooks" subtitle="Opening lines written for your business. Your calendar can use them." testId="section-hooks">
@@ -214,7 +214,7 @@ function Hooks({ hooks }) {
   )
 }
 
-function Competitors({ c }) {
+export function Competitors({ c }) {
   const has = c?.hasCompetitorData
   return (
     <StrategyCard
@@ -239,7 +239,7 @@ function Competitors({ c }) {
   )
 }
 
-function Platforms({ platforms }) {
+export function Platforms({ platforms }) {
   return (
     <StrategyCard icon={Share2} title="Platform strategy" subtitle="Your platforms" testId="section-platforms">
       <ul className="flex flex-col gap-3">
@@ -287,7 +287,7 @@ function Posting({ s }) {
   )
 }
 
-function Cta({ c }) {
+export function Cta({ c }) {
   return (
     <StrategyCard icon={Megaphone} title="CTA strategy" testId="section-cta">
       <div className="flex flex-col gap-3">
@@ -305,7 +305,7 @@ function Cta({ c }) {
   )
 }
 
-function Hashtags({ h }) {
+export function Hashtags({ h }) {
   return (
     <StrategyCard icon={Hash} title="Hashtag strategy" testId="section-hashtags">
       {h.enabled ? (
@@ -319,7 +319,7 @@ function Hashtags({ h }) {
   )
 }
 
-function Tone({ t }) {
+export function Tone({ t }) {
   return (
     <StrategyCard icon={MessageSquare} title="Tone & voice" testId="section-tone">
       <div className="flex flex-col gap-3">
@@ -336,7 +336,7 @@ function Tone({ t }) {
   )
 }
 
-function BrandRules({ r }) {
+export function BrandRules({ r }) {
   return (
     <StrategyCard icon={Palette} title="Brand rules" testId="section-brand">
       <div className="flex flex-col gap-3">

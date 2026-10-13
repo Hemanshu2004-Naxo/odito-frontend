@@ -1,41 +1,43 @@
 "use client"
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, Sparkles, RefreshCw, XCircle, CalendarPlus } from 'lucide-react'
+import { Loader2, Sparkles, XCircle, RefreshCw } from 'lucide-react'
 import { StrategyStatusCard } from '@/components/social-media/StrategyStatusCard'
 import { StrategyProfileChangedBanner } from '@/components/social-media/StrategyProfileChangedBanner'
 import { StrategyBusinessContext } from '@/components/social-media/StrategyBusinessContext'
 import { StrategyGapsCard } from '@/components/social-media/StrategyGapsCard'
-import { AIStrategySections } from '@/components/social-media/AIStrategySections'
+import { StrategyOverview } from '@/components/social-media/StrategyOverview'
+import { StrategyHighlights } from '@/components/social-media/StrategyHighlights'
+import { StrategyDetails } from '@/components/social-media/StrategyDetails'
+import { StrategyWizard } from '@/components/social-media/StrategyWizard'
 import { SingleAIPostGenerator } from '@/components/social-media/SingleAIPostGenerator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useProject } from '@/contexts/ProjectContext'
-import { useSocialAIStrategy, useGenerateSocialAIStrategy } from '@/hooks/useSocialMediaAI'
+import { useSocialAIStrategy, useGenerateSocialAIStrategy, useSocialContentCalendar } from '@/hooks/useSocialMediaAI'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
 import { statusView, formatDateTime } from '@/lib/socialMedia/aiStrategy'
 
 /**
  * Social Media AI — AI Strategy, driven entirely by the backend.
  *
- * The strategy is generated on the server from the resolved Business Profile (Google Business Profile +
- * project + the user's own Social AI fields), stored with an exact snapshot of that profile, and shown here
- * read-only. Generation is asynchronous: this page asks the server to start it, then follows the server's own
- * state (it polls a cheap status endpoint while the server says "generating") — there is no client-side
- * progress, no sample strategy and no local state standing in for the result. If generation fails, the last
- * good strategy (if any) stays visible and the real, safe failure message is shown.
+ * Creating a strategy starts with a short wizard (platforms, posting frequency, planning duration, review). Nothing is generated until the
+ * last step is confirmed; the choice is validated and counted by the server's calendar planner, saved with the strategy version, sent to the
+ * AI, and becomes the default of the first content calendar. Editing or regenerating re-opens the same wizard and creates the NEXT version -
+ * the strategy that exists, and any calendar made from it, are never modified.
  *
- * The strategy is the BRAIN, kept compact: an overview and short grouped cards with expandable detail. It holds no posting
- * schedule: "Create content calendar" goes to the Content Calendar, where the user picks posts per week, platforms and
- * dates. Below the strategy sits the single-post generator (one post at a time, saved as a draft in the existing approval
- * workflow). Not in this page by design: editing (the strategy is regenerated, not hand-edited), and any publishing /
- * approval / scheduling action.
+ * The page shows a short overview and the few things a business owner needs (summary, goals, audience, content mix, posting plan, success
+ * measures); everything else the strategy stores is one click away under "Detailed insights". Generation is asynchronous: the server owns
+ * the state (this page polls a cheap status endpoint while it says "generating"). There is no client-side progress and no sample data. If
+ * generation fails, the last good strategy stays visible, the real failure is shown, and "Try again" re-opens the wizard with the same choices.
  */
 export default function AIStrategyPage() {
-  const { activeProjectId } = useProject()
+  const { activeProject, activeProjectId } = useProject()
   const query = useSocialAIStrategy(activeProjectId)
+  const calendarQuery = useSocialContentCalendar(activeProjectId)
   const generate = useGenerateSocialAIStrategy(activeProjectId)
-  // Set synchronously on the first click, so a fast double-click can never start two requests before React re-renders the disabled button.
+  const [wizard, setWizard] = useState(null) // null | 'create' | 'edit' | 'regenerate'
+  // Set synchronously on the first confirmation, so a fast double-click can never start two requests before React re-renders the disabled button.
   const startInFlight = useRef(false)
 
   const header = (view) => (
@@ -65,7 +67,7 @@ export default function AIStrategyPage() {
       <div className="flex-1 space-y-6 pb-16">
         {header(null)}
         <div className="space-y-4" data-testid="strategy-loading" aria-busy="true">
-          <Skeleton className="h-24 rounded-2xl bg-slate-200" aria-label="Loading AI strategy" />
+          <Skeleton className="h-28 rounded-2xl bg-slate-200" aria-label="Loading AI strategy" />
           <Skeleton className="h-64 rounded-2xl bg-slate-200" />
         </div>
       </div>
@@ -79,7 +81,7 @@ export default function AIStrategyPage() {
         <div role="alert" data-testid="strategy-error" className="flex flex-col items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-10 text-center">
           <p className="text-sm font-semibold text-red-700">Couldn&apos;t load your AI strategy</p>
           <p className="max-w-md text-sm text-red-600/90">{describeApiError(query.error, 'The request to Odito failed. Nothing was changed.').message}</p>
-          <button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="mt-1 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70">
+          <button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="mt-1 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60">
             {query.isFetching ? 'Retrying…' : 'Try again'}
           </button>
         </div>
@@ -93,35 +95,32 @@ export default function AIStrategyPage() {
   const serverGenerating = state.status === 'generating'
   const busy = generate.isPending || serverGenerating
   const failedAttempt = state.status === 'failed' ? generation : null
-  const startError = generate.isError ? describeApiError(generate.error, 'Could not start the strategy generation.') : null
   const blockers = profile?.blockers || []
   const canGenerate = profile?.canGenerate !== false
+  const startError = generate.isError ? describeApiError(generate.error, 'Could not start the strategy generation.').message : null
+  const businessName = strategy?.profileSnapshot?.data?.business?.name || activeProject?.project_name || ''
+  const calendar = calendarQuery.data?.calendar ? { ...calendarQuery.data.calendar } : null
 
-  function handleGenerate() {
+  const openWizard = (mode) => { if (busy || !canGenerate) return; generate.reset(); setWizard(mode) }
+
+  function handleConfirm(options) {
     if (startInFlight.current || busy || !canGenerate) return
     startInFlight.current = true
-    generate.mutate(undefined, { onSettled: () => { startInFlight.current = false } })
+    generate.mutate(options, {
+      onSuccess: () => setWizard(null),
+      onSettled: () => { startInFlight.current = false },
+    })
   }
 
-  const generateButton = (
-    <button
-      type="button"
-      onClick={handleGenerate}
-      disabled={busy || !canGenerate}
-      data-testid="generate-button"
-      className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 active:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : strategy ? <RefreshCw className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-      {busy ? 'Generating…' : strategy ? 'Regenerate strategy' : 'Generate strategy'}
-    </button>
-  )
+  const wizardMode = wizard
+  const retryChoice = wizard === 'regenerate' && failedAttempt?.planning ? failedAttempt.planning : null
 
   return (
     <div className="flex-1 space-y-6 pb-16">
       {header(statusView(state))}
 
       {profile?.changed && strategy && (
-        <StrategyProfileChangedBanner changes={profile.changes} busy={busy} onRegenerate={handleGenerate} />
+        <StrategyProfileChangedBanner changes={profile.changes} busy={busy} onRegenerate={() => openWizard('regenerate')} />
       )}
 
       {serverGenerating && (
@@ -145,13 +144,13 @@ export default function AIStrategyPage() {
               <p className="text-sm font-semibold text-red-800">The last attempt to generate a strategy failed.</p>
               <p className="mt-0.5 text-sm text-red-700" data-testid="strategy-failed-message">{failedAttempt.failure?.message}</p>
               {strategy && <p className="mt-0.5 text-sm text-red-700">Your previous strategy (version {strategy.version}) is shown below and is unchanged.</p>}
+              {failedAttempt.planning && <p className="mt-0.5 text-sm text-red-700" data-testid="strategy-failed-choice">Your choices were kept: {failedAttempt.planning.postsPerWeek} posts per week for {failedAttempt.planning.months} month{failedAttempt.planning.months === 1 ? '' : 's'}.</p>}
             </div>
           </div>
+          <button type="button" onClick={() => openWizard('regenerate')} disabled={busy || !canGenerate} data-testid="retry-strategy" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-100 disabled:opacity-60">
+            <RefreshCw className="h-4 w-4" /> Try again
+          </button>
         </div>
-      )}
-
-      {startError && (
-        <p role="alert" data-testid="strategy-start-error" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{startError.message}</p>
       )}
 
       {!canGenerate && (
@@ -161,23 +160,11 @@ export default function AIStrategyPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap justify-end gap-3">
-        {strategy && !serverGenerating && (
-          <Link
-            href="/app/social-media/content-calendar"
-            data-testid="create-calendar-cta"
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 shadow-sm transition-colors hover:bg-violet-50"
-          >
-            <CalendarPlus className="h-4 w-4" /> Create content calendar
-          </Link>
-        )}
-        {generateButton}
-      </div>
-
       {strategy ? (
         <>
-          <StrategyBusinessContext snapshot={strategy.profileSnapshot} />
-          <AIStrategySections strategy={strategy.strategy} />
+          {!serverGenerating && <StrategyOverview strategy={strategy} businessName={businessName} calendar={calendar} busy={busy} onEdit={() => openWizard('edit')} onRegenerate={() => openWizard('regenerate')} />}
+          <StrategyHighlights strategy={strategy.strategy} planning={strategy.planning} />
+          <StrategyDetails strategy={strategy.strategy} basedOn={<StrategyBusinessContext snapshot={strategy.profileSnapshot} />} />
           {!serverGenerating && <SingleAIPostGenerator projectId={activeProjectId} strategyState={state} />}
           <StrategyGapsCard gaps={strategy.strategyGaps} title="Gaps in this strategy" subtitle="Information that was missing when this strategy was generated." />
         </>
@@ -187,12 +174,34 @@ export default function AIStrategyPage() {
             <div data-testid="strategy-empty" className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-14 text-center">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-50 text-violet-600"><Sparkles className="h-6 w-6" /></span>
               <p className="text-base font-semibold text-slate-800">You don&apos;t have an AI strategy yet</p>
-              <p className="max-w-md text-sm text-slate-500">Odito will use your Business profile — what it knows about your business, audience, goals and brand — to propose what to publish on Facebook and Instagram.</p>
+              <p className="max-w-md text-sm text-slate-500">Odito will use your Business profile — what it knows about your business, audience, goals and brand — to propose what to publish. First you choose how often to post and for how long.</p>
+              <button
+                type="button" onClick={() => openWizard('create')} disabled={busy || !canGenerate} data-testid="generate-button"
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 active:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {busy ? 'Generating…' : 'Create AI Strategy'}
+              </button>
             </div>
-            <StrategyGapsCard gaps={profile?.gaps} title="Make your strategy more specific" subtitle="These details are missing from your Business profile. You can generate without them, but the strategy will be more general." />
+            <StrategyGapsCard gaps={profile?.gaps} title="Make your strategy more specific" subtitle="These details are missing from your Business profile. You can generate without them, but the strategy will be more generic." />
           </>
         )
       )}
+
+      <StrategyWizard
+        open={!!wizard}
+        onOpenChange={(open) => { if (!open) setWizard(null) }}
+        projectId={activeProjectId}
+        businessName={businessName}
+        connectedPlatforms={profile?.connectedPlatforms}
+        current={strategy?.planning || null}
+        currentVersion={strategy?.version || 0}
+        retryChoice={retryChoice}
+        mode={wizardMode || 'create'}
+        pending={generate.isPending}
+        error={startError}
+        onConfirm={handleConfirm}
+      />
     </div>
   )
 }
