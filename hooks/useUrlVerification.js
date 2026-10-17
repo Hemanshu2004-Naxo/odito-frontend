@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import apiService from '@/lib/apiService'
 import socketService from '@/lib/socketService'
-import { queryKeys } from '@/lib/query/keys'
+import { queryKeys, issueContextPageFilter } from '@/lib/query/keys'
 
 /**
  * Per-page URL Verification trigger (F4-001).
@@ -75,6 +75,8 @@ export function useUrlVerification(projectId, pageUrl) {
     const url = pageUrlRef.current
     if (pid && url) {
       queryClient.invalidateQueries({ queryKey: queryKeys.issues.page(pid, url) })
+      // This page's "Current State" (issue context) is derived from the crawl this run just replaced. Only this page's entries.
+      queryClient.invalidateQueries(issueContextPageFilter(pid, url))
       // F4-002's result panel reads this key once progress.status is
       // 'completed' — invalidate explicitly rather than relying solely on
       // the enabled-toggle to guarantee a fresh fetch even if a previous

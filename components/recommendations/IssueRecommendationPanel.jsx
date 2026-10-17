@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState, useCallback } from "react"
+import { memo, useState, useCallback, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Copy, Check, AlertCircle, Zap, Eye, Layers } from "lucide-react"
 import RecommendationLoadingState from "./RecommendationLoadingState"
@@ -8,6 +8,10 @@ import RecommendationCodeBlock from "./RecommendationCodeBlock"
 import RecommendationDiffViewer from "./RecommendationDiffViewer"
 import { describeFaqGenerationBlock } from "../issue-context/faqDetection"
 import { describeRatingGenerationBlock, formatRating } from "../issue-context/ratingDetection"
+import BreadcrumbHierarchyPanel from "./BreadcrumbHierarchyPanel"
+import { getBreadcrumbModel } from "./breadcrumbHierarchy"
+import SchemaIntentPanel from "./SchemaIntentPanel"
+import { getOrganizationIntentModel } from "./organizationIntent"
 
 // ── Design tokens — theme-aware CSS variables ────────────────────────────────
 const T = {
@@ -258,6 +262,8 @@ export default function IssueRecommendationPanel({
   onReset,
   faqDetection = null,
   ratingDetection = null,
+  // Optional: lets a parent that shows the recommendation elsewhere (the DIY guide) follow a breadcrumb regeneration.
+  onRecommendationReplaced = null,
 }) {
   const {
     isIdle = true,
@@ -265,9 +271,26 @@ export default function IssueRecommendationPanel({
     isSuccess = false,
     isError = false,
     error = null,
-    recommendation = null,
-    meta = null,
+    recommendation: generatedRecommendation = null,
+    meta: generatedMeta = null,
   } = mutationState
+
+  // A breadcrumb regeneration (owner-confirmed hierarchy) replaces the recommendation shown here WITHOUT re-running the
+  // generation mutation. It belongs to one page: it is dropped when the page changes or the panel returns to idle.
+  const [replacement, setReplacement] = useState(null)
+  useEffect(() => { setReplacement(null) }, [selUrl])
+  useEffect(() => { if (isIdle) setReplacement(null) }, [isIdle])
+  const recommendation = replacement?.data ?? generatedRecommendation
+  const meta = replacement?.meta ?? generatedMeta
+  const breadcrumbModel = getBreadcrumbModel(issueId, meta)
+  const showBreadcrumbPanel = breadcrumbModel.applies && ["unavailable", "user_provided", "conflict"].includes(breadcrumbModel.state)
+  // organization_schema: the server decided WHICH entity (Organization / LocalBusiness / Hospital / reuse / ask for a missing fact)
+  const orgModel = getOrganizationIntentModel(issueId, meta)
+  const showOrgIntent = orgModel.applies
+  const handleBreadcrumbRegenerated = (response) => {
+    setReplacement(response)
+    onRecommendationReplaced?.(response)
+  }
 
   // ── STATE 1: No URL selected ───────────────────────────────────────────────
   if (!selUrl) {
@@ -398,13 +421,39 @@ export default function IssueRecommendationPanel({
           <IssueAnalysisSection recommendation={recommendation} issue={issue} />
         </motion.div>
 
-        {/* Recommended Version — what the corrected version looks like */}
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
-          <RecommendedVersionSection recommendation={recommendation} />
-        </motion.div>
+        {showBreadcrumbPanel ? (
+          /* Breadcrumb hierarchy the crawl could not determine: ask the owner (no fake code), or show what was generated from it */
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+            <BreadcrumbHierarchyPanel
+              projectId={projectId}
+              selUrl={selUrl}
+              model={breadcrumbModel}
+              recommendation={recommendation}
+              ruleMetadata={{ title: issue?.title || issue?.issue || issue?.issue_message, category: issue?.category, severity: issue?.severity }}
+              onRegenerated={handleBreadcrumbRegenerated}
+            />
+          </motion.div>
+        ) : showOrgIntent ? (
+          /* Organization / LocalBusiness / Hospital: the chosen type, why, the facts used, and validated JSON-LD or a question */
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+            <SchemaIntentPanel
+              model={orgModel}
+              recommendation={recommendation}
+              projectId={projectId}
+              selUrl={selUrl}
+              ruleMetadata={{ title: issue?.title || issue?.issue || issue?.issue_message, category: issue?.category, severity: issue?.severity }}
+              onRegenerated={handleBreadcrumbRegenerated}
+            />
+          </motion.div>
+        ) : (
+          /* Recommended Version — what the corrected version looks like */
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+            <RecommendedVersionSection recommendation={recommendation} />
+          </motion.div>
+        )}
 
         {/* Before / After — visual diff */}
-        {(recommendation.beforeState || recommendation.afterState) && (
+        {!showBreadcrumbPanel && !showOrgIntent && (recommendation.beforeState || recommendation.afterState) && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
             <BeforeAfterSection
               beforeState={recommendation.beforeState}
@@ -414,7 +463,7 @@ export default function IssueRecommendationPanel({
         )}
 
         {/* Change Summary — concise bullet list of what needs to change */}
-        {recommendation.changeSummary?.items?.length > 0 && (
+        {recommendation.changeSummary?.items?.length > 0 && !(showBreadcrumbPanel && breadcrumbModel.state !== "user_provided") && !(showOrgIntent && orgModel.needsNoTask) && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
             <ChangeSummarySection changeSummary={recommendation.changeSummary} />
           </motion.div>
@@ -458,7 +507,7 @@ export default function IssueRecommendationPanel({
                 The fix was not confirmed. Use the <strong className="text-foreground">DIY Guide</strong> or <strong className="text-foreground">History Logs</strong> to re-implement.
               </p>
             </div>
-          ) : typeof onCreateTask === 'function' ? (
+          ) : (showBreadcrumbPanel && ["unavailable", "conflict"].includes(breadcrumbModel.state)) || (showOrgIntent && orgModel.needsNoTask) ? null : typeof onCreateTask === 'function' ? (
             // Only rendered when a screen actually provides a handler — a button
             // whose click silently does nothing is worse than no button.
             <button

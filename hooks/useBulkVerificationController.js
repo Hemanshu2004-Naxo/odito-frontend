@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import apiService from '@/lib/apiService'
 import socketService from '@/lib/socketService'
-import { queryKeys } from '@/lib/query/keys'
+import { queryKeys, issueContextPageFilter } from '@/lib/query/keys'
 import { BatchState, reduceBatchState, isValidBatchTransition } from '@/lib/verification/bulkBatchState'
 import { BulkVerificationController, BULK_VERIFICATION_CONCURRENCY } from '@/lib/verification/BulkVerificationController'
 import { BatchVerificationController } from '@/lib/verification/BatchVerificationController'
@@ -160,6 +160,8 @@ export function useBulkVerificationController({ projectId, concurrency = BULK_VE
         anyCompleted = true
         queryClient.invalidateQueries({ queryKey: queryKeys.issues.page(projectId, url) })
         queryClient.invalidateQueries({ queryKey: queryKeys.verification.latest(projectId, url) })
+        // That page's "Current State" (issue context) comes from the crawl this batch just replaced.
+        queryClient.invalidateQueries(issueContextPageFilter(projectId, url))
       }
     }
     if (anyCompleted) {

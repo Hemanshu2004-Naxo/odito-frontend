@@ -221,10 +221,17 @@ describe('useUrlVerification', () => {
     expect(socketService.offVerificationCompleted).toHaveBeenCalledTimes(1)
     expect(socketService.offVerificationFailed).toHaveBeenCalledTimes(1)
 
-    expect(invalidateSpy).toHaveBeenCalledTimes(3)
+    expect(invalidateSpy).toHaveBeenCalledTimes(4)
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.issues.page('proj-1', 'https://example.com/page'),
     })
+    // this page's issue-context (the "Current State" derived from the replaced crawl) — and no other page's, no other project's
+    const scoped = invalidateSpy.mock.calls.map((c) => c[0]).find((a) => typeof a.predicate === 'function')
+    const q = (queryKey) => ({ queryKey })
+    expect(scoped.predicate(q(['issue-context', 'proj-1', 'images_missing_alt_text', 'https://example.com/page']))).toBe(true)
+    expect(scoped.predicate(q(['issue-context', 'proj-1', 'title_missing', 'https://example.com/page']))).toBe(true)
+    expect(scoped.predicate(q(['issue-context', 'proj-1', 'images_missing_alt_text', 'https://example.com/other']))).toBe(false)
+    expect(scoped.predicate(q(['issue-context', 'proj-2', 'images_missing_alt_text', 'https://example.com/page']))).toBe(false)
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.verification.latest('proj-1', 'https://example.com/page'),
     })

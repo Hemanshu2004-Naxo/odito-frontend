@@ -45,10 +45,18 @@ import { useScrollIntoViewWhenStacked } from "@/hooks/useScrollIntoViewWhenStack
 import { describeApplyError } from "./wordPressApplyError"
 import FaqSchemaApplyDialog from "./FaqSchemaApplyDialog"
 import RatingSchemaApplyDialog from "./RatingSchemaApplyDialog"
-import SameAsApplyDialog from "./SameAsApplyDialog"
+import SameAsFixPanel from "./SameAsFixPanel"
+import BreadcrumbFixCard from "./BreadcrumbFixCard"
+import { BREADCRUMB_DIY_POINTER, BREADCRUMB_ISSUE_ID } from "./breadcrumbFix"
+import { SAMEAS_DIY_POINTER, SAMEAS_ISSUE_ID } from "./sameAsFix"
 import H1ApplyDialog from "./H1ApplyDialog"
 import { FAQ_ISSUE_ID, getFaqDetection } from "@/components/issue-context/faqDetection"
 import { RATING_ISSUE_ID, getRatingDetection } from "@/components/issue-context/ratingDetection"
+import OrganizationFixPanel from "./OrganizationFixPanel"
+import { ORGANIZATION_FIX_ISSUE_ID } from "./organizationFix"
+import ImageAltFixPanel from "./ImageAltFixPanel"
+import { IMAGE_ALT_ISSUE_ID, ALT_DIY_POINTER, ALT_NOT_APPLICABLE_MESSAGE, ALT_NOT_APPLICABLE_TITLE, getAltPanelAvailability, isAltFindingNotApplicable } from "./imageAltFix"
+import AuditIqHelpPanel from "./AuditIqHelpPanel"
 
 // issueKey -> the field WordPress fixes can target, mirrored from the
 // backend's own providerCapabilityRegistry.js/issueSnapshotTypes.js. Kept in
@@ -222,90 +230,6 @@ function WordPressApplyConfirmDialog({ open, onOpenChange, fieldLabel, siteLabel
   )
 }
 
-/**
- * Breadcrumbs confirmation dialog — a single site-wide toggle, not a value
- * replacement. Explicitly does NOT claim "breadcrumb schema fixed" from the
- * write alone (Section 12): a successful write only confirms Rank Math's
- * OWN setting flipped, never that BreadcrumbList JSON-LD actually renders —
- * that's TaskVerificationService's job after the next recrawl, same
- * two-layer distinction as canonical.
- */
-function BreadcrumbApplyDialog({ open, onOpenChange, siteLabel, providerLabel, breadcrumbs, breadcrumbsLoading, breadcrumbsUnavailable, onConfirm, onRefreshLiveValue, isApplying, errorInfo }) {
-  if (!open) return null
-  const showRefreshAction = errorInfo?.requiresRefresh || breadcrumbsUnavailable
-  const applyDisabledByError = !!errorInfo?.nonRetryable
-  const alreadyEnabled = breadcrumbs?.enabled === true
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)" }}>
-      <div style={{ width: "min(440px, 92vw)", background: "var(--card, var(--s))", border: "1px solid var(--b)", borderRadius: 14, padding: 20, boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>Enable Rank Math Breadcrumbs?</div>
-        <div style={{ fontSize: 11.5, color: "var(--t3)", marginBottom: 4 }}>
-          {siteLabel ? `Website: ${siteLabel}` : null}{providerLabel ? ` · Provider: ${providerLabel}` : null}
-        </div>
-        <div style={{ fontSize: 11, color: "#f5a623", marginBottom: 14, lineHeight: 1.4 }}>
-          This changes Rank Math's global breadcrumb setting — it affects every page on this site, not just this one.
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 9.5, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-            Rank Math Breadcrumbs — Current Status
-          </div>
-          <div style={{ fontSize: 12.5, padding: "8px 10px", background: "var(--s2)", borderRadius: 8, border: "1px solid var(--b)", display: "flex", alignItems: "center", gap: 8 }}>
-            {breadcrumbsLoading ? (
-              <span style={{ color: "var(--t3)" }}>Loading current status…</span>
-            ) : breadcrumbsUnavailable ? (
-              <span style={{ color: "#ff3860" }}>Unable to read the current setting. Refresh and try again.</span>
-            ) : (
-              <>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: alreadyEnabled ? "#00f5a0" : "#ff3860", display: "inline-block" }} />
-                <span style={{ color: "var(--t)", fontWeight: 600 }}>{alreadyEnabled ? "Enabled" : "Disabled"}</span>
-              </>
-            )}
-          </div>
-          {alreadyEnabled && (
-            <div style={{ fontSize: 11, color: "#f5a623", marginTop: 6 }}>
-              Already enabled in Rank Math. Applying will be a no-op — the actual BreadcrumbList schema on this page still depends on crawler verification, not this setting alone.
-            </div>
-          )}
-        </div>
-
-        {errorInfo && (
-          <div style={{
-            fontSize: 11.5, lineHeight: 1.5, marginBottom: 12, padding: "8px 10px", borderRadius: 8,
-            color: errorInfo.isConflict ? "#f5a623" : "#ff3860",
-            background: errorInfo.isConflict ? "rgba(245,166,35,0.1)" : "rgba(255,56,96,0.08)",
-          }}>
-            {errorInfo.wordpressWriteSucceeded
-              ? "The WordPress change may have already been applied, but Odito couldn't record it because the task changed at the same time. Refresh and check WordPress before trying again."
-              : errorInfo.isConflict
-                ? "This value changed on WordPress before the fix was applied. Refresh and review before applying again."
-                : errorInfo.message}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" onClick={() => onOpenChange(false)} disabled={isApplying}
-            style={{ flex: 1, padding: "10px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, border: "1px solid var(--b)", background: "var(--s2)", color: "var(--t2)", cursor: isApplying ? "not-allowed" : "pointer" }}>
-            Cancel
-          </button>
-          {showRefreshAction ? (
-            <button type="button" onClick={onRefreshLiveValue} disabled={breadcrumbsLoading}
-              style={{ flex: 1, padding: "10px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, border: "none", background: "#f5a623", color: "#1a1a1a", cursor: breadcrumbsLoading ? "not-allowed" : "pointer", opacity: breadcrumbsLoading ? 0.7 : 1 }}>
-              {breadcrumbsLoading ? "Refreshing…" : "Refresh Live Value"}
-            </button>
-          ) : (
-            <button type="button" onClick={onConfirm} disabled={isApplying || breadcrumbsLoading || applyDisabledByError}
-              style={{ flex: 1, padding: "10px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, border: "none", background: "linear-gradient(135deg,#7730ed,#00dfff)", color: "#fff", cursor: (isApplying || breadcrumbsLoading || applyDisabledByError) ? "not-allowed" : "pointer", opacity: (isApplying || breadcrumbsLoading || applyDisabledByError) ? 0.5 : 1 }}>
-              {isApplying ? "Applying…" : "Enable Breadcrumbs"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function IssueDetailView({
   issue,
   onBack,
@@ -321,6 +245,10 @@ export default function IssueDetailView({
   const fixPanelRef = useRef(null)
   useScrollIntoViewWhenStacked(fixPanelRef, selUrl)
   const [toast, setToast] = useState(null)
+  // The AuditIQ tab mounts on first visit and then stays mounted (hidden), so its state survives tab switches
+  // without issuing its request-status query for people who never open it.
+  const [auditIqVisited, setAuditIqVisited] = useState(initialMode === "help")
+  if (mode === "help" && !auditIqVisited) setAuditIqVisited(true)
 
   // Closes the pre-existing gap where a task silently verified/reopened in
   // the background (a routine recrawl) never reached this view without a
@@ -408,7 +336,7 @@ export default function IssueDetailView({
   // Fetch the live issue context (same query that CurrentStateRenderer uses).
   // React Query deduplicates this — no extra network call when the sub-component
   // also renders CurrentStateRenderer for the same key.
-  const { data: issueContextData } = useIssueContext(activeProject?._id, issueId, selUrl)
+  const { data: issueContextData, isLoading: issueContextLoading } = useIssueContext(activeProject?._id, issueId, selUrl)
 
   // Resolve the issueCode
   const issueCode = useMemo(() => {
@@ -508,13 +436,16 @@ export default function IssueDetailView({
   });
 
   const { data, isIdle, isPending, isSuccess, isError, error } = recommendationMutation;
+  // A breadcrumb hierarchy confirmed by the site owner regenerates the recommendation WITHOUT re-running the generation
+  // mutation above (see BreadcrumbHierarchyPanel). Held here, next to the mutation state, so the DIY guide follows it too.
+  const [replacedResult, setReplacedResult] = useState(null)
   // Local, ephemeral result of THIS component instance's own "Generate
   // Recommendation" click — NOT the source of truth for whether a
   // recommendation is linked to the task. Kept only to (a) display
   // freshly-generated content immediately, before the by-id fetch below
   // has round-tripped, and (b) drive the auto-link effect further down.
-  const recommendation = data?.data;
-  const meta = data?.meta;
+  const recommendation = replacedResult?.data ?? data?.data;
+  const meta = replacedResult?.meta ?? data?.meta;
 
   // ── Apply via WordPress (Phase 4) ─────────────────────────────────────
   // Only offered when: a WordPress connection exists, the detected SEO
@@ -535,7 +466,7 @@ export default function IssueDetailView({
   // Enabled regardless of scope — site-scoped fields don't use its
   // per-field write flags (see wpFieldSupported below), but its
   // connected/providerLabel data is shared display info both dialogs use.
-  const { data: wpCapabilitiesResponse } = useWordPressCapabilities(activeProject?._id, { enabled: !!wordPressFieldType })
+  const { data: wpCapabilitiesResponse, isError: wpCapabilitiesError } = useWordPressCapabilities(activeProject?._id, { enabled: !!wordPressFieldType || issueId === ORGANIZATION_FIX_ISSUE_ID || issueId === IMAGE_ALT_ISSUE_ID })
   const wpCapabilities = wpCapabilitiesResponse?.data
   const wpCapabilityKey = wordPressFieldType ? WORDPRESS_CAPABILITY_KEY[wordPressFieldType] : null
   // Site-scoped fields (same_as, breadcrumb) have no per-post capability
@@ -583,6 +514,19 @@ export default function IssueDetailView({
   } = useWordPressPageResolution(activeProject?._id, selUrl, { enabled: wpConfirmOpen && isSchemaChannel })
   const wpPageResolution = wpPageResolutionResponse?.data
   const selectedTask = selUrl ? taskMap[selUrl] : null
+  // The finding covered only analytics trackers: there is no picture to fix, so neither the AI recommendation, the DIY checklist
+  // ("Mark as Implemented") nor the WordPress panel is offered — a notice says why instead.
+  const altNotApplicable = issueId === IMAGE_ALT_ISSUE_ID && !!selUrl && isAltFindingNotApplicable(issueContextData)
+  // Until the page's context is known the alt content is held back, so nothing is fetched or offered for a tracker-only finding and
+  // then taken away. A FAILED context load does not block: everything behaves as it did before this check existed.
+  const altContextPending = issueId === IMAGE_ALT_ISSUE_ID && !!selUrl && !!issueContextLoading
+  const altNotApplicableNotice = (
+    <div role="status" data-testid="image-alt-not-applicable" className="rounded-xl border border-border bg-muted p-4 text-[12.5px] leading-relaxed text-muted-foreground">
+      <div className="mb-1 font-bold text-foreground">{ALT_NOT_APPLICABLE_TITLE}</div>
+      {ALT_NOT_APPLICABLE_MESSAGE}
+    </div>
+  )
+  const altPanel = getAltPanelAvailability({ selUrl, taskId: selectedTask?._id, wpCapabilities, capabilitiesError: !!wpCapabilitiesError })
 
   // Bug fix: this used to gate on the local `recommendation` (this
   // component instance's own last "Generate Recommendation" result) —
@@ -899,6 +843,7 @@ export default function IssueDetailView({
   // panel back to a stale "success" state after the user has moved on.
   useEffect(() => {
     recommendationMutation.reset()
+    setReplacedResult(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selUrl])
 
@@ -1382,7 +1327,10 @@ export default function IssueDetailView({
               </div>
 
               {/* Tab 1: AI Recommendation */}
-              {mode === "ai" && (
+              {mode === "ai" && altContextPending && <div role="status" data-testid="image-alt-context-loading" className="p-3 text-[12px] text-muted-foreground">Checking what this page flagged…</div>}
+              {mode === "ai" && altNotApplicable && altNotApplicableNotice}
+              {mode === "ai" && !altNotApplicable && !altContextPending && (
+                <>
                 <IssueRecommendationPanel
                   projectId={activeProject?._id}
                   issueId={issueId}
@@ -1403,9 +1351,46 @@ export default function IssueDetailView({
                     recommendation,
                     meta,
                   }}
-                  onGenerate={() => recommendationMutation.mutate()}
-                  onReset={() => recommendationMutation.reset()}
+                  onGenerate={() => { setReplacedResult(null); recommendationMutation.mutate() }}
+                  onReset={() => { setReplacedResult(null); recommendationMutation.reset() }}
+                  onRecommendationReplaced={setReplacedResult}
                 />
+                {/* Organization schema: the typed preview -> approve -> apply -> verify -> rollback workflow. Offered only once a
+                    task exists with a linked recommendation and WordPress is connected; the panel itself explains anything unsupported. */}
+                {issueId === ORGANIZATION_FIX_ISSUE_ID && selectedTask?._id && linkedRecommendationId && wpCapabilities?.connected && (
+                  <OrganizationFixPanel projectId={activeProject?._id} task={selectedTask} />
+                )}
+                {/* Breadcrumbs: once the owner has confirmed a trail, the exact change WordPress can make for it (or the manual steps), approval,
+                    apply, and verification of the live pages. The card renders nothing until there is a task and a confirmed trail. */}
+                {issueId === BREADCRUMB_ISSUE_ID && selectedTask?._id && (
+                  <BreadcrumbFixCard projectId={activeProject?._id} task={selectedTask} recommendationLinked={!!linkedRecommendationId} />
+                )}
+                {/* Organization sameAs: discover the profile links on the site, review/edit/add, preview the exact change, approve, apply,
+                    verify. Discovery and preview need no task or recommendation; applying does (the panel says so and offers to create the task). */}
+                {issueId === SAMEAS_ISSUE_ID && selUrl && (
+                  <SameAsFixPanel
+                    key={selUrl}
+                    projectId={activeProject?._id}
+                    pageUrl={selUrl}
+                    task={selectedTask}
+                    hasRecommendation={!!(recommendation || linkedRecommendation)}
+                    recommendationLinked={!!(selectedTask?._id && linkedRecommendationId)}
+                    onCreateTask={onCreateTask}
+                    isCreatingTask={createTaskMutation.isPending}
+                  />
+                )}
+                {/* Image alt text: one image at a time, written to the media library only after approval. The text is written by
+                    a person, so no linked recommendation is required — only a task and a connected WordPress site. */}
+                {issueId === IMAGE_ALT_ISSUE_ID && altPanel.available && (
+                  <ImageAltFixPanel projectId={activeProject?._id} task={selectedTask} recommendationKey={`${recommendation?.id || linkedRecommendationId || ""}:${recommendation?.updatedAt || ""}`} />
+                )}
+                {/* When the panel cannot be offered, say why — never a silent absence. */}
+                {issueId === IMAGE_ALT_ISSUE_ID && !altPanel.available && altPanel.message && (
+                  <div role="status" data-testid="image-alt-unavailable" data-reason={altPanel.reason} className="mt-3 rounded-lg border border-border bg-muted px-3 py-2.5 text-[12px] leading-relaxed text-muted-foreground">
+                    {altPanel.message}
+                  </div>
+                )}
+                </>
               )}
 
               {/* Tab 2: DIY Guide — Uses shared recommendation intelligence.
@@ -1417,7 +1402,8 @@ export default function IssueDetailView({
                   task already has a real one linked. Without this fallback,
                   a correctly-gated canOfferWordPressApply:true could never
                   actually be reached, since this tab wouldn't render at all. */}
-              {mode === "diy" && (recommendation || linkedRecommendation) && (
+              {mode === "diy" && altNotApplicable && altNotApplicableNotice}
+              {mode === "diy" && !altNotApplicable && !altContextPending && (recommendation || linkedRecommendation) && (
                 <DIYRenderer
                   recommendation={recommendation || linkedRecommendation}
                   issue={issue}
@@ -1425,13 +1411,13 @@ export default function IssueDetailView({
                   selUrl={selUrl}
                   onMarkImplemented={onMarkImplemented}
                   isMarkingImplemented={markImplementedMutation.isPending}
-                  canApplyViaWordPress={canOfferWordPressApply}
+                  canApplyViaWordPress={canOfferWordPressApply && wordPressFieldType !== "same_as" && wordPressFieldType !== "breadcrumb"}
                   wordPressFieldLabel={wordPressFieldType ? WORDPRESS_FIELD_LABEL[wordPressFieldType] : null}
                   wordPressProviderLabel={wpCapabilities?.providerLabel}
                   wordPressBridgeRequired={!!(wordPressFieldType && !isContentChannel && wpCapabilities?.connected && !wpCapabilities?.ambiguous && wpCapabilities?.bridgeRequired && !wpFieldSupported)}
-                  wordPressUnsupportedReason={wpSiteSchemaUnsupportedReason || wpSchemaChannelUnsupportedReason || wpContentUnsupportedReason}
+                  wordPressUnsupportedReason={wpSiteSchemaUnsupportedReason || wpSchemaChannelUnsupportedReason || wpContentUnsupportedReason || (issueId === IMAGE_ALT_ISSUE_ID ? ALT_DIY_POINTER : issueId === SAMEAS_ISSUE_ID ? SAMEAS_DIY_POINTER : issueId === BREADCRUMB_ISSUE_ID ? BREADCRUMB_DIY_POINTER : null)}
                   wordPressUserInputHint={wordPressFieldType === "same_as"
-                    ? "Enter your own verified social profile URLs and Odito will add them to your Organization schema in WordPress. Odito never guesses profile URLs."
+                    ? "Open the AI Recommendation tab: Odito finds the profile links on your own site, you review or add your own, and only then approve the exact change to your Organization schema in WordPress. Odito never guesses profile URLs."
                     : (isContentChannel && wpH1Context?.supported
                       ? `Odito can add the H1 to this page directly in WordPress (${wpH1Context.builder?.label || "page builder"}). You will review exactly what changes before anything is written.`
                       : null)}
@@ -1447,7 +1433,7 @@ export default function IssueDetailView({
                   be eligible for Apply via WordPress, so the message is
                   identical regardless of whether the DIY guide has other
                   content to show yet. */}
-              {mode === "diy" && !recommendation && !linkedRecommendation && (
+              {mode === "diy" && !altNotApplicable && !altContextPending && !recommendation && !linkedRecommendation && (
                 <div style={{
                   padding: "20px",
                   textAlign: "center",
@@ -1477,244 +1463,25 @@ export default function IssueDetailView({
                 </div>
               )}
 
-              {/* Tab 3: AuditIQ Help */}
-              {mode === "help" && (
-                <div>
-                  {/* Centered Header Section */}
-                  <div style={{
-                    textAlign: "center",
-                    padding: "16px 0 18px"
-                  }}>
-                    <div style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 14,
-                      background: "linear-gradient(135deg,#7730ed,#00dfff)",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: 24,
-                      margin: "0 auto 12px"
-                    }}>
-                      🤝
-                    </div>
-                    <div style={{
-                      fontFamily: "/dashboard",
-                      fontSize: 17,
-                      fontWeight: 800,
-                      marginBottom: 6
-                    }}>
-                      Let AuditIQ Fix It
-                    </div>
-                    <div style={{
-                      fontSize: 12,
-                      color: "var(--t2)",
-                      lineHeight: 1.6
-                    }}>
-                      Our technical team will resolve <strong style={{ color: "var(--t)" }}>{issue.title || issue.issue}</strong> across all {issue.pages || issue.pages_affected || 0} affected pages — with QA verification and a before/after report.
-                    </div>
-                  </div>
-
-                  {/* Service Options */}
-                  {[
-                    {
-                      icon: "⚡",
-                      title: "Express Fix",
-                      desc: "Fix all pages in 24 hours",
-                      tag: "Most Popular",
-                      tc: "var(--cy)",
-                      bg: "var(--color-brand-cyan-surface)"
-                    },
-                    {
-                      icon: "🔍",
-                      title: "Technical Audit + Fix",
-                      desc: "Full review then implement fixes with docs",
-                      tag: "Comprehensive",
-                      tc: "var(--vi)",
-                      bg: "var(--color-brand-violet-surface)"
-                    },
-                    {
-                      icon: "♾",
-                      title: "Monthly Maintenance",
-                      desc: "Ongoing fixes + monitoring + alerts",
-                      tag: "Best Value",
-                      tc: "var(--gr)",
-                      bg: "var(--color-status-success-surface)"
-                    }
-                  ].map((option, i) => (
-                    <div key={i} style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "13px 14px",
-                      marginBottom: 9,
-                      background: "var(--s)",
-                      border: "1px solid var(--b)",
-                      borderRadius: 11,
-                      cursor: "pointer",
-                      transition: "all 0.2s"
-                    }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "var(--border2)"
-                        e.currentTarget.style.transform = "translateX(2px)"
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "var(--b)"
-                        e.currentTarget.style.transform = "translateX(0)"
-                      }}>
-                      <div style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 10,
-                        display: "grid",
-                        placeItems: "center",
-                        fontSize: 20,
-                        background: option.bg,
-                        flexShrink: 0
-                      }}>{option.icon}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          fontWeight: 700,
-                          fontSize: 13,
-                          marginBottom: 2
-                        }}>{option.title}</div>
-                        <div style={{
-                          fontSize: 11,
-                          color: "var(--t3)"
-                        }}>{option.desc}</div>
-                      </div>
-                      <span style={{
-                        borderRadius: 20,
-                        padding: "2px 9px",
-                        fontSize: "9.5px",
-                        fontWeight: 600,
-                        color: option.tc,
-                        background: `var(--color-brand-cyan-surface)`,
-                        border: `1px solid var(--color-brand-cyan-border)`
-                      }}>{option.tag}</span>
-                    </div>
-                  ))}
-
-                  <button
-                    style={{
-                      width: "100%",
-                      padding: 10,
-                      borderRadius: 9,
-                      fontSize: "12.5px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      border: "none",
-                      fontFamily: "/dashboard",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      marginBottom: 7,
-                      background: "linear-gradient(135deg,#7730ed,#00dfff)",
-                      color: "#fff",
-                      boxShadow: "0 0 18px rgba(0,223,255,0.16)"
-                    }}
-                  >
-                    🚀 Request Expert Fix
-                  </button>
-                  <button
-                    style={{
-                      width: "100%",
-                      padding: 10,
-                      borderRadius: 9,
-                      fontSize: "12.5px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      border: "none",
-                      fontFamily: "/dashboard",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      marginBottom: 7,
-                      background: "linear-gradient(135deg, var(--color-brand-violet-surface), rgba(157,78,221,0.2))",
-                      color: "var(--vi)",
-                      border: "1px solid var(--color-brand-violet-border)"
-                    }}
-                  >
-                    📅 Book a Strategy Call
-                  </button>
-                  <button
-                    style={{
-                      width: "100%",
-                      padding: 10,
-                      borderRadius: 9,
-                      fontSize: "12.5px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      border: "none",
-                      fontFamily: "/dashboard",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      background: "var(--s2)",
-                      color: "var(--t2)",
-                      border: "1px solid var(--b)"
-                    }}
-                    onClick={() => setMode("ai")}
-                  >
-                    ← Back to AI Fix
-                  </button>
-
-                  {/* Green Info Strip */}
-                  <div style={{
-                    background: "var(--color-status-success-surface)",
-                    border: "1px solid var(--color-status-success-border)",
-                    borderRadius: 9,
-                    padding: "10px 12px",
-                    marginTop: 12,
-                    fontSize: 11,
-                    color: "var(--gr)",
-                    textAlign: "center"
-                  }}>
-                    ✓ Includes before/after screenshots + 30-day rank tracking
-                  </div>
-                </div>
+              {/* Tab 3: AuditIQ Help — real actions live in AuditIqHelpPanel. Mounted on first visit and then kept
+                  (hidden) so a half-written request note survives switching tabs. */}
+              {auditIqVisited && (
+                <AuditIqHelpPanel
+                  hidden={mode !== "help"}
+                  projectId={activeProject?._id}
+                  projectName={activeProject?.project_name || activeProject?.main_url}
+                  issue={issue}
+                  issueId={issueId}
+                  issueCategory={issue.category || issueTypeName}
+                  affectedPageCount={Number(issue.pages || issue.pages_affected || 0)}
+                  selUrl={selUrl}
+                  onBackToAi={() => setMode("ai")}
+                />
               )}
             </div>
           </div>
         </div>
       </div>
-
-      {wpConfirmOpen && wordPressFieldType === "same_as" && createPortal(
-        <SameAsApplyDialog
-          open={wpConfirmOpen}
-          onOpenChange={(open) => { setWpConfirmOpen(open); if (!open) applyWordPressFixMutation.reset() }}
-          siteLabel={activeProject?.main_url || activeProject?.project_name}
-          providerLabel={wpCapabilities?.providerLabel}
-          organization={wpSiteSchema?.organization}
-          organizationLoading={wpSiteSchemaLoading}
-          organizationUnavailable={wpConfirmOpen && !wpSiteSchemaLoading && wpSiteSchemaError}
-          unavailableReason={wpSiteSchemaUnsupportedReason}
-          onConfirm={(profiles) => applyWordPressFixMutation.mutate(profiles)}
-          onRefreshLiveValue={onRefreshLiveValue}
-          isApplying={applyWordPressFixMutation.isPending}
-          errorInfo={applyErrorInfo}
-        />,
-        document.body
-      )}
-
-      {wpConfirmOpen && wordPressFieldType === "breadcrumb" && createPortal(
-        <BreadcrumbApplyDialog
-          open={wpConfirmOpen}
-          onOpenChange={(open) => { setWpConfirmOpen(open); if (!open) applyWordPressFixMutation.reset() }}
-          siteLabel={activeProject?.main_url || activeProject?.project_name}
-          providerLabel={wpCapabilities?.providerLabel}
-          breadcrumbs={wpSiteSchema?.breadcrumbs}
-          breadcrumbsLoading={wpSiteSchemaLoading}
-          breadcrumbsUnavailable={wpConfirmOpen && !wpSiteSchemaLoading && wpSiteSchemaError}
-          onConfirm={() => applyWordPressFixMutation.mutate()}
-          onRefreshLiveValue={onRefreshLiveValue}
-          isApplying={applyWordPressFixMutation.isPending}
-          errorInfo={applyErrorInfo}
-        />,
-        document.body
-      )}
 
       {wpConfirmOpen && isFaqSchema && createPortal(
         <FaqSchemaApplyDialog

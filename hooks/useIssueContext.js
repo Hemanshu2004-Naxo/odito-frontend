@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import apiService from '@/lib/apiService';
+import { queryKeys } from '@/lib/query/keys';
 
 /**
  * useIssueContext
@@ -15,7 +16,7 @@ import apiService from '@/lib/apiService';
  */
 export function useIssueContext(projectId, issueId, pageUrl) {
   return useQuery({
-    queryKey: ['issue-context', projectId, issueId, pageUrl],
+    queryKey: queryKeys.issueContext.detail(projectId, issueId, pageUrl),
     queryFn: async () => {
       const response = await apiService.getIssueContext(projectId, issueId, pageUrl);
       if (!response.success) throw new Error(response.message || 'Failed to load issue context');
