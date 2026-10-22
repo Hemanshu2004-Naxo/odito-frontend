@@ -1,0 +1,1008 @@
+{
+ "schemaVersion": "1.1.0",
+ "metadata": {
+  "projectId": "6a926e2477a1dc109666490a",
+  "projectName": "Sapphiredigitalagency-Com",
+  "domain": "sapphiredigitalagency.com",
+  "audit": {
+   "runId": "6ad5f1f020c1ea4b5cc4d36f",
+   "auditNumber": 2,
+   "startedAt": "2026-10-19T10:30:10.034Z",
+   "completedAt": "2026-10-19T10:33:20.792Z",
+   "source": "manual_recheck",
+   "isLatest": true
+  },
+  "auditDate": "2026-10-19T10:33:20.792Z",
+  "generatedAt": "2026-10-19T12:38:45.922Z",
+  "scoringVersion": "1.1",
+  "aiScoringVersion": "v2",
+  "coverage": {
+   "pagesDiscovered": 35,
+   "pagesCrawled": 35,
+   "pagesAnalyzed": 35
+  },
+  "snapshot": {
+   "source": "audit_run",
+   "consistency": "aligned",
+   "note": "The latest completed audit run is also the project's current audit; live sections describe the same audit.",
+   "requestedAuditNumber": null,
+   "latestAuditNumber": 2,
+   "projectAuditStartedAt": "2026-10-19T10:30:10.034Z"
+  }
+ },
+ "sections": {
+  "onPageSeo": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "services/onPageIssuesService.getOnPageIssues",
+   "asOf": null,
+   "timeBasis": "live_current",
+   "snapshotRelation": "within_run",
+   "data": {
+    "totalIssues": 249,
+    "issueTypes": 16,
+    "pagesAnalyzed": 35,
+    "bySeverity": {
+     "high": 153,
+     "medium": 82,
+     "low": 14
+    },
+    "topIssues": [
+     {
+      "issueCode": "images_missing_alt_text",
+      "title": "Images Missing Alt Text",
+      "severity": "high",
+      "category": "Images",
+      "dataPath": "images.https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp.alt",
+      "pagesAffected": 35,
+      "occurrences": 35,
+      "impactPercentage": 100,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "person_schema_linked",
+      "title": "Person schema missing role/expertise information",
+      "severity": "high",
+      "category": "EEAT",
+      "dataPath": "structured_data.person.role",
+      "pagesAffected": 35,
+      "occurrences": 35,
+      "impactPercentage": 100,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "privacy_terms_pages",
+      "title": "Missing Terms of Service link",
+      "severity": "high",
+      "category": "EEAT",
+      "dataPath": "content.terms_link",
+      "pagesAffected": 29,
+      "occurrences": 29,
+      "impactPercentage": 82.9,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "invalid_schema_type",
+      "title": "Invalid Schema Type for Page",
+      "severity": "high",
+      "category": "Schema",
+      "dataPath": "structured_data.article",
+      "pagesAffected": 19,
+      "occurrences": 19,
+      "impactPercentage": 54.3,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "invalid_schema_type",
+      "title": "Invalid Schema Type for Page",
+      "severity": "high",
+      "category": "Schema",
+      "dataPath": "structured_data.faqpage",
+      "pagesAffected": 15,
+      "occurrences": 15,
+      "impactPercentage": 42.9,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "author_name_bio",
+      "title": "Author validation failed",
+      "severity": "high",
+      "category": "EEAT",
+      "dataPath": "author_signals",
+      "pagesAffected": 10,
+      "occurrences": 10,
+      "impactPercentage": 28.6,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "multiple_h1_tags",
+      "title": "Multiple H1 tags found",
+      "severity": "high",
+      "category": "Content",
+      "dataPath": "headings.h1",
+      "pagesAffected": 7,
+      "occurrences": 7,
+      "impactPercentage": 20,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "images_missing_alt_text",
+      "title": "Images Missing Alt Text",
+      "severity": "high",
+      "category": "Images",
+      "dataPath": "images.https://www.sapphiredigitalconnect.com/wp-content/uploads/2025/04/x-twitter-brands-solid.svg.alt",
+      "pagesAffected": 2,
+      "occurrences": 2,
+      "impactPercentage": 5.7,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "images_missing_alt_text",
+      "title": "Images Missing Alt Text",
+      "severity": "high",
+      "category": "Images",
+      "dataPath": "images.https://sapphiredigitalagency.com/wp-content/uploads/2025/12/Digital-Marketing-Agency-That-Delivers-Real-Results.webp.alt",
+      "pagesAffected": 1,
+      "occurrences": 1,
+      "impactPercentage": 2.9,
+      "difficulty": "hard"
+     },
+     {
+      "issueCode": "author_photo",
+      "title": "Author section missing real person photo",
+      "severity": "medium",
+      "category": "EEAT",
+      "dataPath": "images.author_photo",
+      "pagesAffected": 33,
+      "occurrences": 33,
+      "impactPercentage": 94.3,
+      "difficulty": "medium"
+     }
+    ],
+    "affectedUrls": {
+     "images_missing_alt_text": {
+      "totalUrls": 35,
+      "sample": [
+       {
+        "url": "https://www.sapphiredigitalagency.com/",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/about-us",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/app-development",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/become-a-partner",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/digital-marketing-in-2026-how-ai-automation-human-creativity-are-shaping-the-future",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/from-clicks-to-conversions-performance-marketing-strategies-that-actually-work-in-2026",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/seo-in-2026-how-to-rank-in-an-ai-driven-zero-click-search-world",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/step-by-step-guide-to-ranking-in-ai-search-engines-2026-edition",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/the-death-of-third-party-cookies-how-brands-can-win-with-privacy-first-marketing-in-2026",
+        "detectedValue": "https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp"
+       }
+      ]
+     },
+     "person_schema_linked": {
+      "totalUrls": 35,
+      "sample": [
+       {
+        "url": "https://www.sapphiredigitalagency.com/",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/about-us",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/app-development",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/become-a-partner",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/digital-marketing-in-2026-how-ai-automation-human-creativity-are-shaping-the-future",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/from-clicks-to-conversions-performance-marketing-strategies-that-actually-work-in-2026",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/seo-in-2026-how-to-rank-in-an-ai-driven-zero-click-search-world",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/step-by-step-guide-to-ranking-in-ai-search-engines-2026-edition",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/the-death-of-third-party-cookies-how-brands-can-win-with-privacy-first-marketing-in-2026",
+        "detectedValue": "Person: 'Sapphire-Digital-Agency' lacks jobTitle or description"
+       }
+      ]
+     },
+     "privacy_terms_pages": {
+      "totalUrls": 29,
+      "sample": [
+       {
+        "url": "https://www.sapphiredigitalagency.com/",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/app-development",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/become-a-partner",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/digital-marketing-in-2026-how-ai-automation-human-creativity-are-shaping-the-future",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/from-clicks-to-conversions-performance-marketing-strategies-that-actually-work-in-2026",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/seo-in-2026-how-to-rank-in-an-ai-driven-zero-click-search-world",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/the-ultimate-guide-to-aeo-geo-in-2026",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/what-is-generative-engine-optimization-geo-a-complete-guide",
+        "detectedValue": "No terms of service link found in page content"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/features-benefits",
+        "detectedValue": "No terms of service link found in page content"
+       }
+      ]
+     },
+     "invalid_schema_type": {
+      "totalUrls": 27,
+      "sample": [
+       {
+        "url": "https://www.sapphiredigitalagency.com/become-a-partner",
+        "detectedValue": "Found: Article | Page type: Contact"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/digital-marketing-in-2026-how-ai-automation-human-creativity-are-shaping-the-future",
+        "detectedValue": "Found: FAQPage | Page type: Article"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/from-clicks-to-conversions-performance-marketing-strategies-that-actually-work-in-2026",
+        "detectedValue": "Found: FAQPage | Page type: Article"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/seo-in-2026-how-to-rank-in-an-ai-driven-zero-click-search-world",
+        "detectedValue": "Found: FAQPage | Page type: Article"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/step-by-step-guide-to-ranking-in-ai-search-engines-2026-edition",
+        "detectedValue": "Found: FAQPage | Page type: Article"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/the-death-of-third-party-cookies-how-brands-can-win-with-privacy-first-marketing-in-2026",
+        "detectedValue": "Found: FAQPage | Page type: Article"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/the-ultimate-guide-to-aeo-geo-in-2026",
+        "detectedValue": "Found: FAQPage | Page type: Article"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/what-is-answer-engine-optimization-aeo-and-why-it-matters-in-2026",
+        "detectedValue": "Found: FAQPage | Page type: Article"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/blog/what-is-generative-engine-optimization-geo-a-complete-guide",
+        "detectedValue": "Found: FAQPage | Page type: Article"
+       },
+       {
+        "url": "https://www.sapphiredigitalagency.com/contact-us",
+        "detectedValue": "Found: FAQPage | Page type: Contact"
+       }
+      ]
+     }
+    },
+    "scope": "non-Accessibility categories, open issues"
+   }
+  },
+  "technicalSeo": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "TechnicalChecksService + Page11Service + Page09Service",
+   "asOf": null,
+   "timeBasis": "live_current",
+   "snapshotRelation": "within_run",
+   "data": {
+    "checks": [
+     {
+      "id": "ssl_certificate",
+      "name": "SSL Certificate",
+      "status": "OK",
+      "severity": "none",
+      "affectedPages": 0,
+      "impactPercentage": 0,
+      "impactBasis": "severity_tier",
+      "difficulty": "easy",
+      "message": "SSL certificate is valid and properly configured"
+     },
+     {
+      "id": "security_headers",
+      "name": "Security Headers",
+      "status": "Critical",
+      "severity": "high",
+      "affectedPages": 35,
+      "impactPercentage": 100,
+      "impactBasis": "pages_affected_ratio",
+      "difficulty": "hard",
+      "message": "35 pages missing critical security headers"
+     },
+     {
+      "id": "canonical_tags",
+      "name": "Canonical Tags",
+      "status": "OK",
+      "severity": "none",
+      "affectedPages": 0,
+      "impactPercentage": 0,
+      "impactBasis": "pages_affected_ratio",
+      "difficulty": "easy",
+      "message": "Canonical tags properly configured"
+     },
+     {
+      "id": "robots_txt",
+      "name": "Robots.txt",
+      "status": "OK",
+      "severity": "none",
+      "affectedPages": 0,
+      "impactPercentage": 0,
+      "impactBasis": "severity_tier",
+      "difficulty": "easy",
+      "message": "Robots.txt is accessible and properly configured"
+     },
+     {
+      "id": "noindex_tags",
+      "name": "Noindex on Key Pages",
+      "status": "OK",
+      "severity": "none",
+      "affectedPages": 0,
+      "impactPercentage": 0,
+      "impactBasis": "pages_affected_ratio",
+      "difficulty": "easy",
+      "message": "All important pages are indexable"
+     },
+     {
+      "id": "h1_tags",
+      "name": "H1 Tags",
+      "status": "Warning",
+      "severity": "medium",
+      "affectedPages": 7,
+      "impactPercentage": 20,
+      "impactBasis": "pages_affected_ratio",
+      "difficulty": "medium",
+      "message": "0 pages missing H1, 7 with multiple H1s"
+     },
+     {
+      "id": "structured_data",
+      "name": "Structured Data / Schema",
+      "status": "OK",
+      "severity": "none",
+      "affectedPages": 0,
+      "impactPercentage": 0,
+      "impactBasis": "pages_affected_ratio",
+      "difficulty": "easy",
+      "message": "35 pages with valid structured data"
+     },
+     {
+      "id": "mobile_friendliness",
+      "name": "Mobile Friendliness",
+      "status": "OK",
+      "severity": "none",
+      "affectedPages": 0,
+      "impactPercentage": 0,
+      "impactBasis": "pages_affected_ratio",
+      "difficulty": "easy",
+      "message": "Mobile-friendly configuration detected"
+     },
+     {
+      "id": "xml_sitemap",
+      "name": "XML Sitemap",
+      "status": "OK",
+      "severity": "none",
+      "affectedPages": 0,
+      "impactPercentage": 0,
+      "impactBasis": "severity_tier",
+      "difficulty": "easy",
+      "message": "XML sitemap accessible with 46 URLs"
+     },
+     {
+      "id": "og_social_tags",
+      "name": "OG / Social Tags",
+      "status": "Critical",
+      "severity": "high",
+      "affectedPages": 31,
+      "impactPercentage": 88.6,
+      "impactBasis": "pages_affected_ratio",
+      "difficulty": "hard",
+      "message": "31 pages missing Open Graph tags"
+     }
+    ],
+    "healthScore": 70,
+    "summary": {
+     "total": 10,
+     "passed": 7,
+     "passing": 7,
+     "warnings": 1,
+     "critical": 2,
+     "healthScore": 70
+    },
+    "crawlability": {
+     "totalPages": 35,
+     "indexedPages": 35,
+     "blockedPages": 0,
+     "indexRate": 100,
+     "blockedReasons": []
+    },
+    "structuredData": {
+     "pagesWithSchema": 35,
+     "pagesWithoutSchema": 0,
+     "coveragePercent": 100,
+     "schemaIssueCount": 100,
+     "schemaTypes": [
+      {
+       "count": 35,
+       "type": "Person",
+       "pages": 35
+      },
+      {
+       "count": 35,
+       "type": "WebSite",
+       "pages": 35
+      },
+      {
+       "count": 35,
+       "type": "Organization",
+       "pages": 35
+      },
+      {
+       "count": 35,
+       "type": "WebPage",
+       "pages": 35
+      },
+      {
+       "count": 35,
+       "type": "FAQPage",
+       "pages": 35
+      },
+      {
+       "count": 27,
+       "type": "Article",
+       "pages": 27
+      },
+      {
+       "count": 8,
+       "type": "BlogPosting",
+       "pages": 8
+      },
+      {
+       "count": 6,
+       "type": "ImageObject",
+       "pages": 6
+      }
+     ]
+    },
+    "unavailableParts": []
+   }
+  },
+  "accessibility": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "services/accessibilityIssuesService.getAccessibilityIssues",
+   "asOf": null,
+   "timeBasis": "live_current",
+   "snapshotRelation": "within_run",
+   "data": {
+    "totalIssues": 90,
+    "issueTypes": 6,
+    "pagesAnalyzed": 35,
+    "bySeverity": {
+     "high": 83,
+     "medium": 7
+    },
+    "topIssues": [
+     {
+      "issueCode": "keyboard_accessibility",
+      "severity": "high",
+      "pagesAffected": 28,
+      "impactPercentage": 80
+     },
+     {
+      "issueCode": "keyboard_accessibility",
+      "severity": "high",
+      "pagesAffected": 28,
+      "impactPercentage": 80
+     },
+     {
+      "issueCode": "focus_indicators",
+      "severity": "high",
+      "pagesAffected": 10,
+      "impactPercentage": 28.6
+     },
+     {
+      "issueCode": "form_labels",
+      "severity": "high",
+      "pagesAffected": 10,
+      "impactPercentage": 28.6
+     },
+     {
+      "issueCode": "form_labels",
+      "severity": "high",
+      "pagesAffected": 7,
+      "impactPercentage": 20
+     },
+     {
+      "issueCode": "page_language",
+      "severity": "medium",
+      "pagesAffected": 7,
+      "impactPercentage": 20
+     }
+    ],
+    "scope": "Accessibility category, open issues"
+   }
+  },
+  "pageSpeed": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "ProjectPerformanceService.getProjectPerformance (seo_domain_performance)",
+   "asOf": null,
+   "timeBasis": "live_current",
+   "snapshotRelation": "within_run",
+   "data": {
+    "performanceScore": 40,
+    "mobile": {
+     "scores": {
+      "performance": 35,
+      "accessibility": 81,
+      "bestPractices": 81,
+      "seo": 100
+     },
+     "coreWebVitals": {
+      "lcp": 13.351034183539465,
+      "cls": 0.003575124044850814,
+      "tbt": 1644.0075592474905,
+      "fcp": 3.155701636079001,
+      "ttfb": 522
+     },
+     "opportunities": [
+      {
+       "id": "unused-javascript",
+       "title": "Reduce unused JavaScript",
+       "displayValue": "Est savings of 444 KiB",
+       "numericValue": 2400
+      },
+      {
+       "id": "unused-css-rules",
+       "title": "Reduce unused CSS",
+       "displayValue": "Est savings of 1,385 KiB",
+       "numericValue": 150
+      }
+     ]
+    },
+    "desktop": {
+     "scores": {
+      "performance": 52,
+      "accessibility": 81,
+      "bestPractices": 81,
+      "seo": 100
+     },
+     "coreWebVitals": {
+      "lcp": 2.6545602492818148,
+      "cls": 0.0020193542425141976,
+      "tbt": 647.9994878798543,
+      "fcp": 0.8057000964096809,
+      "ttfb": 345
+     },
+     "opportunities": [
+      {
+       "id": "unused-javascript",
+       "title": "Reduce unused JavaScript",
+       "displayValue": "Est savings of 442 KiB",
+       "numericValue": 350
+      },
+      {
+       "id": "unused-css-rules",
+       "title": "Reduce unused CSS",
+       "displayValue": "Est savings of 657 KiB",
+       "numericValue": 80
+      }
+     ]
+    }
+   }
+  },
+  "keywords": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "SeoRankingCurrent + KeywordRankingHistory (rankingHistoryService)",
+   "asOf": "2026-08-29T05:29:23.482Z",
+   "timeBasis": "point_in_time",
+   "snapshotRelation": "before_run",
+   "data": {
+    "origin": "seo_rankings_current",
+    "location": "100 Church St 8th floor, New York, NY 10007, USA",
+    "country": "US",
+    "scope": "local",
+    "summary": {
+     "tracked": 1,
+     "ranking": 0,
+     "notInTop100": 1,
+     "scanErrors": 0,
+     "top3": 0,
+     "top10": 0,
+     "rank11to20": 0,
+     "rank21to100": 0
+    },
+    "keywords": [
+     {
+      "keyword": "best digital marketing agency near me",
+      "currentRank": null,
+      "rankState": "not_in_top_100",
+      "previousScanRank": null,
+      "previousWeekRank": null,
+      "previousMonthRank": null,
+      "bestRank": null,
+      "mapsRank": 8,
+      "lastScanStatus": "ok"
+     }
+    ],
+    "truncated": false,
+    "note": "Odito-tracked search rankings; not Google Search Console data."
+   }
+  },
+  "searchConsole": {
+   "status": "not_configured",
+   "reason": "not_connected",
+   "message": "Google Search Console is not connected for this project.",
+   "source": "GoogleConnection + SearchConsoleData (stored)",
+   "asOf": null,
+   "timeBasis": "live_current",
+   "snapshotRelation": "not_applicable",
+   "data": null
+  },
+  "aeo": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "ai_hub/aiHubController.getAEOHubData (ai_projects, ai_pages, ai_issues)",
+   "asOf": "2026-10-19T10:32:47.521Z",
+   "timeBasis": "live_current",
+   "snapshotRelation": "within_run",
+   "data": {
+    "score": 31,
+    "jobId": "6ad5f1cb20c1ea4b5cc4d108",
+    "pagesScored": 35,
+    "computedAt": "2026-10-19T10:32:47.521Z",
+    "details": {
+     "trimmed": true
+    },
+    "interpretation": "On-site readiness checks. These are not measured AI-platform citations or mentions."
+   }
+  },
+  "geo": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "ai_hub/aiHubController.getGEOHubData (ai_projects, ai_pages, ai_issues)",
+   "asOf": "2026-10-19T10:32:47.521Z",
+   "timeBasis": "live_current",
+   "snapshotRelation": "within_run",
+   "data": {
+    "score": 14,
+    "jobId": "6ad5f1cb20c1ea4b5cc4d108",
+    "pagesScored": 35,
+    "computedAt": "2026-10-19T10:32:47.521Z",
+    "details": {
+     "trimmed": true
+    },
+    "interpretation": "On-site readiness checks. These are not measured AI-platform citations or mentions."
+   }
+  },
+  "aiso": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "ai_hub/aiHubController.getAISOHubData (ai_projects, ai_pages, ai_issues)",
+   "asOf": "2026-10-19T10:32:47.521Z",
+   "timeBasis": "live_current",
+   "snapshotRelation": "within_run",
+   "data": {
+    "score": 89,
+    "jobId": "6ad5f1cb20c1ea4b5cc4d108",
+    "pagesScored": 35,
+    "computedAt": "2026-10-19T10:32:47.521Z",
+    "details": {
+     "trimmed": true
+    },
+    "interpretation": "On-site readiness checks. These are not measured AI-platform citations or mentions."
+   }
+  },
+  "progress": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "Task model + AuditComparisonService.compareLatest",
+   "asOf": null,
+   "timeBasis": "live_current",
+   "snapshotRelation": "not_applicable",
+   "data": {
+    "tasks": {
+     "total": 3,
+     "byStatus": {
+      "task_created": 1,
+      "implemented": 0,
+      "verified_fixed": 2,
+      "reopened": 0
+     }
+    },
+    "comparison": {
+     "available": true,
+     "currentAuditNumber": 2,
+     "previousAuditNumber": 1,
+     "currentCompletedAt": "2026-10-19T10:33:20.792Z",
+     "previousCompletedAt": "2026-08-29T05:33:37.307Z",
+     "delta": {
+      "websiteScore": {
+       "current": 71.41,
+       "previous": 64.83,
+       "change": 6.579999999999998,
+       "direction": "improved",
+       "percentage": 10.15
+      }
+     },
+     "scope": "two most recent audit runs"
+    },
+    "scope": "Tasks are project-wide (not run-scoped); comparison is between the two most recent audit runs."
+   }
+  },
+  "recommendations": {
+   "status": "unavailable",
+   "reason": "not_run_scoped",
+   "message": "Recommendations are generated per issue on demand and are not associated with an audit run, so they are not included in the report data. Use the dashboard.",
+   "source": "recommendations module",
+   "asOf": null,
+   "timeBasis": "live_current",
+   "snapshotRelation": "not_applicable",
+   "data": null
+  },
+  "executiveSummary": {
+   "status": "available",
+   "reason": null,
+   "message": null,
+   "source": "AuditRun + IssueAggregationService",
+   "asOf": "2026-10-19T10:33:20.792Z",
+   "timeBasis": "audit_snapshot",
+   "snapshotRelation": "within_run",
+   "data": {
+    "scores": {
+     "categories": {
+      "seoHealth": {
+       "value": 71,
+       "available": true,
+       "source": "audit_run",
+       "asOf": "2026-10-19T10:33:20.792Z"
+      },
+      "performance": {
+       "value": 40,
+       "available": true,
+       "source": "audit_run",
+       "asOf": "2026-10-19T10:33:20.792Z"
+      },
+      "technicalHealth": {
+       "value": 70,
+       "available": true,
+       "source": "audit_run",
+       "asOf": "2026-10-19T10:33:20.792Z"
+      },
+      "aiReadiness": {
+       "value": 45,
+       "available": true,
+       "source": "audit_run",
+       "asOf": "2026-10-19T10:33:20.792Z"
+      }
+     },
+     "overall": {
+      "value": 57,
+      "method": "mean_of_available_categories",
+      "basis": [
+       "seoHealth",
+       "performance",
+       "technicalHealth",
+       "aiReadiness"
+      ],
+      "excluded": [],
+      "complete": true
+     }
+    },
+    "websiteGrade": "C",
+    "websiteGradeBasis": "grade of the website (SEO) score, as stored by the scoring pipeline",
+    "issues": {
+     "status": "available",
+     "reason": null,
+     "message": null,
+     "source": "IssueAggregationService.getIssueSummary / getCategoryCounts",
+     "asOf": null,
+     "timeBasis": "live_current",
+     "snapshotRelation": "within_run",
+     "data": {
+      "totalOpen": 339,
+      "resolved": 0,
+      "bySeverity": {
+       "critical": 236,
+       "medium": 89,
+       "low": 14
+      },
+      "byCategory": [
+       {
+        "count": 107,
+        "category": "EEAT"
+       },
+       {
+        "count": 90,
+        "category": "Accessibility"
+       },
+       {
+        "count": 65,
+        "category": "Schema"
+       },
+       {
+        "count": 38,
+        "category": "Images"
+       },
+       {
+        "count": 29,
+        "category": "Content"
+       },
+       {
+        "count": 10,
+        "category": "Internal Pages"
+       }
+      ],
+      "definition": "open issues, distinct dedup_key, all categories (IssueAggregationService.getIssueSummary)"
+     }
+    },
+    "importantFindings": [
+     {
+      "module": "On-page SEO",
+      "issueCode": "images_missing_alt_text",
+      "title": "Images Missing Alt Text",
+      "severity": "high",
+      "category": "Images",
+      "dataPath": "images.https://sapphiredigitalagency.com/wp-content/uploads/2025/12/sapphire-digital-Agency-1.webp.alt",
+      "pagesAffected": 35,
+      "occurrences": 35,
+      "impactPercentage": 100,
+      "difficulty": "hard"
+     },
+     {
+      "module": "On-page SEO",
+      "issueCode": "person_schema_linked",
+      "title": "Person schema missing role/expertise information",
+      "severity": "high",
+      "category": "EEAT",
+      "dataPath": "structured_data.person.role",
+      "pagesAffected": 35,
+      "occurrences": 35,
+      "impactPercentage": 100,
+      "difficulty": "hard"
+     },
+     {
+      "module": "On-page SEO",
+      "issueCode": "privacy_terms_pages",
+      "title": "Missing Terms of Service link",
+      "severity": "high",
+      "category": "EEAT",
+      "dataPath": "content.terms_link",
+      "pagesAffected": 29,
+      "occurrences": 29,
+      "impactPercentage": 82.9,
+      "difficulty": "hard"
+     },
+     {
+      "module": "Accessibility",
+      "issueCode": "keyboard_accessibility",
+      "severity": "high",
+      "pagesAffected": 28,
+      "impactPercentage": 80
+     },
+     {
+      "module": "Accessibility",
+      "issueCode": "keyboard_accessibility",
+      "severity": "high",
+      "pagesAffected": 28,
+      "impactPercentage": 80
+     }
+    ]
+   }
+  }
+ },
+ "methodology": {
+  "overallScore": "Mean of the available category scores (SEO health, performance, technical health, AI readiness). Unavailable categories are excluded, never counted as 0. The category scores are produced by the existing scoring pipeline and are not recomputed here.",
+  "issueCounts": "Open issues, counted once per distinct dedup_key across all categories (IssueAggregationService), identical to the dashboard Overview. Critical bucket = critical + high severity; medium; low bucket = low + info.",
+  "aiReadiness": "AEO, GEO and AISO are on-site readiness assessments. Odito does not query AI platforms; no citation, mention or platform-ranking data is included.",
+  "timeSemantics": "Scores come from the selected audit run. Issues, PageSpeed, technical and AI-hub data reflect the current project state (see snapshot.consistency). Keyword rankings carry their own scan timestamps. Search Console data is a separate reporting period."
+ },
+ "availability": {
+  "onPageSeo": "available",
+  "technicalSeo": "available",
+  "accessibility": "available",
+  "pageSpeed": "available",
+  "keywords": "available",
+  "searchConsole": "not_configured",
+  "aeo": "available",
+  "geo": "available",
+  "aiso": "available",
+  "progress": "available",
+  "recommendations": "unavailable",
+  "executiveSummary": "available"
+ },
+ "integrity": {
+  "warnings": [
+   "The stored audit-run issue total differs from the canonical live count; the canonical count is reported."
+  ],
+  "categoryParity": {
+   "checked": true,
+   "canonicalTotal": 339,
+   "onPagePlusAccessibility": 339,
+   "match": true,
+   "note": "On-page (non-Accessibility) + Accessibility should equal the all-category canonical total; a difference means other categories exist or the data changed between queries."
+  },
+  "snapshotIssueTotal": {
+   "checked": true,
+   "auditRunTotal": 294,
+   "canonicalTotal": 339,
+   "match": false,
+   "note": "AuditRun.totalIssues is captured from project.total_issues at audit completion; the canonical total is the live distinct open count. Report issue counts use the canonical total."
+  }
+ }
+}

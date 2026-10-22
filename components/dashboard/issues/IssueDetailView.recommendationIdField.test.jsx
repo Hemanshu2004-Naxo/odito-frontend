@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import IssueDetailView from "./IssueDetailView"
 import apiService from "@/lib/apiService"
+import { runInvestigation, legacyGenerateButton, investigateButton } from "@/test-utils/investigationKit"
 
 /**
  * Regression test for the REAL root cause behind a production bug that
@@ -61,6 +62,7 @@ vi.mock("@/hooks/useDashboardQueries", async () => {
 
 vi.mock("@/lib/apiService", () => ({
   default: {
+    startInvestigation: vi.fn(), getInvestigation: vi.fn(), cancelInvestigation: vi.fn(), prepareInvestigationFix: vi.fn(), approveInvestigation: vi.fn(), verifyInvestigation: vi.fn(),
     getIssueContext: vi.fn().mockResolvedValue({ success: true, data: null }),
     request: vi.fn(),
     createTask: vi.fn(),
@@ -118,7 +120,7 @@ describe("IssueDetailView — recommendation.id field-name regression (real API 
     expect(response.data._id).toBeUndefined()
   })
 
-  test("after Generate AI Recommendation, the DIY tab picks up the new link WITHOUT a page reload (real invalidate/refetch)", async () => {
+  test("after Investigate & Recommend, opening the DIY tab generates the legacy recommendation once and picks up the new link WITHOUT a page reload (real invalidate/refetch)", async () => {
     // Shaped EXACTLY like recommendationService._formatOutput()'s real
     // output: `id`, never `_id`. A mock shaped `{ _id: ... }` here would
     // make this test pass even with the bug still present — it must match
@@ -143,18 +145,16 @@ describe("IssueDetailView — recommendation.id field-name regression (real API 
 
     renderIssueDetailView()
 
-    const generateButton = await screen.findByRole("button", { name: /Generate AI Recommendation/i })
-    fireEvent.click(generateButton)
-
-    await waitFor(() => expect(screen.getByText(/Regenerate/i)).toBeInTheDocument())
+    await runInvestigation(apiService)
+    expect(apiService.request).not.toHaveBeenCalled() // the investigation alone never calls the legacy endpoint
+    fireEvent.click(screen.getByText("🛠 DIY Guide")) // the compatibility adapter generates it, once, for the DIY guide
+    await waitFor(() => expect(apiService.request).toHaveBeenCalledTimes(1))
 
     // THE ACTUAL BUG: with `recommendation._id` (undefined against this
     // shape), this call would never happen at all.
     await waitFor(() => expect(apiService.linkTaskRecommendation).toHaveBeenCalledWith("task-1", "rec-fresh-1"), { timeout: 2000 })
 
-    // Switch to the DIY tab — must reflect the link immediately, no reload.
-    fireEvent.click(screen.getByText("🛠 DIY Guide"))
-
+    // The DIY tab is already open — it must reflect the link immediately, no reload.
     await waitFor(() => expect(screen.getByText("Apply via WordPress")).toBeInTheDocument(), { timeout: 2000 })
     expect(screen.queryByText(/No AI recommendation is linked/)).not.toBeInTheDocument()
   })
@@ -168,10 +168,9 @@ describe("IssueDetailView — recommendation.id field-name regression (real API 
     })
 
     renderIssueDetailView()
-    const generateButton = await screen.findByRole("button", { name: /Generate AI Recommendation/i })
-    fireEvent.click(generateButton)
-
-    await waitFor(() => expect(screen.getByText(/Regenerate/i)).toBeInTheDocument())
+    await runInvestigation(apiService)
+    fireEvent.click(screen.getByText("🛠 DIY Guide"))
+    await waitFor(() => expect(apiService.request).toHaveBeenCalledTimes(1))
     // Give any (incorrect) auto-link attempt a chance to fire.
     await new Promise((r) => setTimeout(r, 50))
     expect(apiService.linkTaskRecommendation).not.toHaveBeenCalled()

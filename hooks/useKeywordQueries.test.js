@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import React from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query'
 import { useAddKeyword } from './useKeywordQueries'
 import apiService from '@/lib/apiService'
 import { queryKeys } from '@/lib/query/keys'
@@ -153,5 +153,41 @@ describe('useAddKeyword — optimistic placeholder', () => {
     const cached = client.getQueryData(queryKeys.keywords.list(PROJECT_ID))
     expect(cached.data[0].keywords).toHaveLength(1)
     expect(cached.data[0].keywords[0].keyword).toBe('existing keyword')
+  })
+})
+
+describe('useAddKeyword — project that has no ranking document yet', () => {
+  const emptyKey = () => queryKeys.keywords.list(PROJECT_ID)
+  const seedEmpty = (client) => client.setQueryData(emptyKey(), { success: true, data: [] })
+
+  test('adding the first keyword refetches so the new document and keyword appear (nothing to patch in the cache)', async () => {
+    const client = makeClient()
+    seedEmpty(client)
+    const newKw = { keyword: 'first keyword', current_rank: 7, last_scan_status: 'ok', mobile: { status: 'not_ranked' } }
+    apiService.addKeyword.mockResolvedValue({ success: true, data: { keyword: newKw, usage: { used: 1, limit: 5, remaining: 4 } } })
+    apiService.getProjectRankings.mockResolvedValue({
+      success: true,
+      data: [{ keywords: [newKw], usage: { used: 1, limit: 5, remaining: 4 }, country: 'IN', location_code: 9040235 }],
+    })
+    // an active observer, like the Keywords page has
+    const observer = new QueryObserver(client, { queryKey: emptyKey(), queryFn: () => apiService.getProjectRankings(PROJECT_ID), staleTime: Infinity })
+    const stop = observer.subscribe(() => {})
+
+    const { result } = renderHook(() => useAddKeyword(PROJECT_ID), { wrapper: (p) => Wrapper({ client, ...p }) })
+    await act(async () => { await result.current.mutateAsync('first keyword') })
+
+    await waitFor(() => expect(client.getQueryData(emptyKey()).data[0]?.keywords?.[0]?.keyword).toBe('first keyword'))
+    expect(apiService.getProjectRankings).toHaveBeenCalled()
+    stop()
+  })
+
+  test('when a ranking document already exists the result is patched in place without an extra fetch', async () => {
+    const client = makeClient()
+    seedExistingKeywords(client, [{ keyword: 'existing keyword', current_rank: 5, last_scan_status: 'ok' }])
+    apiService.addKeyword.mockResolvedValue({ success: true, data: { keyword: { keyword: 'another', current_rank: 3, last_scan_status: 'ok' }, usage: { used: 2, limit: 5, remaining: 3 } } })
+    const { result } = renderHook(() => useAddKeyword(PROJECT_ID), { wrapper: (p) => Wrapper({ client, ...p }) })
+    await act(async () => { await result.current.mutateAsync('another') })
+    expect(apiService.getProjectRankings).not.toHaveBeenCalled()
+    expect(client.getQueryData(queryKeys.keywords.list(PROJECT_ID)).data[0].keywords.map(k => k.keyword)).toContain('another')
   })
 })

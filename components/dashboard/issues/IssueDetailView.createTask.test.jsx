@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query"
 import IssueDetailView from "./IssueDetailView"
 import apiService from "@/lib/apiService"
 import { defineCreateTaskScenarios } from "@/test-utils/createTaskScenarios"
+import { runInvestigation, legacyGenerateButton, investigateButton } from "@/test-utils/investigationKit"
 
 /**
  * IssueDetailView is the On-Page issue screen (/app/onpage) — also used by
@@ -39,6 +40,7 @@ vi.mock("@/hooks/useDashboardQueries", () => ({
 }))
 vi.mock("@/lib/apiService", () => ({
   default: {
+    startInvestigation: vi.fn(), getInvestigation: vi.fn(), cancelInvestigation: vi.fn(), prepareInvestigationFix: vi.fn(), approveInvestigation: vi.fn(), verifyInvestigation: vi.fn(),
     getIssueContext: vi.fn().mockResolvedValue({ success: true, data: null }),
     request: vi.fn(), createTask: vi.fn(), updateTaskStatus: vi.fn(), applyWordPressFix: vi.fn(), linkTaskRecommendation: vi.fn(), getRecommendationById: vi.fn(),
   },
@@ -50,6 +52,7 @@ defineCreateTaskScenarios({
   label: "On-Page issues (IssueDetailView)",
   apiService,
   pageUrl: PAGE,
+  expectedRecommendationId: null,
   expectedPayload: { projectId: "project-1", issueKey: "missing_h1", issueName: "H1 missing", issueCategory: "On-Page Issues" },
   setTaskMap: (map) => { taskMapData = map },
   renderScreen: (queryClient) => render(
@@ -59,7 +62,7 @@ defineCreateTaskScenarios({
   ),
   generate: async () => {
     fireEvent.click(await screen.findByText(PAGE))
-    fireEvent.click(await screen.findByRole("button", { name: /Generate AI Recommendation/ }))
-    await waitFor(() => expect(screen.getByRole("button", { name: /Regenerate/ })).toBeInTheDocument())
+    await runInvestigation(apiService)
+    await screen.findByTestId("unified-task-actions")
   },
 })

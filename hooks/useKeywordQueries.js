@@ -84,11 +84,17 @@ export function useAddKeyword(projectId) {
 
     onSuccess: (response, keyword) => {
       const newKw = response?.data?.keyword
-      if (!newKw) return
       const normalized = keyword.toLowerCase().trim()
 
+      // A project with no ranking document yet has nothing in the cache to
+      // patch (data: []). The backend just created that document while adding
+      // the keyword, so the only correct move is to refetch — patching a
+      // missing document silently did nothing and left the table empty
+      // ("No tracked keywords yet") even though the keyword was saved.
+      let needsRefetch = !newKw
       queryClient.setQueryData(queryKey, (old) => {
-        if (!old?.data?.[0]) return old
+        if (!old?.data?.[0]) { needsRefetch = true; return old }
+        if (!newKw) return old
         const keywords = (old.data[0].keywords || []).map((k) =>
           k.keyword.toLowerCase().trim() === normalized ? newKw : k
         )
@@ -97,6 +103,7 @@ export function useAddKeyword(projectId) {
           data: [{ ...old.data[0], keywords, usage: response.data.usage ?? old.data[0].usage }],
         }
       })
+      if (needsRefetch) queryClient.invalidateQueries({ queryKey })
     },
 
     onError: (_err, _keyword, context) => {

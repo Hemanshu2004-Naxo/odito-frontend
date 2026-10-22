@@ -22,13 +22,24 @@ export function SidebarHeader({ isCollapsed = false }) {
     >
       {/* Logo */}
       <div className={cn("flex items-center gap-2", isCollapsed && "justify-center")}>
+        {/* Brand kit: deep-colour wordmark on light themes, bright wordmark on dark. Collapsed = the mark. */}
         <Image
-          src="/oditologo.png"
+          src={isCollapsed ? "/logo/odito-mark-on-light.png" : "/logo/odito-logo-on-light.png"}
           alt="Odito AI"
-          width={isCollapsed ? 28 : 100}
-          height={28}
-          className="object-contain"
-          style={{ width: isCollapsed ? 28 : 100, height: "auto" }}
+          width={isCollapsed ? 512 : 1200}
+          height={isCollapsed ? 512 : 424}
+          className="object-contain dark:hidden"
+          style={{ height: "auto", width: isCollapsed ? 28 : 100 }}
+          priority
+        />
+        <Image
+          src={isCollapsed ? "/logo/odito-mark-on-dark.png" : "/logo/odito-logo-on-dark.png"}
+          alt=""
+          aria-hidden="true"
+          width={isCollapsed ? 512 : 1200}
+          height={isCollapsed ? 512 : 424}
+          className="hidden object-contain dark:block"
+          style={{ height: "auto", width: isCollapsed ? 28 : 100 }}
           priority
         />
       </div>

@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import IssueDetailView from "./IssueDetailView"
 import apiService from "@/lib/apiService"
+import { runInvestigation, legacyGenerateButton, investigateButton } from "@/test-utils/investigationKit"
 
 /**
  * The AuditIQ tab inside the real On-Page issue screen: it is wired to the real request API, keeps its
@@ -35,6 +36,7 @@ vi.mock("@/hooks/useDashboardQueries", () => ({
 }))
 vi.mock("@/lib/apiService", () => ({
   default: {
+    startInvestigation: vi.fn(), getInvestigation: vi.fn(), cancelInvestigation: vi.fn(), prepareInvestigationFix: vi.fn(), approveInvestigation: vi.fn(), verifyInvestigation: vi.fn(),
     getIssueContext: vi.fn().mockResolvedValue({ success: true, data: null }),
     request: vi.fn(), createTask: vi.fn(), updateTaskStatus: vi.fn(), applyWordPressFix: vi.fn(), linkTaskRecommendation: vi.fn(), getRecommendationById: vi.fn(),
   },
@@ -130,8 +132,8 @@ describe("IssueDetailView — AuditIQ tab", () => {
     fireEvent.click(tab(/AuditIQ/))
     fireEvent.click(await screen.findByRole("button", { name: /Back to AI Fix/ }))
     expect(screen.getByTestId("auditiq-panel")).not.toBeVisible()
-    const generate = await screen.findByRole("button", { name: /Generate AI Recommendation/ })
-    await waitFor(() => expect(generate).toBeVisible()) // fade-in, see below
+    const primary = await screen.findByRole("button", { name: /Investigate & Recommend/ })
+    await waitFor(() => expect(primary).toBeVisible()) // fade-in, see below
   })
 
   test("initialMode=help opens straight onto the AuditIQ tab", async () => {
@@ -141,16 +143,23 @@ describe("IssueDetailView — AuditIQ tab", () => {
 })
 
 describe("IssueDetailView — the other tabs are unaffected", () => {
-  test("Fix with AI still offers recommendation generation", async () => {
+  test("Fix with AI offers exactly ONE primary AI action: Investigate & Recommend (no separate Generate button, no second card)", async () => {
     renderView()
-    const generate = await screen.findByRole("button", { name: /Generate AI Recommendation/ })
-    await waitFor(() => expect(generate).toBeVisible()) // the panel fades in (framer-motion), so visibility is not instant
+    const primary = await screen.findByRole("button", { name: /Investigate & Recommend/ })
+    await waitFor(() => expect(primary).toBeVisible()) // the panel fades in (framer-motion), so visibility is not instant
+    expect(screen.getAllByRole("button", { name: /Investigate|Generate/ })).toHaveLength(1)
+    expect(legacyGenerateButton()).not.toBeInTheDocument()
+    expect(screen.queryByText("Investigate this page")).not.toBeInTheDocument()
+    expect(screen.getByText("Analyze the affected page, identify the root cause, and recommend the safest fix.")).toBeInTheDocument()
+    expect(apiService.request).not.toHaveBeenCalledWith(expect.stringContaining("/recommendations/generate"), expect.anything())
   })
 
   test("DIY Guide still shows its no-recommendation fallback", async () => {
     renderView()
     fireEvent.click(tab(/DIY Guide/))
-    expect(await screen.findByText(/Generate an AI recommendation first to access the DIY guide/)).toBeVisible()
+    expect(await screen.findByText(/Run Investigate & Recommend first to unlock the DIY guide/)).toBeVisible()
+    expect(legacyGenerateButton()).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Go to Investigate & Recommend" })).toBeVisible()
     expect(auditIqCalls()).toHaveLength(0)
   })
 })

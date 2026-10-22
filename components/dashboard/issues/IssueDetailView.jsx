@@ -57,6 +57,8 @@ import { ORGANIZATION_FIX_ISSUE_ID } from "./organizationFix"
 import ImageAltFixPanel from "./ImageAltFixPanel"
 import { IMAGE_ALT_ISSUE_ID, ALT_DIY_POINTER, ALT_NOT_APPLICABLE_MESSAGE, ALT_NOT_APPLICABLE_TITLE, getAltPanelAvailability, isAltFindingNotApplicable } from "./imageAltFix"
 import AuditIqHelpPanel from "./AuditIqHelpPanel"
+import InvestigationPanel from "./InvestigationPanel"
+import { ORGANIZATION_ISSUE_IDS } from "@/components/recommendations/organizationIntent"
 
 // issueKey -> the field WordPress fixes can target, mirrored from the
 // backend's own providerCapabilityRegistry.js/issueSnapshotTypes.js. Kept in
@@ -229,6 +231,9 @@ function WordPressApplyConfirmDialog({ open, onOpenChange, fieldLabel, siteLabel
     </div>
   )
 }
+
+// Issues whose owner-input panels (breadcrumb hierarchy confirmation, Organization facts) are built from the legacy recommendation's evidence.
+const LEGACY_OWNER_INPUT_ISSUES = [BREADCRUMB_ISSUE_ID, ...ORGANIZATION_ISSUE_IDS]
 
 export default function IssueDetailView({
   issue,
@@ -847,6 +852,25 @@ export default function IssueDetailView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selUrl])
 
+  // ── Compatibility adapter: investigation -> legacy recommendation ───────────────────────────────────────────────────────
+  // The investigation is the authoritative diagnosis. A few existing features still consume the legacy recommendation record (the DIY guide, and
+  // the owner-input panels for breadcrumb hierarchy / organization, which need the evidence only legacy generation produces). It is therefore
+  // generated through the existing endpoint — once, on demand, and ONLY after an investigation of this exact issue + URL has completed — never
+  // as a second visible action and never in parallel with the investigation. It is the service's real output, not a fabricated record.
+  const selectionKey = `${issueId}|${selUrl}`
+  const [investigationState, setInvestigationState] = useState({ key: null, completed: false })
+  const investigationCompleted = investigationState.key === selectionKey && investigationState.completed
+  const onInvestigationStatus = useCallback((st) => setInvestigationState({ key: selectionKey, completed: !!st.completed }), [selectionKey])
+  const needsLegacyRecommendation = investigationCompleted && (mode === "diy" || LEGACY_OWNER_INPUT_ISSUES.includes(issueId))
+
+  useEffect(() => {
+    if (!needsLegacyRecommendation || altNotApplicable) return
+    if (!recommendationMutation.isIdle) return
+    if (recommendation || linkedRecommendation || linkedRecommendationLoading) return
+    recommendationMutation.mutate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsLegacyRecommendation, altNotApplicable, recommendationMutation.isIdle, recommendation?.id, linkedRecommendation?._id, linkedRecommendationLoading])
+
   // Calculate progress
   const totalUrls = fixedCount + openUrls.length
   const progress = totalUrls > 0 ? Math.round((fixedCount / totalUrls) * 100) : 0
@@ -1331,29 +1355,41 @@ export default function IssueDetailView({
               {mode === "ai" && altNotApplicable && altNotApplicableNotice}
               {mode === "ai" && !altNotApplicable && !altContextPending && (
                 <>
+                {/* ONE primary AI action. "Investigate & Recommend" runs the evidence-driven investigation (live page, root cause, findings,
+                    recommended fix). The legacy "Generate AI Recommendation" button no longer exists in this panel; the legacy recommendation is
+                    only produced by the compatibility adapter above (after an investigation, when the DIY guide or an owner-input panel needs it). */}
                 <IssueRecommendationPanel
+                  unified
                   projectId={activeProject?._id}
                   issueId={issueId}
                   issueSource={issue.rule_id ? "ai_visibility" : "on_page"}
                   selUrl={selUrl}
                   issue={issue}
+                  faqDetection={issueId === FAQ_ISSUE_ID ? getFaqDetection(issueContextData) : null}
+                  ratingDetection={issueId === RATING_ISSUE_ID ? getRatingDetection(issueContextData) : null}
+                  mutationState={{ isIdle, isPending, isSuccess, isError, error, recommendation, meta }}
+                  onRecommendationReplaced={setReplacedResult}
                   onCreateTask={onCreateTask}
                   isCreatingTask={createTaskMutation.isPending}
                   task={selUrl ? taskMap[selUrl] : null}
-                  faqDetection={issueId === FAQ_ISSUE_ID ? getFaqDetection(issueContextData) : null}
-                  ratingDetection={issueId === RATING_ISSUE_ID ? getRatingDetection(issueContextData) : null}
-                  mutationState={{
-                    isIdle,
-                    isPending,
-                    isSuccess,
-                    isError,
-                    error,
-                    recommendation,
-                    meta,
-                  }}
-                  onGenerate={() => { setReplacedResult(null); recommendationMutation.mutate() }}
-                  onReset={() => { setReplacedResult(null); recommendationMutation.reset() }}
-                  onRecommendationReplaced={setReplacedResult}
+                  showTaskActions={investigationCompleted}
+                  primaryAction={selUrl ? (
+                    <InvestigationPanel
+                      key={`${issueId}|${selUrl}`}
+                      projectId={activeProject?._id}
+                      issueId={issueId}
+                      pageUrl={selUrl}
+                      issueSource={issue.rule_id ? "ai_visibility" : "on_page"}
+                      onStatusChange={onInvestigationStatus}
+                      ruleMetadata={{
+                        title: issue.title || issue.issue || issue.issue_message,
+                        description: issue.description || issue.issue_message,
+                        category: issue.category,
+                        severity: issue.severity,
+                        difficulty: issue.difficulty,
+                      }}
+                    />
+                  ) : null}
                 />
                 {/* Organization schema: the typed preview -> approve -> apply -> verify -> rollback workflow. Offered only once a
                     task exists with a linked recommendation and WordPress is connected; the panel itself explains anything unsupported. */}
@@ -1434,31 +1470,25 @@ export default function IssueDetailView({
                   identical regardless of whether the DIY guide has other
                   content to show yet. */}
               {mode === "diy" && !altNotApplicable && !altContextPending && !recommendation && !linkedRecommendation && (
-                <div style={{
-                  padding: "20px",
-                  textAlign: "center",
-                  color: "var(--t2)",
-                  fontSize: "11.5px",
-                  lineHeight: 1.65
-                }}>
-                  {wpFieldSupported && selUrl && selectedTask
-                    ? "No AI recommendation is linked to this task yet — generate one before applying a WordPress fix."
-                    : "Generate an AI recommendation first to access the DIY guide."}
-                  {wpFieldSupported && selUrl && selectedTask && (
-                    <div style={{ marginTop: 12 }}>
-                      <button
-                        type="button"
-                        onClick={() => recommendationMutation.mutate()}
-                        disabled={recommendationMutation.isPending}
-                        style={{
-                          padding: "8px 14px", borderRadius: 8, fontSize: 11.5, fontWeight: 600,
-                          border: "1px solid var(--b)", background: "var(--s2)", color: "var(--t)",
-                          cursor: recommendationMutation.isPending ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        {recommendationMutation.isPending ? "Generating…" : "Generate Recommendation"}
-                      </button>
-                    </div>
+                <div data-testid="diy-empty" style={{ padding: "20px", textAlign: "center", color: "var(--t2)", fontSize: "11.5px", lineHeight: 1.65 }}>
+                  {recommendationMutation.isPending || (investigationCompleted && recommendationMutation.isIdle) ? (
+                    <span role="status">Preparing the DIY guide…</span>
+                  ) : recommendationMutation.isError ? (
+                    <>
+                      <div role="alert">The DIY guide could not be prepared. {recommendationMutation.error?.message || ""}</div>
+                      <div style={{ marginTop: 12 }}>
+                        <button type="button" onClick={() => recommendationMutation.mutate()} style={{ padding: "8px 14px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, border: "1px solid var(--b)", background: "var(--s2)", color: "var(--t)", cursor: "pointer" }}>Retry</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {wpFieldSupported && selUrl && selectedTask
+                        ? "No AI recommendation is linked to this task yet — run Investigate & Recommend first."
+                        : "Run Investigate & Recommend first to unlock the DIY guide."}
+                      <div style={{ marginTop: 12 }}>
+                        <button type="button" onClick={() => setMode("ai")} style={{ padding: "8px 14px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, border: "1px solid var(--b)", background: "var(--s2)", color: "var(--t)", cursor: "pointer" }}>Go to Investigate & Recommend</button>
+                      </div>
+                    </>
                   )}
                 </div>
               )}

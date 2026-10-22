@@ -1,208 +1,117 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
-import { PageHeader, PageFooter, SectionHeader, StatCard, Badge, InsightBox } from '../layout';
-import API_BASE_URL from '@/lib/apiConfig';
+import React from 'react';
+import { PAGE_HEIGHT } from '../../pageSize';
+import { PageHeader, PageFooter, SectionHeader, StatCard, Badge, InsightBox, MissingReport, UnavailableSection, Caption } from '../layout';
+import { useCanonicalReport } from '../../reportMeta';
+import { onPageVM, unavailableText } from '../../reportViewModels';
 
-const sevMap = { CRITICAL: 'critical', HIGH: 'high', MEDIUM: 'medium', LOW: 'low', INFO: 'low' };
-const impMap = { High: 'critical', Medium: 'medium', Low: 'low' };
+const sevType = { critical: 'critical', high: 'high', medium: 'medium', warning: 'medium', low: 'low', info: 'low' };
 
-// Color mapping for severity badges
-const severityColors = {
-  critical: '#9333EA', // Purple
-  high: '#EF4444',     // Red  
-  medium: '#EAB308',   // Yellow
-  low: '#3B82F6',      // Blue
-  info: '#3B82F6'      // Blue (same as low)
+// Colors per severity tier (display only).
+const COLORS = { all: '#9333EA', criticalHigh: '#EF4444', medium: '#EAB308', lowInfo: '#3B82F6' };
+
+const frame = {
+  width: 960, minHeight: PAGE_HEIGHT, background: '#fff', display: 'flex',
+  flexDirection: 'column', boxShadow: '0 4px 40px rgba(0,0,0,0.12)',
+  margin: '0 auto', fontFamily: "'DM Sans', sans-serif",
 };
 
-export default function OnPageSEOPage({ projectId }) {
-  const [pageData, setPageData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [timeoutReached, setTimeoutReached] = useState(false);
+/**
+ * On-page SEO. All counts come from the canonical report (distinct open issues
+ * from onPageIssuesService), so they match the dashboard's On-Page Issues tab.
+ * Accessibility issues are reported separately.
+ */
+export default function OnPageSEOPage() {
+  const report = useCanonicalReport();
+  if (!report) return <MissingReport title="On-Page SEO" />;
+  const vm = onPageVM(report);
+  const widest = vm.hasData
+    ? vm.rows.slice().sort((a, b) => (b.pagesAffected || 0) - (a.pagesAffected || 0))[0]
+    : null;
 
-  // Mark component as ready AFTER DOM render is complete
-  useEffect(() => {
-    if (pageData) {
-      
-      // CRITICAL FIX: Use requestAnimationFrame to ensure DOM has rendered with new data
-      requestAnimationFrame(() => {
-        
-        // PINPOINT FIX: Use correct window targeting
-        const markReady = () => {
-          const target = window.parent || window;
-
-          if (target && target.__PDF_READY__) {
-            target.__PDF_READY__.markReady("On-Page SEO");
-          } else if (target && target.__PDF_SET_READY__) {
-            target.__PDF_SET_READY__('onpage-seo', true, 'On-Page SEO');
-          } else {
-            // Retry mechanism - system might still be initializing
-            setTimeout(markReady, 50);
-          }
-        };
-        
-        markReady();
-      });
-    }
-  }, [pageData]);
-
-  useEffect(() => {
-    
-    // Component registration is now handled inline by the PDF renderer
-    
-    if (!projectId) {
-      setError('Project ID is required');
-      setLoading(false);
-      return;
-    }
-
-    const fetchPageData = async () => {
-      try {
-        
-        // Set timeout to prevent infinite loading
-        const timeoutId = setTimeout(() => {
-          setTimeoutReached(true);
-          setError('Data loading timeout - please try again');
-          setLoading(false);
-          
-          // Mark as ready to prevent PDF generation hanging
-          if (typeof window !== 'undefined' && window.__PDF_SET_READY__) {
-            window.__PDF_SET_READY__('onpage-seo', true, 'On-Page SEO (Timeout)');
-          }
-        }, 25000); // 25 second timeout
-        
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          clearTimeout(timeoutId);
-          setError('Authentication required - please login again');
-          setLoading(false);
-          return;
-        }
-        
-        const response = await fetch(`${API_BASE_URL}/pdf/${projectId}/page08`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-
-        if (!response.ok) {
-          clearTimeout(timeoutId);
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        
-        if (!result.success) {
-          clearTimeout(timeoutId);
-          throw new Error(result.error?.message || 'Failed to fetch page data');
-        }
-
-        // Clear timeout on successful response
-        clearTimeout(timeoutId);
-
-        setPageData(result.data);
-        // NOTE: markReady is now called in the useEffect that watches pageData
-      } catch (err) {
-        clearTimeout(timeoutId);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPageData();
-  }, [projectId]);
-
-  if (loading) {
-    return (
-      <div style={{
-        width: 960, minHeight: 1280, background: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{ color: '#6B7280', fontSize: 16 }}>Loading On-Page SEO data...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{
-        width: 960, minHeight: 1280, background: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{ color: '#EF4444', fontSize: 16 }}>Error: {error}</div>
-      </div>
-    );
-  }
-
-  const { totalIssues, totalPages, severityBreakdown, topIssues } = pageData || {
-    totalIssues: 0,
-    totalPages: 0,
-    severityBreakdown: { critical: 0, high: 0, medium: 0, lowInfo: 0, totalAll: 0 },
-    topIssues: []
-  };
-
-  const displayText = `${totalIssues} issues across ${totalPages} pages`;
   return (
-    <div style={{
-      width: 960, minHeight: 1280, background: '#fff', display: 'flex',
-      flexDirection: 'column', boxShadow: '0 4px 40px rgba(0,0,0,0.12)',
-      margin: '0 auto', fontFamily: "'DM Sans', sans-serif"
-    }}>
-      <PageHeader page={8} />
+    <div style={frame}>
+      <PageHeader page={3} />
       <div style={{ padding: '32px 40px', flex: 1 }}>
-        <SectionHeader num="06" title="On-Page SEO Audit" subtitle={displayText} />
+        <SectionHeader
+          num="02"
+          title="On-Page SEO Audit"
+          subtitle={vm.hasData ? `${vm.totalIssues} open issues across ${vm.pagesAnalyzed ?? 'N/A'} analyzed pages` : 'On-page issue summary'}
+        />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
-          <StatCard value={severityBreakdown.totalAll} label="All Issues" sub="Total issues found" color={severityColors.critical} borderColor={severityColors.critical} />
-          <StatCard value={severityBreakdown.high} label="High" sub="Fix within 7 days" color={severityColors.high} borderColor={severityColors.high} />
-          <StatCard value={severityBreakdown.medium} label="Medium" sub="Fix in 30 days" color={severityColors.medium} borderColor={severityColors.medium} />
-          <StatCard value={severityBreakdown.lowInfo} label="Low+Info" sub="Opportunities" color={severityColors.low} borderColor={severityColors.low} />
-        </div>
+        {!vm.hasData ? (
+          <UnavailableSection title="On-page SEO data unavailable" message={unavailableText(vm, 'on-page SEO')} tone="warn" />
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
+              <StatCard value={vm.cards.all} label="All Issues" sub="Open, excl. accessibility" color={COLORS.all} borderColor={COLORS.all} />
+              <StatCard value={vm.cards.criticalHigh} label="Critical / High" sub="Critical + high severity" color={COLORS.criticalHigh} borderColor={COLORS.criticalHigh} />
+              <StatCard value={vm.cards.medium} label="Medium" sub="Medium severity" color={COLORS.medium} borderColor={COLORS.medium} />
+              <StatCard value={vm.cards.lowInfo} label="Low / Info" sub="Low + info severity" color={COLORS.lowInfo} borderColor={COLORS.lowInfo} />
+            </div>
 
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, fontFamily: "'Inter', sans-serif" }}>Issue Breakdown</h3>
+            <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, fontFamily: "'Inter', sans-serif" }}>Top Issues</h3>
 
-        <div style={{ borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', marginBottom: 24 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#111827' }}>
-                {['#', 'Issue', 'Severity', 'Pages', 'Count', 'Recommended Fix'].map((h, i) => (
-                  <th key={i} style={{ padding: '11px 14px', color: '#fff', fontWeight: 600, textAlign: 'left' }}>{h}</th>
+            <div style={{ borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', marginBottom: 24 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#111827' }}>
+                    {['#', 'Issue', 'Severity', 'Pages affected', '% of pages', 'Fix difficulty'].map((h, i) => (
+                      <th key={i} style={{ padding: '11px 14px', color: '#fff', fontWeight: 600, textAlign: 'left' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {vm.rows.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ padding: '20px', textAlign: 'center', color: '#10B981' }}>
+                        No open on-page issues were found in this audit.
+                      </td>
+                    </tr>
+                  ) : vm.rows.map((r, i) => (
+                    <tr key={r.key} style={{ borderBottom: '1px solid #F3F4F6', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                      <td style={{ padding: '10px 14px', color: '#9CA3AF' }}>{i + 1}</td>
+                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#111827' }}>{r.title}</td>
+                      <td style={{ padding: '10px 14px' }}><Badge label={(r.severity || 'n/a').toUpperCase()} type={sevType[r.severity] || 'info'} /></td>
+                      <td style={{ padding: '10px 14px', color: '#374151' }}>{r.pagesAffected ?? 'N/A'}</td>
+                      <td style={{ padding: '10px 14px', color: '#374151' }}>{r.impactPercentage == null ? 'N/A' : `${r.impactPercentage}%`}</td>
+                      <td style={{ padding: '10px 14px', color: '#6B7280', textTransform: 'capitalize' }}>{r.difficulty || 'N/A'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {vm.evidence.length > 0 && (
+              <>
+                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>Example affected pages</h3>
+                {vm.evidence.map((e) => (
+                  <div key={e.issueCode} style={{ fontSize: 12, color: '#374151', marginBottom: 8 }}>
+                    <strong>{e.title}</strong> — {e.totalUrls} page(s)
+                    {e.sample.map((u) => (
+                      <div key={u} style={{ color: '#6B7280', wordBreak: 'break-all' }}>{u}</div>
+                    ))}
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {topIssues.map((issue, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                  <td style={{ padding: '10px 14px', color: '#9CA3AF' }}>{i + 1}</td>
-                  <td style={{ padding: '10px 14px', fontWeight: 600, color: '#111827' }}>{issue.issue}</td>
-                  <td style={{ padding: '10px 14px' }}><Badge label={issue.severity.toUpperCase()} type={sevMap[issue.severity.toUpperCase()]} /></td>
-                  <td style={{ padding: '10px 14px', color: '#374151' }}>{issue.pages}</td>
-                  <td style={{ padding: '10px 14px', color: '#374151' }}>{issue.count}</td>
-                  <td style={{ padding: '10px 14px', color: '#6B7280' }}>{issue.recommendation}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </>
+            )}
 
-        <InsightBox title="On-Page Priority Recommendation">
-          {topIssues.length > 0 ? 
-            `Prioritize fixing "${topIssues[0]?.issue}" which affects ${topIssues[0]?.pages} pages with ${topIssues[0]?.count} total occurrences. This issue has the highest impact on your SEO performance and should be addressed first for maximum improvement.` :
-            'No critical issues found. Your on-page SEO is well optimized. Continue monitoring for new opportunities.'
-          }
-        </InsightBox>
+            {vm.status === 'partial' && <Caption>Some detail could not be loaded: {vm.message}</Caption>}
+
+            {widest && (
+              <InsightBox title="On-Page Priority">
+                {`The most widespread open issue in this list is "${widest.title}", affecting ${widest.pagesAffected} page(s). Issues are ordered by severity first, then by pages affected.`}
+              </InsightBox>
+            )}
+          </>
+        )}
+        <Caption>
+          Counts are distinct open issues and exclude accessibility issues. They reflect the project's current state at report time
+          {vm.snapshotRelation === 'after_run' ? ' (which may be newer than the selected audit run).' : '.'}
+        </Caption>
       </div>
-      <PageFooter page={8} />
+      <PageFooter page={3} />
     </div>
   );
 }

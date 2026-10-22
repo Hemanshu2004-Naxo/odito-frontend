@@ -63,7 +63,7 @@ function LoginHero() {
         <div>
           <Link href="/">
             <img 
-              src="/oditologo.png" 
+              src="/logo/odito-logo-on-dark.png" 
               alt="Odito AI" 
               className="h-16 w-auto object-contain hover:scale-105 hover:opacity-90 transition-all duration-300"
             />
@@ -182,7 +182,7 @@ function LoginForm({ formData, setFormData, error, setError, isLoading, setIsLoa
         <div className="lg:hidden mb-12 flex justify-center">
           <Link href="/">
             <img 
-              src="/oditologo.png" 
+              src="/logo/odito-logo-on-dark.png" 
               alt="Odito AI" 
               className="h-16 w-auto object-contain hover:scale-105 hover:opacity-90 transition-all duration-300"
             />

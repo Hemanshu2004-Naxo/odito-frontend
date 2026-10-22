@@ -13,7 +13,7 @@ const data = {
   ],
 }
 
-const LABELS = ["Current", "Last Scan", "Best", "Prev Week", "Prev Month", "Benchmark", "Maps", "Status"]
+const LABELS = ["Desktop", "Mobile", "Last Scan", "Best", "Prev Week", "Prev Month", "Benchmark", "Maps", "Status"]
 
 describe("UserAddedKeywords — responsive markup (styles/keywords.css re-flows it into cards)", () => {
   it("labels every metric cell so the stacked-card layout can show its column name", () => {

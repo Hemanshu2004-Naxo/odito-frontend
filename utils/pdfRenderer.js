@@ -195,47 +195,17 @@ const PDF_HTML_TEMPLATE = (pageContent, pageIndex) => `
 /**
  * Add inline component registration and ready calls to HTML
  */
-function addInlineComponentRegistration(pageContent, pageIndex) {
+function addInlineComponentRegistration(pageContent, pageIndex, registration = null) {
   // Define component mappings based on page index
+  // Full Website Audit pages pass an explicit `registration` ({ id, name,
+  // needsData }) taken from pdf/src/reportPages.jsx, so they no longer depend on
+  // fixed page indices. Only the Homepage Audit pages (indices 30-41) are
+  // looked up here.
   const componentMap = {
-    0: { id: 'cover-page', name: 'Cover Page' },
-    1: { id: 'section-divider-2', name: 'Section Divider - Executive Summary' },
-    2: { id: 'executive-summary', name: 'Executive Summary' },
-    3: { id: 'key-strengths', name: 'Key Strengths' },
-    4: { id: 'priority-roadmap', name: 'Priority Roadmap' },
-    5: { id: 'seo-health-overview', name: 'SEO Health Overview' },
-    6: { id: 'section-divider-7', name: 'Section Divider - SEO Audit' },
-    7: { id: 'on-page-seo', name: 'On Page SEO' },
-    8: { id: 'structured-data', name: 'Structured Data' },
-    9: { id: 'technical-seo', name: 'Technical SEO' },
-    10: { id: 'crawlability', name: 'Crawlability' },
-    11: { id: 'section-divider-12', name: 'Section Divider - Performance' },
-    12: { id: 'core-web-vitals', name: 'Core Web Vitals' },
-    13: { id: 'performance-opportunities', name: 'Performance Opportunities' },
-    14: { id: 'section-divider-15', name: 'Section Divider - Keywords' },
-    15: { id: 'keyword-ranking', name: 'Keyword Ranking' },
-    16: { id: 'keyword-opportunity', name: 'Keyword Opportunity' },
-    17: { id: 'section-divider-18', name: 'Section Divider - AI Visibility' },
-    18: { id: 'ai-visibility-overview', name: 'AI Visibility Overview' },
-    19: { id: 'llm-visibility', name: 'LLM Visibility' },
-    20: { id: 'llm-citation-forecast', name: 'LLM Citation Forecast' },
-    21: { id: 'ai-content-readiness', name: 'AI Content Readiness' },
-    22: { id: 'ai-content-strategy', name: 'AI Content Strategy' },
-    23: { id: 'knowledge-graph', name: 'Knowledge Graph' },
-    24: { id: 'section-divider-25', name: 'Section Divider - Action Plan' },
-    25: { id: 'ai-optimisation', name: 'AI Optimisation' },
-    26: { id: 'ai-growth-forecast', name: 'AI Growth Forecast' },
-    27: { id: 'action-plan', name: 'Action Plan' },
-    28: { id: 'audit-methodology', name: 'Audit Methodology' },
-    29: { id: 'about-odito', name: 'About Odito' },
-
-    // Homepage Audit PDF pages — indices 30-40 chosen to sit past Full
-    // Audit's own range (0-29) so lookups never collide. All implicitly
-    // needsDataFetch=false (that flag is decided by the ternary a few
-    // lines below, keyed off specific Full-Audit indices only — 30-40
-    // aren't in that list, so they default to false), which is correct:
-    // these pages take pre-fetched pdfData as a prop and never fetch
-    // internally, so they're ready as soon as they render.
+    // Homepage Audit PDF pages (indices 30-41). They have no `registration`, so
+    // needsDataFetch is false, which is correct: these pages take pre-fetched
+    // pdfData as a prop and never fetch internally, so they are ready as soon
+    // as they render.
     //
     // V3 architecture: one major topic per page (was 8 pages with 3 of them
     // combining two unrelated topics each — Score+OnPage, Technical+Security,
@@ -258,7 +228,7 @@ function addInlineComponentRegistration(pageContent, pageIndex) {
     41: { id: 'homepage-final-cta', name: 'Homepage Final CTA' },
   };
 
-  const component = componentMap[pageIndex];
+  const component = registration || componentMap[pageIndex];
   if (!component) {
     return pageContent;
   }
@@ -285,7 +255,7 @@ function addInlineComponentRegistration(pageContent, pageIndex) {
         
         // For pages that don't fetch data, mark as ready immediately
         // For pages that fetch data, they'll call SET_READY when done
-        var needsDataFetch = ${pageIndex === 0 || pageIndex === 2 || pageIndex === 5 || pageIndex === 7 || pageIndex === 8 || pageIndex === 9 || pageIndex === 10 || pageIndex === 12 || pageIndex === 15 || pageIndex === 16 || pageIndex === 18 || pageIndex === 21 || pageIndex === 22 || pageIndex === 25 || pageIndex === 26 || pageIndex === 27 ? 'true' : 'false'};
+        var needsDataFetch = ${registration?.needsData ? 'true' : 'false'};
         
         if (!needsDataFetch) {
           if (pdfWindow.__PDF_READY__) {
@@ -342,7 +312,7 @@ export class PDFRenderer {
    * @param {string} [options.backgroundColor='#ffffff']
    */
   async renderComponent(component, pageIndex, totalPages, options = {}) {
-    const { width = 960, height = 1280, backgroundColor = '#ffffff' } = options;
+    const { width = 960, height = 1280, backgroundColor = '#ffffff', registration = null } = options;
 
     return new Promise(async (resolve, reject) => {
       let iframe = null;
@@ -394,7 +364,7 @@ export class PDFRenderer {
         root.unmount();
 
         // Write full HTML to iframe with inline component registration
-        const pageWithRegistration = addInlineComponentRegistration(pageContent, pageIndex);
+        const pageWithRegistration = addInlineComponentRegistration(pageContent, pageIndex, registration);
         iframeDoc.open();
         iframeDoc.write(PDF_HTML_TEMPLATE(pageWithRegistration, pageIndex));
         iframeDoc.close();
@@ -525,7 +495,10 @@ export class PDFRenderer {
 
     // Calculate dimensions to fit A4 page
     const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let imgHeight = (canvas.height * imgWidth) / canvas.width;
+    // A4-ratio captures (Full Audit) fill the page exactly; the <0.5% difference
+    // from integer pixel rounding is absorbed instead of leaving a sliver.
+    if (Math.abs(imgHeight - pageHeight) / pageHeight < 0.005) imgHeight = pageHeight;
 
     // Add image to PDF
     const imgData = canvas.toDataURL('image/jpeg', 0.95);

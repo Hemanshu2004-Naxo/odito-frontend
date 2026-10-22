@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import IssueDetailView from "./IssueDetailView"
 import apiService from "@/lib/apiService"
+import { runInvestigation, legacyGenerateButton, investigateButton } from "@/test-utils/investigationKit"
 
 /**
  * breadcrumblist_schema end to end through the REAL IssueDetailView, IssueRecommendationPanel, BreadcrumbHierarchyPanel
@@ -42,6 +43,7 @@ vi.mock("@/hooks/useDashboardQueries", () => ({
 
 vi.mock("@/lib/apiService", () => ({
   default: {
+    startInvestigation: vi.fn(), getInvestigation: vi.fn(), cancelInvestigation: vi.fn(), prepareInvestigationFix: vi.fn(), approveInvestigation: vi.fn(), verifyInvestigation: vi.fn(),
     getIssueContext: vi.fn().mockResolvedValue({ success: true, data: null }),
     request: vi.fn(),
     createTask: vi.fn(),
@@ -98,7 +100,7 @@ beforeEach(() => {
 describe("IssueDetailView — breadcrumb hierarchy workflow", () => {
   test("generate -> form (no fake code) -> submit -> generated JSON-LD in the AI tab and the DIY guide, with no audit and no task changes", async () => {
     renderView()
-    fireEvent.click(await screen.findByRole("button", { name: /Generate AI Recommendation/ }))
+    await runInvestigation(apiService)
 
     expect(await screen.findByRole("heading", { name: "Complete Your Breadcrumb Hierarchy" })).toBeInTheDocument()
     expect(screen.queryByTestId("code-block")).not.toBeInTheDocument()
@@ -128,9 +130,9 @@ describe("IssueDetailView — breadcrumb hierarchy workflow", () => {
     expect(apiService.updateTaskStatus).not.toHaveBeenCalled()
   })
 
-  test("clicking Regenerate returns to the start; the previously regenerated result is not kept", async () => {
+  test("re-running the investigation does not call the legacy generate endpoint again, and the owner-confirmed trail stays on this page", async () => {
     renderView()
-    fireEvent.click(await screen.findByRole("button", { name: /Generate AI Recommendation/ }))
+    await runInvestigation(apiService)
     await screen.findByRole("heading", { name: "Complete Your Breadcrumb Hierarchy" })
     fireEvent.change(screen.getAllByLabelText("Page name")[0], { target: { value: "Home" } })
     fireEvent.change(screen.getAllByLabelText("Page URL")[0], { target: { value: `${ORIGIN}/` } })
@@ -138,9 +140,10 @@ describe("IssueDetailView — breadcrumb hierarchy workflow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate BreadcrumbList" }))
     await screen.findByTestId("breadcrumb-generated")
 
-    fireEvent.click(screen.getByRole("button", { name: /Regenerate/ }))
-    expect(await screen.findByRole("button", { name: /Generate AI Recommendation/ })).toBeInTheDocument()
-    expect(screen.queryByTestId("breadcrumb-generated")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId("investigation-rerun"))
+    await waitFor(() => expect(apiService.startInvestigation).toHaveBeenCalledTimes(2))
+    expect(apiService.request).toHaveBeenCalledTimes(1) // the single compatibility call; nothing re-ran
+    expect(legacyGenerateButton()).not.toBeInTheDocument()
   })
 
   test("an issue that is not breadcrumb schema never shows the form", async () => {
@@ -151,9 +154,9 @@ describe("IssueDetailView — breadcrumb hierarchy workflow", () => {
         <IssueDetailView issue={{ issue_code: "meta_description_missing", title: "Meta", affected_urls: [PAGE] }} initialSelUrl={PAGE} initialMode="ai" />
       </QueryClientProvider>
     )
-    fireEvent.click(await screen.findByRole("button", { name: /Generate AI Recommendation/ }))
-    await screen.findAllByText(/Breadcrumbs matter|Issue Analysis/)
+    await runInvestigation(apiService)
     expect(screen.queryByTestId("breadcrumb-hierarchy-form")).not.toBeInTheDocument()
+    expect(apiService.request).not.toHaveBeenCalled() // no owner-input panel -> the legacy endpoint is never needed
   })
 })
 
@@ -172,7 +175,7 @@ describe("IssueDetailView — breadcrumbs are applied only through the checked f
     wpConnected = true
     taskMapData = { [PAGE]: { _id: "task-1", status: "task_created", recommendationId: "rec-2" } }
     renderView()
-    fireEvent.click(await screen.findByRole("button", { name: /Generate AI Recommendation/ }))
+    await runInvestigation(apiService)
     await screen.findByRole("heading", { name: "Complete Your Breadcrumb Hierarchy" })
     fireEvent.click(screen.getByRole("button", { name: /DIY Guide/ }))
     expect(await screen.findByText(/Odito looks for your page's real breadcrumb trail, you confirm it/)).toBeInTheDocument()
@@ -185,7 +188,7 @@ describe("IssueDetailView — breadcrumbs are applied only through the checked f
     apiService.getWordPressFixPreview.mockResolvedValue(previewFor("ready_to_apply"))
     taskMapData = {}
     const { unmount } = renderView()
-    fireEvent.click(await screen.findByRole("button", { name: /Generate AI Recommendation/ }))
+    await runInvestigation(apiService)
     await screen.findByRole("heading", { name: "Complete Your Breadcrumb Hierarchy" })
     expect(screen.queryByTestId("breadcrumb-fix-card")).not.toBeInTheDocument()
     expect(apiService.getWordPressFixPreview).not.toHaveBeenCalled()
@@ -193,7 +196,7 @@ describe("IssueDetailView — breadcrumbs are applied only through the checked f
 
     taskMapData = { [PAGE]: { _id: "task-1", status: "task_created", recommendationId: "rec-2" } }
     renderView()
-    fireEvent.click(await screen.findByRole("button", { name: /Generate AI Recommendation/ }))
+    await runInvestigation(apiService)
     expect(await screen.findByTestId("breadcrumb-fix-card")).toBeInTheDocument()
     expect(apiService.getWordPressFixPreview).toHaveBeenCalledWith("task-1")
     expect(screen.getByTestId("breadcrumb-fix-state")).toHaveAttribute("data-state", "ready_to_apply")

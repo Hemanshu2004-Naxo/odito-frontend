@@ -124,10 +124,10 @@ const Navbar1 = ({
           <div className="flex items-center gap-6">
             <Link href={logo.url} className="flex items-center gap-2">
               <Image 
-                src="/oditologo.png" 
+                src="/logo/odito-logo-on-dark.png" 
                 alt="Odito Logo" 
-                width={150} 
-                height={50}
+                width={1200}
+                height={424}
                 priority={true}
                 className="h-12 w-auto hover:scale-105 transition-transform duration-200"
               />
@@ -153,10 +153,10 @@ const Navbar1 = ({
           <div className="flex items-center justify-between">
             <Link href={logo.url} className="flex items-center gap-2">
               <Image 
-                src="/oditologo.png" 
+                src="/logo/odito-logo-on-dark.png" 
                 alt="Odito Logo" 
-                width={130} 
-                height={40}
+                width={1200}
+                height={424}
                 priority={true}
                 className="h-10 w-auto hover:scale-105 transition-transform duration-200"
               />
@@ -172,10 +172,10 @@ const Navbar1 = ({
                   <SheetTitle>
                     <Link href={logo.url} className="flex items-center gap-2">
                       <Image 
-                        src="/oditologo.png" 
+                        src="/logo/odito-logo-on-dark.png" 
                         alt="Odito Logo" 
-                        width={130} 
-                        height={40}
+                        width={1200}
+                        height={424}
                         priority={true}
                         className="h-10 w-auto hover:scale-105 transition-transform duration-200"
                       />

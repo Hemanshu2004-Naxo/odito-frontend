@@ -138,7 +138,7 @@ export function SiteHeader({ user, onLogout }) {
               >
                 <IconDownload size={16} />
                 <span className="hidden sm:inline">
-                  {loading ? `Exporting... ${progress}%` : 'Export'}
+                  {loading ? "Generating PDF..." : "Export"}
                 </span>
               </button>
 

@@ -92,6 +92,125 @@ function DeltaBadge({ currentRank, compareRank }) {
   );
 }
 
+/**
+ * Position change between a previous and a current rank for ONE device.
+ * Lower rank number = better position. Returns null when either side is
+ * unknown — a missing/failed value never produces a change.
+ */
+export function getRankChange(currentRank, previousRank) {
+  if (currentRank == null || previousRank == null) return null;
+  return previousRank - currentRank; // positive = improved, negative = declined
+}
+
+/** Green ▲N / red ▼N / neutral dash. `change === null` (no history) is a dash too. */
+function ChangeIndicator({ change }) {
+  if (change == null || change === 0) {
+    return <span data-testid="rank-change-neutral" aria-label="No position change" style={{ fontSize: '11px', color: 'var(--text3)', fontWeight: 600 }}>–</span>;
+  }
+  const improved = change > 0;
+  return (
+    <span
+      data-testid={improved ? 'rank-change-up' : 'rank-change-down'}
+      aria-label={`${improved ? 'Improved' : 'Declined'} by ${Math.abs(change)} position${Math.abs(change) === 1 ? '' : 's'}`}
+      style={{ fontSize: '10px', fontWeight: 700, color: improved ? 'var(--gr)' : 'var(--re)', whiteSpace: 'nowrap' }}
+    >
+      {improved ? '▲' : '▼'}{Math.abs(change)}
+    </span>
+  );
+}
+
+/**
+ * Mobile organic ranking cell. Four data states that must never be confused:
+ *   not_collected — mobile was never checked (old keyword / feature off)
+ *   scan_error    — the last mobile check failed (rank unknown)
+ *   ranked        — found at #N (+ change vs the previous mobile scan)
+ *   not_ranked    — checked successfully, not found; "Not in top N" is only
+ *                   stated when the scan recorded how deep it actually looked
+ * Reads ONLY keyword.mobile — never falls back to desktop values.
+ */
+export function getMobileState(mobile) {
+  if (!mobile) return 'not_collected';
+  if (mobile.last_scan_status === 'error') return 'scan_error';
+  if (mobile.last_scan_status === 'ok') return mobile.current_rank != null ? 'ranked' : 'not_ranked';
+  return 'not_collected';
+}
+
+function MobileRankCell({ mobile, isScanning }) {
+  if (isScanning) {
+    return (
+      <span title="Checking your Google mobile ranking…" style={{ fontSize: '12px', color: 'var(--cyan)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+        <span style={{ display: 'inline-block', animation: 'kwdash-spin 1s linear infinite' }}>⟳</span>
+        Scanning…
+      </span>
+    );
+  }
+
+  const state = getMobileState(mobile);
+
+  if (state === 'not_collected') {
+    return (
+      <span
+        data-testid="mobile-not-collected"
+        title="Mobile ranking hasn't been checked yet for this keyword. Rescan to collect it."
+        style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic' }}
+      >
+        Not checked
+      </span>
+    );
+  }
+
+  if (state === 'scan_error') {
+    const message = mobile.last_scan_error || 'The last mobile ranking check failed — this is not a confirmed rank. Try rescanning.';
+    if (mobile.current_rank != null) {
+      // Keep the last known good rank visible, but flag that it is stale.
+      return (
+        <div data-testid="mobile-scan-error" title={`Showing the last known mobile rank. ${message}`} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <RankBadge rank={mobile.current_rank} />
+          <span style={{ fontSize: '11px', color: 'var(--am)', fontWeight: 700 }}>⚠</span>
+        </div>
+      );
+    }
+    return (
+      <span
+        data-testid="mobile-scan-error"
+        title={message}
+        style={{
+          fontSize: '11px', fontWeight: 500,
+          background: 'var(--color-status-warning-surface)', color: 'var(--am)',
+          border: '1px solid var(--color-status-warning-border)',
+          borderRadius: '6px', padding: '3px 8px', display: 'inline-block'
+        }}
+      >
+        Scan Error
+      </span>
+    );
+  }
+
+  if (state === 'not_ranked') {
+    const depth = mobile.tracked_depth;
+    return (
+      <div data-testid="mobile-not-ranked" title={depth ? `Checked on mobile: not found in the top ${depth} results` : 'Checked on mobile: not found in the results returned'} style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>—</span>
+        {depth ? <span style={{ fontSize: '10px', color: 'var(--text3)', whiteSpace: 'nowrap' }}>Not in top {depth}</span> : null}
+      </div>
+    );
+  }
+
+  // ranked
+  const change = getRankChange(mobile.current_rank, mobile.prev_scan_rank ?? null);
+  const history = [
+    mobile.prev_scan_rank != null ? `Last scan #${mobile.prev_scan_rank}` : null,
+    mobile.prev_week_rank != null ? `Prev week #${mobile.prev_week_rank}` : null,
+    mobile.prev_month_rank != null ? `Prev month #${mobile.prev_month_rank}` : null,
+  ].filter(Boolean).join(' · ');
+  return (
+    <div data-testid="mobile-ranked" title={history || 'No earlier mobile scan to compare with'} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <RankBadge rank={mobile.current_rank} />
+      <ChangeIndicator change={change} />
+    </div>
+  );
+}
+
 /** Google Maps rank badge with a pin icon */
 function MapsRankBadge({ mapsRank }) {
   if (mapsRank == null) return <span style={{ fontSize: '12px', color: 'var(--text3)' }}>—</span>;
@@ -202,7 +321,7 @@ function DeleteButton({ isDeleting, onRequestDelete }) {
 }
 
 // ─── Grid layout ─────────────────────────────────────────────────────────────
-// #(36) | Keyword(1fr) | Current(80) | Last Scan(80) | Best(76) | Prev Wk(90) | Prev Mo(90) | Benchmark(80) | Maps(76) | Status(80) | Actions(60)
+// #(36) | Keyword(1fr) | Desktop(80) | Mobile(96) | Last Scan(80) | Best(76) | Prev Wk(90) | Prev Mo(90) | Benchmark(80) | Maps(76) | Status(80) | Actions(60)
 // Column template lives in styles/keywords.css (.kw-grid) so container queries can
 // re-flow it into stacked cards on narrow screens.
 
@@ -255,7 +374,8 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
 
   const status      = currentRank != null ? getStatusFromRank(currentRank) : null;
   const rankingUrls = keyword.ranking_urls || [];
-  const hasUrls     = rankingUrls.length > 0;
+  const mobileUrls  = keyword.mobile?.ranking_urls || [];
+  const hasUrls     = rankingUrls.length > 0 || mobileUrls.length > 0;
   const hasMapsListing = !!(mapsListing && mapsListing.title);
 
   return (
@@ -277,18 +397,18 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
           {keyword.scan_count != null && (
             <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '1px' }}>
               {keyword.scan_count} scan{keyword.scan_count !== 1 ? 's' : ''}
-              {hasUrls && ` · ${rankingUrls.length} URL${rankingUrls.length !== 1 ? 's' : ''}`}
+              {rankingUrls.length > 0 && ` · ${rankingUrls.length} URL${rankingUrls.length !== 1 ? 's' : ''}`}
             </div>
           )}
-          {keyword.scan_count == null && hasUrls && (
+          {keyword.scan_count == null && rankingUrls.length > 0 && (
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
               {rankingUrls.length} ranking URL{rankingUrls.length > 1 ? 's' : ''}
             </div>
           )}
         </div>
 
-        {/* Current Rank */}
-        <div className="kw-c-m" data-label="Current">
+        {/* Desktop rank (the long-standing top-level rank fields) */}
+        <div className="kw-c-m" data-label="Desktop">
           {isScanning ? (
             <span title="Checking your Google ranking…" style={{ fontSize: '12px', color: 'var(--cyan)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
               <span style={{ display: 'inline-block', animation: 'kwdash-spin 1s linear infinite' }}>⟳</span>
@@ -300,6 +420,11 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
               nullTitle={scanFailed ? scanErrorMessage : 'Not in Top 100'}
             />
           )}
+        </div>
+
+        {/* Mobile rank — independent of desktop; reads keyword.mobile only */}
+        <div className="kw-c-m" data-label="Mobile">
+          <MobileRankCell mobile={keyword.mobile} isScanning={isScanning} />
         </div>
 
         {/* Last Scan Rank */}
@@ -427,8 +552,8 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
       {isExpanded && (hasUrls || hasMapsListing) && (
         <div className="kw-expand">
           {hasMapsListing && <MapsListingCard listing={mapsListing} />}
-          {rankingUrls.map((ru, ri) => (
-            <div key={ri} style={{
+          {[...rankingUrls.map(ru => ({ ru, device: 'desktop' })), ...mobileUrls.map(ru => ({ ru, device: 'mobile' }))].map(({ ru, device }, ri) => (
+            <div key={`${device}-${ri}`} data-device={device} style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '7px 12px',
               background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: '8px'
@@ -448,6 +573,9 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
                 flexShrink: 0, width: '80px'
               }}>
                 {ru.type === 'homepage' ? 'Homepage' : 'Page'}
+              </span>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
+                {device === 'mobile' ? 'Mobile' : 'Desktop'}
               </span>
               <a
                 href={ru.url}
@@ -582,7 +710,8 @@ function UserAddedKeywords({ data, loading, error, onRefresh, onRescan, onDelete
         }}>
           <div>#</div>
           <div>Keyword</div>
-          <div>Current</div>
+          <div>Desktop</div>
+          <div>Mobile</div>
           <div>Last Scan</div>
           <div>Best</div>
           <div>Prev Week</div>

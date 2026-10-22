@@ -201,7 +201,7 @@ function EmailVerificationContent() {
           <div className="relative z-10">
             <Link href="/">
               <img 
-                src="/oditologo.png" 
+                src="/logo/odito-logo-on-dark.png" 
                 alt="Odito AI" 
                 className="h-16 w-auto object-contain hover:scale-105 hover:opacity-90 transition-all duration-300"
               />
@@ -257,7 +257,7 @@ function EmailVerificationContent() {
           <div className="lg:hidden absolute top-8 left-8">
             <Link href="/">
               <img 
-                src="/oditologo.png" 
+                src="/logo/odito-logo-on-dark.png" 
                 alt="Odito AI" 
                 className="h-12 w-auto object-contain hover:scale-105 hover:opacity-90 transition-all duration-300"
               />

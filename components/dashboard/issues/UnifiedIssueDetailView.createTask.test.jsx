@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query"
 import UnifiedIssueDetailView from "./UnifiedIssueDetailView"
 import apiService from "@/lib/apiService"
 import { defineCreateTaskScenarios } from "@/test-utils/createTaskScenarios"
+import { runInvestigation, legacyGenerateButton, investigateButton } from "@/test-utils/investigationKit"
 
 /**
  * UnifiedIssueDetailView backs the AISO, AEO and GEO hub issue pages.
@@ -40,6 +41,7 @@ vi.mock("@/hooks/useDashboardQueries", () => ({
 }))
 vi.mock("@/lib/apiService", () => ({
   default: {
+    startInvestigation: vi.fn(), getInvestigation: vi.fn(), cancelInvestigation: vi.fn(), prepareInvestigationFix: vi.fn(), approveInvestigation: vi.fn(), verifyInvestigation: vi.fn(),
     getIssueContext: vi.fn().mockResolvedValue({ success: true, data: null }),
     request: vi.fn(), createTask: vi.fn(), updateTaskStatus: vi.fn(), applyWordPressFix: vi.fn(), linkTaskRecommendation: vi.fn(), getRecommendationById: vi.fn(),
   },
@@ -81,6 +83,7 @@ for (const { hub, card, domainRule, pageRule } of HUBS) {
     label: `${hub} — page-level issue`,
     apiService,
     pageUrl: PAGE,
+    expectedRecommendationId: null,
     expectedPayload: { projectId: "project-1", issueKey: pageRule, issueName: `${card} page issue`, issueCategory: card },
     setTaskMap: (map) => { taskMapData = map },
     renderScreen: (queryClient) => render(
@@ -94,8 +97,8 @@ for (const { hub, card, domainRule, pageRule } of HUBS) {
     ),
     generate: async () => {
       fireEvent.click(await screen.findByText(PAGE))
-      fireEvent.click(await screen.findByRole("button", { name: /Generate AI Recommendation/ }))
-      await waitFor(() => expect(screen.getByRole("button", { name: /Regenerate/ })).toBeInTheDocument())
+      await runInvestigation(apiService)
+      await screen.findByTestId("unified-task-actions")
     },
   })
 }

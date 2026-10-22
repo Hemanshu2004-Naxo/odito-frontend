@@ -1,713 +1,284 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
-import { PageHeader, PageFooter, SectionHeader, StatCard, Badge, InsightBox } from '../layout';
-import API_BASE_URL from "@/lib/apiConfig";
+import React from 'react';
+import { PAGE_HEIGHT } from '../../pageSize';
+import { PageHeader, PageFooter, SectionHeader, StatCard, Badge, InsightBox, MissingReport, UnavailableSection, Caption } from '../layout';
+import { useCanonicalReport } from '../../reportMeta';
+import { structuredDataVM, technicalChecksVM, crawlabilityVM, unavailableText } from '../../reportViewModels';
 
-// ---- Page 9: Structured Data Analysis ----
-export function StructuredDataPage({ projectId }) {
-  const [pageData, setPageData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [timeoutReached, setTimeoutReached] = useState(false);
+const frame = {
+  width: 960, minHeight: PAGE_HEIGHT, background: '#fff', display: 'flex',
+  flexDirection: 'column', boxShadow: '0 4px 40px rgba(0,0,0,0.12)',
+  margin: '0 auto', fontFamily: "'DM Sans', sans-serif",
+};
 
-  // Mark component as ready AFTER DOM render is complete
-  useEffect(() => {
-    if (pageData) {
-      
-      // CRITICAL FIX: Use requestAnimationFrame to ensure DOM has rendered with new data
-      requestAnimationFrame(() => {
-        
-        // PINPOINT FIX: Use correct window targeting
-        const markReady = () => {
-          const target = window.parent || window;
+const h3 = { fontSize: 17, fontWeight: 700, marginBottom: 8, fontFamily: "'Inter', sans-serif" };
+const rule = { borderBottom: '2px solid #4F6EF7', marginBottom: 20 };
 
-          if (target && target.__PDF_READY__) {
-            target.__PDF_READY__.markReady("Structured Data");
-          } else if (target && target.__PDF_SET_READY__) {
-            target.__PDF_SET_READY__('structured-data', true, 'Structured Data');
-          } else {
-            // Retry mechanism - system might still be initializing
-            setTimeout(markReady, 50);
-          }
-        };
-        
-        markReady();
-      });
-    }
-  }, [pageData]);
+const TECH_NOTE = 'Technical checks, crawlability and structured data reflect the project\'s current state at report time.';
 
-  useEffect(() => {
-    
-    // Component registration is now handled inline by the PDF renderer
-    
-    if (!projectId) {
-      setError('Project ID is required');
-      setLoading(false);
-      return;
-    }
-
-    const fetchPageData = async () => {
-      try {
-        
-        // Set timeout to prevent infinite loading
-        const timeoutId = setTimeout(() => {
-          setTimeoutReached(true);
-          setError('Data loading timeout - please try again');
-          setLoading(false);
-          
-          // Mark as ready to prevent PDF generation hanging
-          if (typeof window !== 'undefined' && window.__PDF_SET_READY__) {
-            window.__PDF_SET_READY__('structured-data', true, 'Structured Data (Timeout)');
-          }
-        }, 25000); // 25 second timeout
-        
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          clearTimeout(timeoutId);
-          setError('Authentication required - please login again');
-          setLoading(false);
-          return;
-        }
-        
-        const response = await fetch(`${API_BASE_URL}/pdf/${projectId}/page09`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-
-        if (!response.ok) {
-          clearTimeout(timeoutId);
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        
-        if (!result.success) {
-          clearTimeout(timeoutId);
-          throw new Error(result.error?.message || 'Failed to fetch page data');
-        }
-
-        // Clear timeout on successful response
-        clearTimeout(timeoutId);
-
-        setPageData(result.data);
-        // NOTE: markReady is now called in the useEffect that watches pageData
-      } catch (err) {
-        clearTimeout(timeoutId);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPageData();
-  }, [projectId]);
-
-  if (loading) {
-    return (
-      <div style={{
-        width: 960, minHeight: 1280, background: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{ color: '#6B7280', fontSize: 16 }}>Loading Structured Data analysis...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{
-        width: 960, minHeight: 1280, background: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{ color: '#EF4444', fontSize: 16 }}>Error: {error}</div>
-      </div>
-    );
-  }
-
-  const { withSchema, withoutSchema, coverage, errors, schemaTypes, mode } = pageData || {
-    withSchema: 0,
-    withoutSchema: 0,
-    coverage: 0,
-    errors: 0,
-    schemaTypes: [],
-    mode: 'coverage'
-  };
-
-  const whyRows = [
-    ['Google Rich Results', 'Eligible for rich results', 'Plain blue link only', withoutSchema > 0 ? 'Missing' : 'Achieved'],
-    ['Google AI Overviews', 'Entities extracted & cited', 'Anonymous — skipped', withoutSchema > 0 ? 'Critical' : 'Optimized'],
-    ['ChatGPT / Perplexity', 'High citation probability', 'Low citation probability', withoutSchema > 0 ? '12% vs 43%' : 'Maximized'],
-    ['LLM Training Index', 'Structured facts indexed', 'Unstructured — low priority', withoutSchema > 0 ? 'Impact' : 'Indexed'],
-  ];
+// ---- Structured Data ----
+export function StructuredDataPage() {
+  const report = useCanonicalReport();
+  if (!report) return <MissingReport title="Structured Data" />;
+  const vm = structuredDataVM(report);
 
   return (
-    <div style={{
-      width: 960, minHeight: 1280, background: '#fff', display: 'flex',
-      flexDirection: 'column', boxShadow: '0 4px 40px rgba(0,0,0,0.12)',
-      margin: '0 auto', fontFamily: "'DM Sans', sans-serif"
-    }}>
-      <PageHeader page={9} />
+    <div style={frame}>
+      <PageHeader page={4} />
       <div style={{ padding: '32px 40px', flex: 1 }}>
-        <SectionHeader num="07" title="Structured Data Analysis" subtitle={mode === 'distribution' ? 'Schema type distribution and AI search readiness' : 'JSON-LD coverage and AI search impact'} />
+        <SectionHeader num="03" title="Structured Data Analysis" subtitle={vm.mode === 'distribution' ? 'Schema type distribution' : 'JSON-LD / structured data coverage'} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
-          <StatCard value={withSchema} label="With Schema" sub="JSON-LD detected" color="#10B981" borderColor="#10B981" />
-          <StatCard value={withoutSchema} label="Missing Schema" sub="No structured data" color={withoutSchema > 0 ? '#EF4444' : '#10B981'} borderColor={withoutSchema > 0 ? '#EF4444' : '#10B981'} />
-          <StatCard value={`${coverage}%`} label="Coverage" sub="of all pages" color={coverage === 100 ? '#10B981' : '#F59E0B'} borderColor={coverage === 100 ? '#10B981' : '#F59E0B'} />
-          <StatCard value={errors} label="Errors" sub="Validation issues" color={errors > 0 ? '#F97316' : '#10B981'} borderColor={errors > 0 ? '#F97316' : '#10B981'} />
-        </div>
-
-        {mode === 'distribution' ? (
-          // Schema Distribution View (100% coverage case)
-          <>
-            <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>Schema Type Distribution</h3>
-            <div style={{ borderBottom: '2px solid #4F6EF7', marginBottom: 20 }} />
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 40, marginBottom: 28 }}>
-              <svg width={180} height={180} viewBox="0 0 180 180">
-                {schemaTypes.slice(0, 5).map((type, i) => {
-                  const colors = ['#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EF4444'];
-                  const total = schemaTypes.reduce((sum, t) => sum + t.count, 0);
-                  let offset = 0;
-                  
-                  for (let j = 0; j < i; j++) {
-                    offset += (schemaTypes[j].count / total);
-                  }
-                  
-                  const r = 70; const c = 2 * Math.PI * r;
-                  const pct = type.count / total;
-                  
-                  return (
-                    <circle key={i} cx={90} cy={90} r={r} fill="none" stroke={colors[i]} strokeWidth={24}
-                      strokeDasharray={`${c * pct} ${c}`} strokeDashoffset={-c * offset} transform="rotate(-90 90 90)" />
-                  );
-                })}
-                <circle cx={90} cy={90} r={56} fill="white" />
-              </svg>
-              <div style={{ fontSize: 13, color: '#374151', lineHeight: 2 }}>
-                <div><span style={{ color: '#10B981' }}>■</span> {withSchema} pages with schema ({coverage}%)</div>
-                <div><span style={{ color: '#10B981' }}>■</span> {schemaTypes.length} schema types detected</div>
-                <div style={{ marginTop: 12, fontWeight: 600 }}>Detected types:</div>
-                {schemaTypes.map((type, i) => (
-                  <div key={type.type} style={{ color: '#6B7280' }}>— {type.type} — {type.pages} pages</div>
-                ))}
-              </div>
-            </div>
-          </>
+        {!vm.hasData ? (
+          <UnavailableSection title="Structured data unavailable" message={unavailableText(vm, 'structured data')} tone="warn" />
         ) : (
-          // Coverage Breakdown View (normal case)
           <>
-            <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>Schema Coverage Breakdown</h3>
-            <div style={{ borderBottom: '2px solid #4F6EF7', marginBottom: 20 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
+              <StatCard value={vm.withSchema} label="With Schema" sub="Structured data detected" color="#10B981" borderColor="#10B981" />
+              <StatCard value={vm.withoutSchema} label="Missing Schema" sub="No structured data" color={vm.withoutSchema > 0 ? '#EF4444' : '#10B981'} borderColor={vm.withoutSchema > 0 ? '#EF4444' : '#10B981'} />
+              <StatCard value={`${vm.coverage}%`} label="Coverage" sub="of crawled pages" color={vm.coverage === 100 ? '#10B981' : '#F59E0B'} borderColor={vm.coverage === 100 ? '#10B981' : '#F59E0B'} />
+              <StatCard value={vm.schemaIssueCount ?? 'N/A'} label="Schema Issues" sub="Open schema-related issues" color={vm.schemaIssueCount > 0 ? '#F97316' : '#10B981'} borderColor={vm.schemaIssueCount > 0 ? '#F97316' : '#10B981'} />
+            </div>
+
+            <h3 style={h3}>{vm.mode === 'distribution' ? 'Schema Type Distribution' : 'Schema Coverage Breakdown'}</h3>
+            <div style={rule} />
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 40, marginBottom: 28 }}>
               <svg width={180} height={180} viewBox="0 0 180 180">
-                {[
-                  { pct: coverage / 100, color: '#10B981', offset: 0 },
-                  { pct: (100 - coverage) / 100, color: '#EF4444', offset: coverage / 100 },
-                ].map(({ pct, color, offset }, i) => {
-                  const r = 70; const c = 2 * Math.PI * r;
-                  return <circle key={i} cx={90} cy={90} r={r} fill="none" stroke={color} strokeWidth={24}
-                    strokeDasharray={`${c * pct} ${c}`} strokeDashoffset={-c * offset} transform="rotate(-90 90 90)" />;
-                })}
+                {vm.mode === 'distribution'
+                  ? (() => {
+                      const colors = ['#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EF4444'];
+                      const top = vm.schemaTypes.slice(0, 5);
+                      const total = top.reduce((sum, t) => sum + t.count, 0);
+                      let offset = 0;
+                      return top.map((type, i) => {
+                        const r = 70; const c = 2 * Math.PI * r;
+                        const pct = total > 0 ? type.count / total : 0;
+                        const el = (
+                          <circle key={type.type} cx={90} cy={90} r={r} fill="none" stroke={colors[i]} strokeWidth={24}
+                            strokeDasharray={`${c * pct} ${c}`} strokeDashoffset={-c * offset} transform="rotate(-90 90 90)" />
+                        );
+                        offset += pct;
+                        return el;
+                      });
+                    })()
+                  : [
+                      { pct: vm.coverage / 100, color: '#10B981', offset: 0 },
+                      { pct: (100 - vm.coverage) / 100, color: '#EF4444', offset: vm.coverage / 100 },
+                    ].map(({ pct, color, offset }, i) => {
+                      const r = 70; const c = 2 * Math.PI * r;
+                      return <circle key={i} cx={90} cy={90} r={r} fill="none" stroke={color} strokeWidth={24}
+                        strokeDasharray={`${c * pct} ${c}`} strokeDashoffset={-c * offset} transform="rotate(-90 90 90)" />;
+                    })}
                 <circle cx={90} cy={90} r={56} fill="white" />
               </svg>
               <div style={{ fontSize: 13, color: '#374151', lineHeight: 2 }}>
-                <div><span style={{ color: '#10B981' }}>■</span> {withSchema} pages with schema ({coverage}%)</div>
-                <div><span style={{ color: '#EF4444' }}>■</span> {withoutSchema} pages missing schema ({100 - coverage}%)</div>
+                <div><span style={{ color: '#10B981' }}>■</span> {vm.withSchema} pages with schema ({vm.coverage}%)</div>
+                {vm.mode === 'distribution'
+                  ? <div><span style={{ color: '#10B981' }}>■</span> {vm.schemaTypes.length} schema types detected</div>
+                  : <div><span style={{ color: '#EF4444' }}>■</span> {vm.withoutSchema} pages missing schema ({100 - vm.coverage}%)</div>}
                 <div style={{ marginTop: 12, fontWeight: 600 }}>Detected types:</div>
-                {schemaTypes.slice(0, 4).map((type) => (
+                {vm.schemaTypes.length === 0 && <div style={{ color: '#6B7280' }}>— none —</div>}
+                {vm.schemaTypes.slice(0, vm.mode === 'distribution' ? 8 : 4).map((type) => (
                   <div key={type.type} style={{ color: '#6B7280' }}>— {type.type} — {type.pages} pages</div>
                 ))}
               </div>
             </div>
+
+            <InsightBox title="Structured Data Summary">
+              {vm.mode === 'distribution'
+                ? `All ${vm.withSchema} crawled pages have structured data, across ${vm.schemaTypes.length} schema type(s). Validate that the markup is accurate and complete for each page type.`
+                : `${vm.withSchema} of ${vm.withSchema + vm.withoutSchema} crawled pages have structured data (${vm.coverage}%).${vm.withoutSchema > 0 ? ` ${vm.withoutSchema} pages have none; adding accurate schema markup to them is a recommended improvement.` : ''}`}
+              {vm.schemaIssueCount > 0 ? ` ${vm.schemaIssueCount} open schema-related issue(s) were detected.` : ''}
+            </InsightBox>
           </>
         )}
-
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>Why Structured Data Matters</h3>
-        <div style={{ borderBottom: '2px solid #4F6EF7', marginBottom: 16 }} />
-
-        <div style={{ borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', marginBottom: 24 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#111827' }}>
-                {['Platform', 'With Schema', 'Without Schema', 'Your Gap'].map((h, i) => (
-                  <th key={i} style={{ padding: '11px 14px', color: '#fff', fontWeight: 600, textAlign: 'left' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {whyRows.map(([platform, with_, without, gap], i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                  <td style={{ padding: '11px 14px', fontWeight: 600, color: '#111827' }}>{platform}</td>
-                  <td style={{ padding: '11px 14px', color: '#10B981' }}>{with_}</td>
-                  <td style={{ padding: '11px 14px', color: '#EF4444' }}>{without}</td>
-                  <td style={{ padding: '11px 14px' }}>
-                    <Badge 
-                      label={gap} 
-                      type={
-                        gap === 'Missing' || gap === 'Critical' ? 'critical' : 
-                        gap === 'Impact' ? 'warn' : 
-                        gap === 'Achieved' || gap === 'Optimized' || gap === 'Maximized' || gap === 'Indexed' ? 'pass' : 
-                        'medium'
-                      } 
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <InsightBox title="Structured Data Impact">
-          {mode === 'distribution' ? 
-            `Excellent! All ${withSchema} pages have comprehensive schema with ${schemaTypes.length} different types detected. This maximizes AI search visibility and rich result eligibility. Focus now on schema quality and advanced types like FAQ, HowTo, and Event schemas for additional opportunities.` :
-            `JSON-LD is the primary mechanism AI search engines use to understand content. ${withoutSchema > 0 ? `Adding schema to ${withoutSchema} pages is the fastest path to lifting LLM citation rate from 12% to 28-35%.` : 'All pages are optimized for maximum AI search visibility.'}`
-          }
-        </InsightBox>
+        <Caption>{TECH_NOTE}</Caption>
       </div>
-      <PageFooter page={9} />
+      <PageFooter page={4} />
     </div>
   );
 }
 
-// ---- Page 10: Technical SEO Health ----
-export function TechnicalSEOPage({ projectId }) {
-  const [pageData, setPageData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [timeoutReached, setTimeoutReached] = useState(false);
+// ---- Technical SEO ----
+const CHECK_BADGE = {
+  pass: { label: '✓ PASS', type: 'pass' },
+  warn: { label: '▲ WARN', type: 'warn' },
+  fail: { label: '✗ FAIL', type: 'fail' },
+  unknown: { label: 'UNKNOWN', type: 'info' },
+};
 
-  // Mark component as ready AFTER DOM render is complete
-  useEffect(() => {
-    if (pageData) {
-      
-      // CRITICAL FIX: Use requestAnimationFrame to ensure DOM has rendered with new data
-      requestAnimationFrame(() => {
-        
-        // PINPOINT FIX: Use correct window targeting
-        const markReady = () => {
-          const target = window.parent || window;
-
-          if (target && target.__PDF_READY__) {
-            target.__PDF_READY__.markReady("Technical SEO");
-          } else if (target && target.__PDF_SET_READY__) {
-            target.__PDF_SET_READY__('technical-seo', true, 'Technical SEO');
-          } else {
-            // Retry mechanism - system might still be initializing
-            setTimeout(markReady, 50);
-          }
-        };
-        
-        markReady();
-      });
-    }
-  }, [pageData]);
-
-  useEffect(() => {
-    
-    // Component registration is now handled inline by the PDF renderer
-    
-    if (!projectId) {
-      setError('Project ID is required');
-      setLoading(false);
-      return;
-    }
-
-    const fetchPageData = async () => {
-      try {
-        
-        // Set timeout to prevent infinite loading
-        const timeoutId = setTimeout(() => {
-          setTimeoutReached(true);
-          setError('Data loading timeout - please try again');
-          setLoading(false);
-          
-          // Mark as ready to prevent PDF generation hanging
-          if (typeof window !== 'undefined' && window.__PDF_SET_READY__) {
-            window.__PDF_SET_READY__('technical-seo', true, 'Technical SEO (Timeout)');
-          }
-        }, 25000); // 25 second timeout
-        
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          clearTimeout(timeoutId);
-          setError('Authentication required - please login again');
-          setLoading(false);
-          return;
-        }
-        
-        const response = await fetch(`${API_BASE_URL}/pdf/${projectId}/page10`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-
-        if (!response.ok) {
-          clearTimeout(timeoutId);
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        
-        if (!result.success) {
-          clearTimeout(timeoutId);
-          throw new Error(result.error?.message || 'Failed to fetch page data');
-        }
-
-        // Clear timeout on successful response
-        clearTimeout(timeoutId);
-
-        setPageData(result.data);
-        // NOTE: markReady is now called in the useEffect that watches pageData
-      } catch (err) {
-        clearTimeout(timeoutId);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPageData();
-  }, [projectId]);
-
-  if (loading) {
-    return (
-      <div style={{
-        width: 960, minHeight: 1280, background: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{ color: '#6B7280', fontSize: 16 }}>Loading Technical SEO Health analysis...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{
-        width: 960, minHeight: 1280, background: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{ color: '#EF4444', fontSize: 16 }}>Error: {error}</div>
-      </div>
-    );
-  }
-
-  const { checks, summary } = pageData || {
-    checks: [],
-    summary: { passing: 0, warnings: 0, critical: 0, techHealth: 0 }
-  };
+export function TechnicalSEOPage() {
+  const report = useCanonicalReport();
+  if (!report) return <MissingReport title="Technical SEO" />;
+  const vm = technicalChecksVM(report);
 
   return (
-    <div style={{
-      width: 960, minHeight: 1280, background: '#fff', display: 'flex',
-      flexDirection: 'column', boxShadow: '0 4px 40px rgba(0,0,0,0.12)',
-      margin: '0 auto', fontFamily: "'DM Sans', sans-serif"
-    }}>
-      <PageHeader page={10} />
+    <div style={frame}>
+      <PageHeader page={5} />
       <div style={{ padding: '32px 40px', flex: 1 }}>
-        <SectionHeader num="08" title="Technical SEO Health" subtitle="Server, crawlability and indexation audit" score={summary.techHealth} />
+        <SectionHeader num="04" title="Technical SEO Health" subtitle="Server, security and indexation checks" score={vm.hasData ? vm.healthScore ?? undefined : undefined} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
-          <StatCard value={summary.passing} label="Passed" sub={`of ${checks.length} checks`} color="#10B981" borderColor="#10B981" />
-          <StatCard value={summary.warnings} label="Warnings" sub="Need attention" color="#F59E0B" borderColor="#F59E0B" />
-          <StatCard value={summary.critical} label="Failed" sub="Urgent fixes" color="#EF4444" borderColor="#EF4444" />
-          <StatCard value={`${summary.techHealth}%`} label="Tech Health" sub="Overall" color="#4F6EF7" borderColor="#4F6EF7" />
-        </div>
+        {!vm.hasData ? (
+          <UnavailableSection title="Technical checks unavailable" message={unavailableText(vm, 'technical check')} tone="warn" />
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
+              <StatCard value={vm.passed} label="Passed" sub={`of ${vm.checks.length} checks`} color="#10B981" borderColor="#10B981" />
+              <StatCard value={vm.warnings} label="Warnings" sub="Need attention" color="#F59E0B" borderColor="#F59E0B" />
+              <StatCard value={vm.failed} label="Failed" sub="Critical status" color="#EF4444" borderColor="#EF4444" />
+              <StatCard value={vm.healthScore == null ? 'N/A' : `${vm.healthScore}%`} label="Tech Health" sub="Passed / total checks" color="#4F6EF7" borderColor="#4F6EF7" />
+            </div>
 
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, fontFamily: "'Inter', sans-serif" }}>Technical Check Results</h3>
+            <h3 style={{ ...h3, marginBottom: 16 }}>Technical Check Results</h3>
 
-        <div style={{ borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', marginBottom: 24 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#111827' }}>
-                {['Technical Check', 'Status', 'Finding / Detail'].map((h, i) => (
-                  <th key={i} style={{ padding: '11px 14px', color: '#fff', fontWeight: 600, textAlign: 'left' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {checks.map((check, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                  <td style={{ padding: '10px 14px', fontWeight: 600, color: '#111827' }}>{check.name}</td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <Badge
-                      label={check.status === 'PASS' ? '✓ PASS' : check.status === 'WARN' ? '▲ WARN' : '✗ FAIL'}
-                      type={check.status === 'PASS' ? 'pass' : check.status === 'WARN' ? 'warn' : 'fail'}
-                    />
-                  </td>
-                  <td style={{ padding: '10px 14px', color: '#6B7280' }}>{check.detail}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <InsightBox title="Technical Priority Analysis">
-          {summary.critical > 0 ? 
-            `Critical issues found: ${checks.filter(c => c.status === 'FAIL').map(c => c.name).join(', ')}. Address these immediately as they directly impact search visibility and user experience.` :
-            summary.warnings > 0 ?
-            `Warning issues need attention: ${checks.filter(c => c.status === 'WARN').map(c => c.name).join(', ')}. Monitor these and fix if they escalate.` :
-            `Excellent technical health! All ${summary.passing} checks are passing. Maintain regular monitoring to ensure continued optimal performance.`
-          }
-        </InsightBox>
-      </div>
-      <PageFooter page={10} />
-    </div>
-  );
-}
-
-// ---- Page 11: Crawlability Analysis ----
-export function CrawlabilityPage({ projectId }) {
-  const [pageData, setPageData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [timeoutReached, setTimeoutReached] = useState(false);
-
-  // Mark component as ready AFTER DOM render is complete
-  useEffect(() => {
-    if (pageData) {
-      
-      // CRITICAL FIX: Use requestAnimationFrame to ensure DOM has rendered with new data
-      requestAnimationFrame(() => {
-        
-        // PINPOINT FIX: Use correct window targeting
-        const markReady = () => {
-          const target = window.parent || window;
-
-          if (target && target.__PDF_READY__) {
-            target.__PDF_READY__.markReady("Crawlability");
-          } else if (target && target.__PDF_SET_READY__) {
-            target.__PDF_SET_READY__('crawlability', true, 'Crawlability');
-          } else {
-            // Retry mechanism - system might still be initializing
-            setTimeout(markReady, 50);
-          }
-        };
-        
-        markReady();
-      });
-    }
-  }, [pageData]);
-
-  useEffect(() => {
-    
-    // Component registration is now handled inline by the PDF renderer
-    
-    if (!projectId) {
-      setError('Project ID is required');
-      setLoading(false);
-      return;
-    }
-
-    const fetchPageData = async () => {
-      try {
-        
-        // Set timeout to prevent infinite loading
-        const timeoutId = setTimeout(() => {
-          setTimeoutReached(true);
-          setError('Data loading timeout - please try again');
-          setLoading(false);
-          
-          // Mark as ready to prevent PDF generation hanging
-          if (typeof window !== 'undefined' && window.__PDF_SET_READY__) {
-            window.__PDF_SET_READY__('crawlability', true, 'Crawlability (Timeout)');
-          }
-        }, 25000); // 25 second timeout
-        
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          clearTimeout(timeoutId);
-          setError('Authentication required - please login again');
-          setLoading(false);
-          return;
-        }
-        
-        const response = await fetch(`${API_BASE_URL}/pdf/${projectId}/page11`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-
-        if (!response.ok) {
-          clearTimeout(timeoutId);
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        if (!result.success) {
-          clearTimeout(timeoutId);
-          throw new Error(result.error?.message || 'Failed to fetch page data');
-        }
-
-        // Clear timeout on successful response
-        clearTimeout(timeoutId);
-
-        setPageData(result.data);
-        // NOTE: markReady is now called in the useEffect that watches pageData
-      } catch (err) {
-        clearTimeout(timeoutId);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPageData();
-  }, [projectId]);
-
-  if (loading) {
-    return (
-      <div style={{
-        width: 960, minHeight: 1280, background: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{ color: '#6B7280', fontSize: 16 }}>Loading Crawlability analysis...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{
-        width: 960, minHeight: 1280, background: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{ color: '#EF4444', fontSize: 16 }}>Error: {error}</div>
-      </div>
-    );
-  }
-
-  const { metrics, chartData, blockedReasons } = pageData || {
-    metrics: { totalPages: 0, indexedPages: 0, blockedPages: 0, indexRate: 0 },
-    chartData: [],
-    blockedReasons: []
-  };
-
-  return (
-    <div style={{
-      width: 960, minHeight: 1280, background: '#fff', display: 'flex',
-      flexDirection: 'column', boxShadow: '0 4px 40px rgba(0,0,0,0.12)',
-      margin: '0 auto', fontFamily: "'DM Sans', sans-serif"
-    }}>
-      <PageHeader page={11} />
-      <div style={{ padding: '32px 40px', flex: 1 }}>
-        <SectionHeader num="09" title="Crawlability Analysis" subtitle="Indexation status and crawl budget analysis" />
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
-          <StatCard value={metrics.totalPages} label="Pages Crawled" sub="Discovered" color="#4F6EF7" borderColor="#4F6EF7" />
-          <StatCard value={metrics.indexedPages} label="Pages Indexed" sub="In Google" color="#10B981" borderColor="#10B981" />
-          <StatCard value={metrics.blockedPages} label="Pages Blocked" sub="Noindex/robots" color="#EF4444" borderColor="#EF4444" />
-          <StatCard value={`${metrics.indexRate}%`} label="Index Rate" sub="Indexed/Crawled" color={metrics.indexRate >= 90 ? '#10B981' : metrics.indexRate >= 70 ? '#F59E0B' : '#EF4444'} borderColor={metrics.indexRate >= 90 ? '#10B981' : metrics.indexRate >= 70 ? '#F59E0B' : '#EF4444'} />
-        </div>
-
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>Crawl Status Distribution</h3>
-        <div style={{ borderBottom: '2px solid #4F6EF7', marginBottom: 20 }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 40, marginBottom: 28 }}>
-          <svg width={180} height={180} viewBox="0 0 180 180">
-            {chartData.map((item, i) => {
-              const colors = ['#10B981', '#EF4444'];
-              const r = 70; const c = 2 * Math.PI * r;
-              let offset = 0;
-              
-              for (let j = 0; j < i; j++) {
-                offset += (chartData[j].percentage / 100);
-              }
-              
-              return (
-                <circle key={i} cx={90} cy={90} r={r} fill="none" stroke={colors[i]} strokeWidth={24}
-                  strokeDasharray={`${c * (item.percentage / 100)} ${c}`} strokeDashoffset={-c * offset} transform="rotate(-90 90 90)" />
-              );
-            })}
-            <circle cx={90} cy={90} r={56} fill="white" />
-          </svg>
-          <div style={{ fontSize: 14, color: '#374151', lineHeight: 2.2 }}>
-            {chartData.map((item, i) => (
-              <div key={i}>
-                <span style={{ color: item.label === 'Indexed' ? '#10B981' : '#EF4444' }}>■</span> {item.value} {item.label.toLowerCase()} ({item.percentage}%)
-              </div>
-            ))}
-            <p style={{ fontSize: 13, color: '#6B7280', marginTop: 12 }}>
-              {metrics.blockedPages > 0 ? 
-                `${metrics.blockedPages} blocked pages = lost ranking potential on ${metrics.indexRate < 100 ? Math.round((metrics.blockedPages / metrics.totalPages) * 100) : 0}% of site content.` :
-                'All pages are successfully indexed and accessible to search engines.'
-              }
-            </p>
-          </div>
-        </div>
-
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>Blocked Pages Breakdown</h3>
-        <div style={{ borderBottom: '2px solid #4F6EF7', marginBottom: 16 }} />
-
-        <div style={{ borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', marginBottom: 24 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#111827' }}>
-                {['Reason', 'Affected', 'SEO Impact', 'Fix'].map((h, i) => (
-                  <th key={i} style={{ padding: '11px 14px', color: '#fff', fontWeight: 600, textAlign: 'left' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {blockedReasons.length > 0 ? (
-                blockedReasons.map((reason, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                    <td style={{ padding: '11px 14px', fontWeight: 600, color: '#111827' }}>{reason.reason}</td>
-                    <td style={{ padding: '11px 14px', color: '#374151', textAlign: 'center' }}>{reason.affected}</td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <Badge 
-                        label={reason.impact} 
-                        type={reason.impact.toLowerCase() === 'critical' ? 'critical' : 
-                              reason.impact.toLowerCase() === 'high' ? 'warn' : 
-                              reason.impact.toLowerCase() === 'medium' ? 'medium' : 'pass'} 
-                      />
-                    </td>
-                    <td style={{ padding: '11px 14px', color: '#6B7280' }}>{reason.fix}</td>
+            <div style={{ borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', marginBottom: 24 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#111827' }}>
+                    {['Technical Check', 'Status', 'Finding'].map((h, i) => (
+                      <th key={i} style={{ padding: '11px 14px', color: '#fff', fontWeight: 600, textAlign: 'left' }}>{h}</th>
+                    ))}
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#10B981' }}>
-                    ✅ No crawlability issues detected - all pages are properly indexed
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {vm.checks.map((check, i) => (
+                    <tr key={check.name + i} style={{ borderBottom: '1px solid #F3F4F6', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#111827' }}>{check.name}</td>
+                      <td style={{ padding: '10px 14px' }}>
+                        <Badge label={CHECK_BADGE[check.state].label} type={CHECK_BADGE[check.state].type} />
+                      </td>
+                      <td style={{ padding: '10px 14px', color: '#6B7280' }}>{check.message || 'No detail provided'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-        <InsightBox title="Crawlability Insight">
-          {blockedReasons.length > 0 ? 
-            `${blockedReasons[0]?.reason || 'Crawlability issues'} affecting ${blockedReasons[0]?.affected || 0} pages should be prioritized. ${blockedReasons.find(r => r.reason.includes('noindex')) ? 'Noindex issues are typically the most critical as they directly prevent search engine indexing.' : 'Review the blocked reasons above and implement fixes to improve indexation rate.'}` :
-            `Excellent crawlability! All ${metrics.totalPages} pages are indexed with a ${metrics.indexRate}% index rate. Maintain current crawlability practices and monitor for any future issues.`
-          }
-        </InsightBox>
+            <InsightBox title="Technical Priority Analysis">
+              {vm.failed > 0
+                ? `Checks in a critical state: ${vm.checks.filter((c) => c.state === 'fail').map((c) => c.name).join(', ')}.`
+                : vm.warnings > 0
+                  ? `Checks needing attention: ${vm.checks.filter((c) => c.state === 'warn').map((c) => c.name).join(', ')}.`
+                  : `All ${vm.passed} technical checks passed.`}
+            </InsightBox>
+          </>
+        )}
+        <Caption>{TECH_NOTE}</Caption>
       </div>
-      <PageFooter page={11} />
+      <PageFooter page={5} />
+    </div>
+  );
+}
+
+// ---- Crawlability ----
+const impactType = (impact) => {
+  const k = String(impact || '').toLowerCase();
+  return k === 'critical' ? 'critical' : k === 'high' ? 'warn' : k === 'medium' ? 'medium' : 'pass';
+};
+
+export function CrawlabilityPage() {
+  const report = useCanonicalReport();
+  if (!report) return <MissingReport title="Crawlability" />;
+  const vm = crawlabilityVM(report);
+  const rateColor = vm.hasData ? (vm.indexRate >= 90 ? '#10B981' : vm.indexRate >= 70 ? '#F59E0B' : '#EF4444') : '#9CA3AF';
+
+  return (
+    <div style={frame}>
+      <PageHeader page={6} />
+      <div style={{ padding: '32px 40px', flex: 1 }}>
+        <SectionHeader num="05" title="Crawlability Analysis" subtitle="Indexability of crawled pages" />
+
+        {!vm.hasData ? (
+          <UnavailableSection title="Crawlability unavailable" message={unavailableText(vm, 'crawlability')} tone="warn" />
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
+              <StatCard value={vm.totalPages} label="Pages Crawled" sub="Analyzed" color="#4F6EF7" borderColor="#4F6EF7" />
+              <StatCard value={vm.indexablePages} label="Indexable" sub="No noindex tag" color="#10B981" borderColor="#10B981" />
+              <StatCard value={vm.blockedPages} label="Blocked" sub="Noindex directive" color="#EF4444" borderColor="#EF4444" />
+              <StatCard value={vm.indexRate == null ? 'N/A' : `${vm.indexRate}%`} label="Indexable Rate" sub="Indexable / crawled" color={rateColor} borderColor={rateColor} />
+            </div>
+
+            <h3 style={h3}>Crawl Status Distribution</h3>
+            <div style={rule} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 40, marginBottom: 28 }}>
+              <svg width={180} height={180} viewBox="0 0 180 180">
+                {(() => {
+                  const colors = ['#10B981', '#EF4444'];
+                  let offset = 0;
+                  return vm.chart.map((item, i) => {
+                    const r = 70; const c = 2 * Math.PI * r;
+                    const el = (
+                      <circle key={item.label} cx={90} cy={90} r={r} fill="none" stroke={colors[i]} strokeWidth={24}
+                        strokeDasharray={`${c * (item.percentage / 100)} ${c}`} strokeDashoffset={-c * offset} transform="rotate(-90 90 90)" />
+                    );
+                    offset += item.percentage / 100;
+                    return el;
+                  });
+                })()}
+                <circle cx={90} cy={90} r={56} fill="white" />
+              </svg>
+              <div style={{ fontSize: 14, color: '#374151', lineHeight: 2.2 }}>
+                {vm.chart.map((item) => (
+                  <div key={item.label}>
+                    <span style={{ color: item.label === 'Indexable' ? '#10B981' : '#EF4444' }}>■</span> {item.value} {item.label.toLowerCase()} ({item.percentage}%)
+                  </div>
+                ))}
+                <p style={{ fontSize: 13, color: '#6B7280', marginTop: 12 }}>
+                  {vm.blockedPages > 0
+                    ? `${vm.blockedPages} page(s) carry a noindex directive and cannot appear in search results.`
+                    : 'No crawled page carries a noindex directive.'}
+                </p>
+              </div>
+            </div>
+
+            <h3 style={h3}>Open Indexation Issues</h3>
+            <div style={{ ...rule, marginBottom: 16 }} />
+
+            <div style={{ borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', marginBottom: 24 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#111827' }}>
+                    {['Reason', 'Open issues', 'Severity', 'Suggested action'].map((h, i) => (
+                      <th key={i} style={{ padding: '11px 14px', color: '#fff', fontWeight: 600, textAlign: 'left' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {vm.blockedReasons.length > 0 ? (
+                    vm.blockedReasons.map((reason, i) => (
+                      <tr key={reason.reason + i} style={{ borderBottom: '1px solid #F3F4F6', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                        <td style={{ padding: '11px 14px', fontWeight: 600, color: '#111827' }}>{reason.reason}</td>
+                        <td style={{ padding: '11px 14px', color: '#374151', textAlign: 'center' }}>{reason.affected}</td>
+                        <td style={{ padding: '11px 14px' }}><Badge label={reason.impact} type={impactType(reason.impact)} /></td>
+                        <td style={{ padding: '11px 14px', color: '#6B7280' }}>{reason.fix}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#10B981' }}>
+                        No open crawlability or indexation issues were detected.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <InsightBox title="Crawlability Insight">
+              {vm.blockedReasons.length > 0
+                ? `"${vm.blockedReasons[0].reason}" accounts for the most open indexation issues (${vm.blockedReasons[0].affected}).`
+                : `All ${vm.totalPages} crawled pages are indexable (${vm.indexRate}%).`}
+            </InsightBox>
+          </>
+        )}
+        <Caption>
+          "Indexable" means the page has no noindex robots meta directive; Odito does not verify what Google has indexed. {TECH_NOTE}
+        </Caption>
+      </div>
+      <PageFooter page={6} />
     </div>
   );
 }

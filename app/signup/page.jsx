@@ -59,7 +59,7 @@ function SignupHero() {
       <div className="absolute top-10 left-10 z-30 flex items-center">
         <Link href="/">
           <img 
-            src="/oditologo.png" 
+            src="/logo/odito-logo-on-dark.png" 
             alt="Odito AI" 
             className="h-16 w-auto object-contain hover:scale-105 hover:opacity-90 transition-all duration-300"
           />
@@ -197,7 +197,7 @@ function SignupForm({ formData, setFormData, error, setError, isLoading, setIsLo
         {/* Mobile Logo */}
         <div className="lg:hidden flex justify-center mb-8">
           <img 
-            src="/oditologo.png" 
+            src="/logo/odito-logo-on-dark.png" 
             alt="Odito AI" 
             className="h-16 w-auto object-contain hover:scale-105 hover:opacity-90 transition-all duration-300"
           />

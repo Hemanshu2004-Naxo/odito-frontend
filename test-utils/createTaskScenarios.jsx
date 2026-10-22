@@ -34,7 +34,9 @@ export const RECOMMENDATION_RESPONSE = {
 
 export const createTaskButton = () => screen.queryByRole("button", { name: /Create Task|Creating/ })
 
-export function defineCreateTaskScenarios({ label, apiService, renderScreen, generate, setTaskMap, pageUrl, expectedPayload }) {
+// expectedRecommendationId: legacy screens create the task from a generated recommendation ("rec-1"). The unified "Investigate & Recommend" screens
+// create it from the investigation, with NO legacy record yet (null); the existing auto-link attaches one later if the compatibility adapter produces it.
+export function defineCreateTaskScenarios({ label, apiService, renderScreen, generate, setTaskMap, pageUrl, expectedPayload, expectedRecommendationId = "rec-1" }) {
   let queryClient
 
   async function mount() {
@@ -65,7 +67,7 @@ export function defineCreateTaskScenarios({ label, apiService, renderScreen, gen
 
       await waitFor(() => expect(apiService.createTask).toHaveBeenCalledTimes(1))
       expect(apiService.createTask).toHaveBeenCalledWith(expect.objectContaining({
-        pageUrl, status: "task_created", origin: "ai_fix", recommendationId: "rec-1", ...expectedPayload,
+        pageUrl, status: "task_created", origin: "ai_fix", recommendationId: expectedRecommendationId, ...expectedPayload,
       }))
       expect(await screen.findByText(/Task created/)).toBeInTheDocument()
 

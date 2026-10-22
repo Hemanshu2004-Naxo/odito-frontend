@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import IssueDetailView from "./IssueDetailView"
 import apiService from "@/lib/apiService"
+import { runInvestigation, legacyGenerateButton, investigateButton } from "@/test-utils/investigationKit"
 
 /**
  * Regression coverage for the production bug where "Apply Fix" rendered
@@ -70,6 +71,7 @@ vi.mock("@/hooks/useDashboardQueries", () => ({
 
 vi.mock("@/lib/apiService", () => ({
   default: {
+    startInvestigation: vi.fn(), getInvestigation: vi.fn(), cancelInvestigation: vi.fn(), prepareInvestigationFix: vi.fn(), approveInvestigation: vi.fn(), verifyInvestigation: vi.fn(),
     getIssueContext: vi.fn().mockResolvedValue({ success: true, data: null }),
     request: vi.fn(),
     createTask: vi.fn(),

@@ -20,7 +20,7 @@ function ResetPasswordHero() {
       {/* Brand Logo */}
       <div className="z-10">
         <img
-          src="/oditologo.png"
+          src="/logo/odito-logo-on-dark.png"
           alt="Odito AI"
           className="h-12 w-auto object-contain hover:scale-105 hover:opacity-90 transition-all duration-300"
         />
@@ -234,7 +234,7 @@ function ResetPasswordForm() {
       {/* Mobile Logo (Visible only on mobile) */}
       <div className="absolute top-8 left-8 md:hidden">
         <img
-          src="/oditologo.png"
+          src="/logo/odito-logo-on-dark.png"
           alt="Odito AI"
           className="h-10 w-auto object-contain hover:scale-105 hover:opacity-90 transition-all duration-300"
         />
