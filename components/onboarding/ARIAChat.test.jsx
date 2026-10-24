@@ -337,6 +337,9 @@ describe('manual website onboarding', () => {
   const chooseType = async () => {
     fireEvent.click(screen.getByText('Service-based'))
     await flush()
+    // industry is its own step, picked from the shared list (never derived from the business type)
+    fireEvent.click(screen.getByRole('button', { name: 'Marketing & advertising' }))
+    await flush()
     await say('digital marketing')
   }
 
@@ -359,6 +362,15 @@ describe('manual website onboarding', () => {
       discovery_source: 'website_scrape',
       source: 'website_manual',
     })
+    // three separate fields: business model, industry (picked from the list) and the typed sub-industry
+    expect(p.business_type).toBe('Service-based')
+    expect(p.industry).toBe('marketing_advertising')
+    expect(p.sub_industry).toBe('digital marketing')
+    // the city the user typed is the confirmed target, sent with its source
+    expect(p.target_city).toBe('Nashik')
+    expect(p.location_source).toBe('user_entered')
+    // the website's own address (Pune) is NOT given to the city resolver when the user typed a location, so it cannot override it
+    expect(api.resolveWebsiteLocation).toHaveBeenCalledWith(expect.objectContaining({ address: 'Nashik', extractedMetadata: null }))
     // nothing pretends to be a verified Google listing
     expect(p.verified_business?.placeId).toBeUndefined()
     expect(p.verified_business?.verifiedAt).toBeUndefined()
@@ -467,6 +479,8 @@ describe('website analysis failure does not strand onboarding', () => {
     fireEvent.click(screen.getByRole('button', { name: /continue without analysis/i }))
     await flush()
     fireEvent.click(screen.getByText('Service-based'))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: 'Marketing & advertising' }))
     await flush()
     await say('digital marketing')
     fireEvent.click(screen.getByText(/Country level/))

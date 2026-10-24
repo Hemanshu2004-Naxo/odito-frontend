@@ -37,6 +37,9 @@ import {
   Users,
   Share2,
   Sparkles,
+  Bot,
+  ListChecks,
+  CircleHelp,
 } from "lucide-react"
 
 /**
@@ -197,6 +200,36 @@ export const sidebarSections = [
         label: "GEO Hub",
         href: "/app/geo-hub",
         icon: Globe,
+      },
+    ],
+  },
+  {
+    id: "chatgpt-visibility",
+    label: "ChatGPT Visibility",
+    items: [
+      {
+        id: "chatgpt-visibility-overview",
+        label: "Overview",
+        href: "/app/chatgpt-visibility",
+        icon: Bot,
+      },
+      {
+        id: "chatgpt-visibility-questions",
+        label: "Questions",
+        href: "/app/chatgpt-visibility/questions",
+        icon: CircleHelp,
+      },
+      {
+        id: "chatgpt-visibility-results",
+        label: "Answers & citations",
+        href: "/app/chatgpt-visibility/results",
+        icon: MessageSquareQuote,
+      },
+      {
+        id: "chatgpt-visibility-history",
+        label: "History",
+        href: "/app/chatgpt-visibility/history",
+        icon: History,
       },
     ],
   },

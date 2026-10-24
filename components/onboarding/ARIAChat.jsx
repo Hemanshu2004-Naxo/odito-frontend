@@ -12,6 +12,7 @@ import { classifyBusinessSearchError } from '@/lib/onboarding/businessSearchErro
 import { renderInlineMarkdown } from '@/lib/security/sanitize';
 import { useSubscription } from '@/hooks/useDashboardQueries';
 import { ONBOARDING_UPGRADE_PENDING_KEY, ONBOARDING_UPGRADE_RESUME_KEY } from '@/lib/onboardingResume';
+import { INDUSTRIES } from '@/lib/industries';
 
 // Phase 15.5 (updated Phase 3 of the Upgrade unification) — the Upgrade
 // Plan CTA below now navigates to the Choose Plan page instead of calling
@@ -56,6 +57,7 @@ const ARIAChat = ({ onComplete }) => {
 
     // Phase 3: SEO Onboarding
     ASK_BUSINESS_TYPE: 'ASK_BUSINESS_TYPE',
+    ASK_INDUSTRY: 'ASK_INDUSTRY',
     ASK_SUB_TYPE: 'ASK_SUB_TYPE',
     ASK_TARGET_LEVEL: 'ASK_TARGET_LEVEL',
     ASK_TARGET_COUNTRY: 'ASK_TARGET_COUNTRY',
@@ -647,11 +649,23 @@ const ARIAChat = ({ onComplete }) => {
 
   // ── Business type selection handler ─────────────────────────────────
   const handleBusinessTypeSelect = (type) => {
-    setProjectData(prev => ({ ...prev, businessType: type, industry: type }));
+    // businessType is the business model (Service-based, Product-based...), not an industry.
+    setProjectData(prev => ({ ...prev, businessType: type }));
     setMessages(m => [
       ...m,
       { type: "user", text: type },
-      { type: "ai", text: subTypePrompts[type] || 'What specific type of business is it?' }
+      { type: "ai", text: 'Which industry is your business in?' }
+    ]);
+    setFlowState(FLOW_STATES.ASK_INDUSTRY);
+  };
+
+  // ── Industry selection handler (a value from the shared taxonomy) ────
+  const handleIndustrySelect = ({ value, label }) => {
+    setProjectData(prev => ({ ...prev, industry: value }));
+    setMessages(m => [
+      ...m,
+      { type: "user", text: label },
+      { type: "ai", text: subTypePrompts[projectData.businessType] || 'What specific type of business is it?' }
     ]);
     setFlowState(FLOW_STATES.ASK_SUB_TYPE);
   };
@@ -664,18 +678,23 @@ const ARIAChat = ({ onComplete }) => {
 
     try {
       const address = projectData.location || projectData.businessLocation || null;
+      // A location the customer TYPED is their confirmed target and must win: the
+      // resolver ranks website metadata above the address, so the metadata is only
+      // sent when the customer gave no location (otherwise a website listing another
+      // city - e.g. a head office - silently replaced the city they asked for).
       const response = await apiService.resolveWebsiteLocation({
         address,
-        extractedMetadata: projectData.extractedMetadata,
+        extractedMetadata: address ? null : projectData.extractedMetadata,
       });
 
       if (response.success && response.data?.city) {
-        // Priority 2: city extracted from website metadata / address
+        // Priority 2: the typed location, or (only when none was typed) the website's
         const { city, country } = response.data;
         console.log(`[LOCAL_LOCATION] Website Location Found | city=${city}`);
         setProjectData(prev => ({
           ...prev,
           resolvedCity: city,
+          locationSource: address ? 'user_entered' : 'website_inferred',
           location: prev.location || city,
           ...(country && !prev.country && { country }),
         }));
@@ -953,9 +972,19 @@ const ARIAChat = ({ onComplete }) => {
         project_name: projectName,
         main_url: websiteUrl,
         keywords: keywordsBeforeAPI,
-        industry: activeProjectData.businessType || activeProjectData.industry,
+        // Three separate fields, never substituted for one another: business_type (how
+        // the business operates), industry (the sector the customer picked from the
+        // list) and sub_industry (what they told us they do, e.g. "eye hospital").
+        industry: activeProjectData.industry || null,
+        sub_industry: activeProjectData.subType?.trim() || null,
+        // The local city the customer is targeting, and where it came from. Only
+        // user_entered / google_places count as confirmed downstream.
+        ...(activeProjectData.targetLevel === 'local' && (activeProjectData.resolvedCity || activeProjectData.verifiedBusiness?.city) ? {
+          target_city: activeProjectData.resolvedCity || activeProjectData.verifiedBusiness?.city,
+          location_source: activeProjectData.locationSource || (activeProjectData.verifiedBusiness ? 'google_places' : null),
+        } : {}),
         location: activeProjectData.verifiedBusiness?.address || activeProjectData.location || '',
-        country: activeProjectData.country,
+        country: activeProjectData.country || activeProjectData.verifiedBusiness?.countryCode || null,
         language: activeProjectData.language,
         status: 'active',
         business_type: activeProjectData.businessType,
@@ -1291,7 +1320,7 @@ const ARIAChat = ({ onComplete }) => {
             return;
           }
           console.log(`[LOCAL_LOCATION] User Selected City | city=${city}`);
-          setProjectData(prev => ({ ...prev, resolvedCity: city, location: prev.location || city }));
+          setProjectData(prev => ({ ...prev, resolvedCity: city, locationSource: 'user_entered', location: prev.location || city }));
           const address = projectData.location || projectData.businessLocation || null;
           setFlowState(FLOW_STATES.GENERATING_KEYWORDS);
           generateKeywordsFlow(projectData.subType, address, null, null, null, city);
@@ -1317,6 +1346,21 @@ const ARIAChat = ({ onComplete }) => {
         >
           <span style={{ fontSize: 18 }}>{icon}</span>
           <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  // Industry selector (shared taxonomy; the stored value is the machine-readable one)
+  const renderIndustrySelector = () => (
+    <div className="chat-selector-grid" role="group" aria-label="Industry">
+      {INDUSTRIES.map((industry) => (
+        <button
+          key={industry.value}
+          onClick={() => handleIndustrySelect(industry)}
+          className="chat-selector-option"
+        >
+          <span>{industry.label}</span>
         </button>
       ))}
     </div>
@@ -1533,6 +1577,7 @@ const ARIAChat = ({ onComplete }) => {
     FLOW_STATES.SEARCHING_BUSINESS,
     FLOW_STATES.SHOW_BUSINESS_RESULTS,
     FLOW_STATES.ASK_BUSINESS_TYPE,
+    FLOW_STATES.ASK_INDUSTRY,
     FLOW_STATES.ASK_TARGET_LEVEL,
     FLOW_STATES.ASK_TARGET_COUNTRY,
     FLOW_STATES.GENERATING_KEYWORDS,
@@ -1651,6 +1696,9 @@ const ARIAChat = ({ onComplete }) => {
 
         {/* Business type selector */}
         {flowState === FLOW_STATES.ASK_BUSINESS_TYPE && renderBusinessTypeSelector()}
+
+        {/* Industry selector */}
+        {flowState === FLOW_STATES.ASK_INDUSTRY && renderIndustrySelector()}
 
         {/* Target level selector */}
         {flowState === FLOW_STATES.ASK_TARGET_LEVEL && renderTargetLevelSelector()}
