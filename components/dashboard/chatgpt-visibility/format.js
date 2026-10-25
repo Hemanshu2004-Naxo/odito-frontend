@@ -183,6 +183,8 @@ export const RUN_REFUSAL_TEXT = {
   QUESTION_SET_NOT_APPROVED: 'That question set is not approved (it is a draft, discarded or replaced by a newer version).',
   QUESTION_SET_NOT_FOUND: 'That question set could not be found.',
   QUESTION_SET_EMPTY: 'The approved question set has no enabled questions.',
+  MODEL_NOT_SUPPORTED: 'The configured ChatGPT model is not supported by the data provider. Ask an administrator to change it.',
+  MODEL_WEB_SEARCH_UNSUPPORTED: 'The configured ChatGPT model cannot search the web. Ask an administrator to change it.',
 }
 export function describeApprovedRunError(error) {
   const refusal = RUN_REFUSAL_TEXT[error?.details?.code]

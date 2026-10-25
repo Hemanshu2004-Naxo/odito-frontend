@@ -107,14 +107,6 @@ export default function VisibilityDashboard() {
           <div ref={tableRef} className="scroll-mt-4">
             {run ? <QuestionsAnswersTable projectId={projectId} run={run} filter={filter} onFilterChange={setFilter} /> : <Panel><div className="h-24 rounded-lg skeleton-base skeleton-shimmer" aria-busy="true" /></Panel>}
           </div>
-          {run?.metrics?.brandReputation?.questions ? (
-            <Panel title="What ChatGPT knows about your business" description="Answers to questions that name your business. They check accuracy and are never counted in the visibility figures above.">
-              <p className="text-sm tabular-nums">
-                {run.metrics.brandReputation.succeeded} of {run.metrics.brandReputation.questions} answered · {run.metrics.brandReputation.answersMentioningBrand} describe your business
-                {" "}<Button variant="link" size="sm" className="h-auto p-0" onClick={() => drill({ group: "brand_reputation" })}>Read them</Button>
-              </p>
-            </Panel>
-          ) : null}
           <RunDetailsPanel overview={overview} />
         </>
       )}

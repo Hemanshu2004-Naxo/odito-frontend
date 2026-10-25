@@ -61,7 +61,7 @@ export default function QuestionSetDetailContent() {
 
   const groups = useMemo(() => {
     const by = new Map()
-    for (const q of set?.questions || []) {
+    for (const q of (set?.questions || []).filter((x) => x.group !== "brand_reputation")) {
       const key = q.group === "brand_reputation" ? "brand_reputation" : q.intent
       if (!by.has(key)) by.set(key, [])
       by.get(key).push(q)

@@ -53,7 +53,8 @@ export default function QuestionsAnswersTable({ projectId, run, filter, onFilter
   }, [search]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setPage(1) }, [filter])
 
-  const params = useMemo(() => ({ page, limit: PAGE_SIZE, ...filter }), [page, filter])
+  // Discovery questions only: brand-name questions are no longer shown.
+  const params = useMemo(() => ({ page, limit: PAGE_SIZE, ...filter, group: "visibility" }), [page, filter])
   const { data, isLoading, error } = useRunEvidence(projectId, run.id, params)
   const items = data?.data || []
   const meta = data?.meta
