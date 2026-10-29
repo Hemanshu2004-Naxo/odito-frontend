@@ -94,6 +94,36 @@ export const sidebarSections = [
         href: "/app/keywords",
         icon: Key,
       },
+      {
+        id: "backlinks",
+        label: "Backlinks",
+        href: "/app/backlinks",
+        icon: Link2,
+        children: [
+          {
+            id: "backlinks-overview",
+            label: "Overview",
+            href: "/app/backlinks",
+          },
+          {
+            id: "backlinks-individual",
+            label: "Individual Backlinks",
+            href: "/app/backlinks/individual",
+          },
+        ],
+      },
+      {
+        id: "backlink-anchors",
+        label: "Backlink Anchors",
+        href: "/app/backlink-anchors",
+        icon: Anchor,
+      },
+      {
+        id: "competitors",
+        label: "Competitors",
+        href: "/app/competitors",
+        icon: Users,
+      },
     ],
   },
   {

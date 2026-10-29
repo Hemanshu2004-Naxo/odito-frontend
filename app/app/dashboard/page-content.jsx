@@ -1,170 +1,251 @@
-"use client"
 
-import { Button } from '@/components/ui/button'
-import { Loader2, Zap } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
-import { useProject } from '@/contexts/ProjectContext'
-import ScoreGrid from "@/components/dashboard/overview/ScoreGrid"
-import AISummaryCard from "@/components/dashboard/overview/AISummaryCard"
-import SEOSummaryPanel from "@/components/dashboard/overview/SEOSummaryPanel"
-import AuditTimeline from "@/components/dashboard/overview/AuditTimeline"
-import { useProjectOverview, useIssueCounts, useLatestComparison } from '@/hooks/useDashboardQueries'
-import { useAuditTrigger } from '@/hooks/useAuditTrigger'
+"use client";
 
-/**
- * Dashboard page client island.
- *
- * Handles all interactivity:
- * - Data fetching via TanStack Query
- * - Background Recrawl (no navigation, no reload)
- * - Score display
- */
+import { Button } from "@/components/ui/button";
+import { Loader2, Zap } from "lucide-react";
+
+import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/contexts/ProjectContext";
+
+import ScoreGrid from "@/components/dashboard/overview/ScoreGrid";
+import AIScoreSummaryPanel from "@/components/dashboard/overview/AIScoreSummaryPanel";
+import SEOSummaryPanel from "@/components/dashboard/overview/SEOSummaryPanel";
+import AuditTimeline from "@/components/dashboard/overview/AuditTimeline";
+
+import {
+  useProjectOverview,
+  useIssueCounts,
+  useLatestComparison,
+  useAISOHub,
+  useAEOHub,
+  useGEOHub,
+} from "@/hooks/useDashboardQueries";
+
+import { useAuditTrigger } from "@/hooks/useAuditTrigger";
+
 export default function DashboardPageContent() {
-  const { user } = useAuth()
-  const { activeProject } = useProject()
+  const { user } = useAuth();
+  const { activeProject } = useProject();
 
+  const projectId = activeProject?._id;
+
+  // Quick recheck
   const {
     isVerifying,
     verifyError,
     startQuickRecheck,
-  } = useAuditTrigger(activeProject?._id)
+  } = useAuditTrigger(projectId);
 
-  // Use React Query for cached data fetching
-  const { data: overviewResponse, isLoading: overviewLoading } = useProjectOverview(activeProject?._id)
-  const { data: issueCountsResponse, isLoading: issueCountsLoading, isError: issueCountsErrored } = useIssueCounts(activeProject?._id)
-  const { data: comparisonRes } = useLatestComparison(activeProject?._id)
+  // Existing dashboard data
+  const {
+    data: overviewResponse,
+    isLoading: overviewLoading,
+  } = useProjectOverview(projectId);
 
-  // Extract data from query results
-  const project = overviewResponse?.data?.project || null
-  const dashboardData = overviewResponse?.data?.performance ? { performance: overviewResponse.data.performance } : null
-  const technicalHealth = overviewResponse?.data?.technical?.summary?.healthScore || 0
-  // No silent all-zero fallback object here anymore — `issueCounts` is either
-  // the live result or null. A failed request must render as an explicit
-  // error/stale state below, never as a fabricated "0 issues" result (see
-  // IssueCountsService.getIssueCounts, which now throws instead of doing that).
-  const issueCounts = issueCountsResponse?.data || null
+  const {
+    data: issueCountsResponse,
+    isLoading: issueCountsLoading,
+    isError: issueCountsErrored,
+  } = useIssueCounts(projectId);
 
-  const loading = overviewLoading || issueCountsLoading
+  const { data: comparisonRes } = useLatestComparison(projectId);
 
-  // Map backend data to dashboard metrics
-  const seoHealth = project ? Math.round(project.website_score || 0) : 0
-  const aiVisibility = overviewResponse?.data?.ai_visibility?.score != null
-    ? Math.round(overviewResponse.data.ai_visibility.score)
-    : 0
-  const performance = dashboardData?.performance?.summary?.performanceScore || 0
-  const technicalHealthScore = technicalHealth
+  // Real scores from the existing AISO, AEO and GEO hub queries
+  const {
+    data: aisoResponse,
+    isLoading: aisoLoading,
+    isError: aisoError,
+  } = useAISOHub(projectId);
 
-  // SEO summary data
-  const pagesCrawled = project ? (project.pages_crawled || 0) : 0
+  const {
+    data: aeoResponse,
+    isLoading: aeoLoading,
+    isError: aeoError,
+  } = useAEOHub(projectId);
 
-  // Total Issues has three explicit states — never a silent fake zero:
-  //  - LIVE:   the live issue-counts query succeeded — use it, this is current.
-  //  - STALE:  the live query failed, but the project document has a cached
-  //            total_issues snapshot from the last completed crawl — show it,
-  //            clearly labeled as cached/possibly out of date.
-  //  - ERROR:  the live query failed and there's no cached value either —
-  //            show "unavailable", never a number.
-  // This replaces a prior `issueCounts?.totalIssues ?? project?.total_issues ?? 0`
-  // chain that could silently render a stale cached count — or even a bare 0 —
-  // as if it were a fresh, current result.
-  let totalIssuesState = 'loading'
-  let totalIssuesValue = null
+  const {
+    data: geoResponse,
+    isLoading: geoLoading,
+    isError: geoError,
+  } = useGEOHub(projectId);
+
+  // Project overview values
+  const project = overviewResponse?.data?.project || null;
+
+  const dashboardData = overviewResponse?.data?.performance
+    ? {
+        performance: overviewResponse.data.performance,
+      }
+    : null;
+
+  const technicalHealth =
+    overviewResponse?.data?.technical?.summary?.healthScore || 0;
+
+  const issueCounts = issueCountsResponse?.data || null;
+
+  const loading = overviewLoading || issueCountsLoading;
+
+  const seoHealth = project
+    ? Math.round(project.website_score || 0)
+    : 0;
+
+  const aiVisibility =
+    overviewResponse?.data?.ai_visibility?.score != null
+      ? Math.round(overviewResponse.data.ai_visibility.score)
+      : 0;
+
+  const performance =
+    dashboardData?.performance?.summary?.performanceScore || 0;
+
+  const technicalHealthScore = technicalHealth;
+
+  const pagesCrawled = project
+    ? project.pages_crawled || 0
+    : 0;
+
+  // Issue counts and fallback handling
+  let totalIssuesState = "loading";
+  let totalIssuesValue = null;
+
   if (issueCounts?.totalIssues != null) {
-    totalIssuesState = 'live'
-    totalIssuesValue = issueCounts.totalIssues
+    totalIssuesState = "live";
+    totalIssuesValue = issueCounts.totalIssues;
   } else if (issueCountsErrored) {
     if (project?.total_issues != null) {
-      totalIssuesState = 'stale'
-      totalIssuesValue = project.total_issues
+      totalIssuesState = "stale";
+      totalIssuesValue = project.total_issues;
     } else {
-      totalIssuesState = 'error'
+      totalIssuesState = "error";
     }
   }
-  const criticalIssues = issueCounts ? (issueCounts.critical || 0) : 0
 
+  const criticalIssues = issueCounts
+    ? issueCounts.critical || 0
+    : 0;
+
+  // Extract the actual score values used by each hub page.
+  const aiScores = {
+    aiso: aisoResponse?.data?.hero?.aiso ?? null,
+
+    aeo: aeoResponse?.data?.aeo_score ?? null,
+
+    geo:
+      geoResponse?.data?.hero?.geo_score ??
+      geoResponse?.data?.geo_score ??
+      null,
+  };
+
+  const aiScoresLoading =
+    aisoLoading || aeoLoading || geoLoading;
+
+  const aiScoresError =
+    aisoError || aeoError || geoError;
+
+  // Loading state for the existing dashboard sections
   if (loading) {
     return (
       <div className="flex-1 space-y-6 skeleton-fade-in">
-        <div className="grid grid-cols-2 @min-[641px]/main:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="rounded-xl border p-6 space-y-3">
-              <div className="w-20 h-3 skeleton-base skeleton-shimmer rounded" />
-              <div className="w-16 h-10 skeleton-base skeleton-shimmer rounded" />
-            </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-7 w-56 rounded skeleton-base skeleton-shimmer" />
+            <div className="h-4 w-40 rounded skeleton-base skeleton-shimmer" />
+          </div>
+
+          <div className="h-10 w-36 rounded-full skeleton-base skeleton-shimmer" />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[1, 2, 3, 4].map((item) => (
+            <div
+              key={item}
+              className="h-48 rounded-xl skeleton-base skeleton-shimmer"
+            />
           ))}
         </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <div className="h-40 rounded-xl skeleton-base skeleton-shimmer" />
+          <div className="h-40 rounded-xl skeleton-base skeleton-shimmer" />
+        </div>
+
+        <div className="h-16 rounded-xl skeleton-base skeleton-shimmer" />
       </div>
-    )
+    );
   }
 
   return (
     <div className="flex-1 space-y-6 skeleton-fade-in">
-      {/* Header */}
-      <div className="border-b pb-4">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <div className="min-w-0">
-            <h1 className="text-foreground text-2xl font-bold tracking-tight">Overview Dashboard</h1>
-            <p className="text-muted-foreground">SEO & AI Visibility Audit</p>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={startQuickRecheck}
-                disabled={isVerifying || !activeProject?._id || activeProject?.crawl_status === 'running'}
-                variant="secondary"
-                size="default"
-                className="tap-target gap-2 rounded-full text-base"
-                title="Refresh SEO, Accessibility and AI Visibility without running a full audit. Does not use a manual recrawl credit."
-              >
-                {isVerifying ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Rechecking...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-5 w-5" />
-                    Quick Recheck
-                  </>
-                )}
-              </Button>
-            </div>
-            {verifyError && (
-              <span className="text-xs text-destructive max-w-55 text-right leading-tight">
-                {verifyError}
-              </span>
-            )}
-          </div>
+      {/* Dashboard header */}
+      <div className="flex flex-col justify-between gap-4 border-b border-border/50 pb-5 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Overview Dashboard
+          </h1>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            SEO &amp; AI Visibility Audit
+          </p>
         </div>
+
+        <Button
+          onClick={startQuickRecheck}
+          disabled={!projectId || isVerifying}
+          className="gap-2 rounded-full"
+        >
+          {isVerifying ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Zap className="h-4 w-4" />
+          )}
+
+          {isVerifying ? "Checking..." : "Quick Recheck"}
+        </Button>
       </div>
 
-      {/* Dashboard Content */}
-      <div>
-        <ScoreGrid
-          seoHealth={seoHealth}
-          aiVisibility={aiVisibility}
-          performance={performance}
-          technicalHealth={technicalHealthScore}
-          deltas={comparisonRes?.data?.delta ?? null}
-        />
-        <AISummaryCard
-          pagesCrawled={pagesCrawled}
-          totalIssues={totalIssuesValue}
-          totalIssuesState={totalIssuesState}
-          criticalIssues={criticalIssues}
-        />
-        <div className="two-col">
+      {verifyError && (
+        <p className="text-sm text-destructive" role="alert">
+          {typeof verifyError === "string"
+            ? verifyError
+            : verifyError?.message || "Quick recheck failed. Please try again."}
+        </p>
+      )}
+
+      {/* Existing overview score cards */}
+      <ScoreGrid
+        seoHealth={seoHealth}
+        aiVisibility={aiVisibility}
+        performance={performance}
+        technicalHealth={technicalHealthScore}
+      />
+
+      {/* SEO Summary and AI Summary */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <section className="min-w-0">
           <SEOSummaryPanel
             pagesCrawled={pagesCrawled}
             totalIssues={totalIssuesValue}
             totalIssuesState={totalIssuesState}
             criticalIssues={criticalIssues}
-            mediumIssues={issueCounts?.warnings || 0}
-            infoIssues={issueCounts?.informational || 0}
           />
-        </div>
-        <AuditTimeline />
+        </section>
+
+        <aside className="min-w-0">
+          <AIScoreSummaryPanel
+            scores={aiScores}
+            loading={aiScoresLoading}
+          />
+
+          {aiScoresError && !aiScoresLoading && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Some AI scores could not be loaded. Check the corresponding
+              hub page and try again.
+            </p>
+          )}
+        </aside>
       </div>
+
+      {/* Existing audit history */}
+      <AuditTimeline />
     </div>
-  )
+  );
 }

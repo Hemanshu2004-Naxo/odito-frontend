@@ -1,13 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════
    Odito Design System — Skeleton Loading Utilities
+   Light theme by default; .dark overrides below.
    ═══════════════════════════════════════════════════════════════ */
 
 .skeleton-shimmer {
   background: linear-gradient(
     90deg,
-    rgba(39, 39, 42, 0.6) 0%,
-    rgba(63, 63, 70, 0.8) 50%,
-    rgba(39, 39, 42, 0.6) 100%
+    rgba(228, 228, 231, 0.6) 0%,
+    rgba(244, 244, 245, 0.9) 50%,
+    rgba(228, 228, 231, 0.6) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 2s infinite linear;
@@ -16,9 +17,9 @@
 .skeleton-shimmer-dark {
   background: linear-gradient(
     90deg,
-    rgba(24, 24, 27, 0.8) 0%,
-    rgba(39, 39, 42, 1) 50%,
-    rgba(24, 24, 27, 0.8) 100%
+    rgba(244, 244, 245, 0.9) 0%,
+    rgba(250, 250, 250, 1) 50%,
+    rgba(244, 244, 245, 0.9) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 2.5s infinite linear;
@@ -29,6 +30,30 @@
 }
 
 .skeleton-base {
-  background-color: rgba(39, 39, 42, 0.6);
+  background-color: rgba(212, 212, 216, 0.6);
   border-radius: 8px;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(39, 39, 42, 0.6) 0%,
+    rgba(63, 63, 70, 0.8) 50%,
+    rgba(39, 39, 42, 0.6) 100%
+  );
+  background-size: 200% 100%;
+}
+
+.dark .skeleton-shimmer-dark {
+  background: linear-gradient(
+    90deg,
+    rgba(24, 24, 27, 0.8) 0%,
+    rgba(39, 39, 42, 1) 50%,
+    rgba(24, 24, 27, 0.8) 100%
+  );
+  background-size: 200% 100%;
+}
+
+.dark .skeleton-base {
+  background-color: rgba(39, 39, 42, 0.6);
 }
