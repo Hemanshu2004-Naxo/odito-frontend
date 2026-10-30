@@ -82,6 +82,8 @@ export function useSaveBusinessProfile(projectId) {
       qc.setQueryData(queryKeys.aiVisibilityQuestions.profile(projectId), response)
       qc.invalidateQueries({ queryKey: [...queryKeys.aiVisibilityQuestions.all(projectId), 'set'] })
       refreshLists(qc, projectId)
+      // The Google AI Overview run preview (questions, country, city, location code) is built from this profile.
+      qc.invalidateQueries({ queryKey: [...queryKeys.googleAioVisibility.all(projectId), 'selection'] })
     },
     onSettled: () => { inFlight.current = false },
   })
@@ -89,11 +91,12 @@ export function useSaveBusinessProfile(projectId) {
 }
 
 /** Generates a DRAFT from the stored profile (nothing is sent). Returns the new draft as the server created it. */
-export function useGenerateDraft(projectId) {
+export function useGenerateDraft(projectId, { maxQuestions } = {}) {
   const qc = useQueryClient()
   const inFlight = useRef(false)
   const m = useMutation({
-    mutationFn: () => aiVisibilityQuestionService.generate(projectId),
+    // Only the project (and, for a size-capped set, the cap): the server reads the stored profile.
+    mutationFn: () => (maxQuestions ? aiVisibilityQuestionService.generate(projectId, { maxQuestions }) : aiVisibilityQuestionService.generate(projectId)),
     onSuccess: (response) => { storeSet(qc, projectId, response); refreshLists(qc, projectId) },
     onSettled: () => { inFlight.current = false },
   })

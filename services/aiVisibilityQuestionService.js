@@ -16,7 +16,8 @@ export const aiVisibilityQuestionService = {
   /** The single approved set (the one runs execute), or a response with no `data` when none exists. */
   getApproved: (projectId) => apiService.get(`${base(projectId)}/approved`),
   /** Generates from the STORED, confirmed business profile (save it first with saveProfile). Nothing else is sent. */
-  generate: (projectId) => apiService.post(base(projectId), {}),
+  /** maxQuestions (optional, 5-50): cap the size of the generated set; omitted = the default full set. */
+  generate: (projectId, { maxQuestions } = {}) => apiService.post(base(projectId), maxQuestions ? { maxQuestions } : {}),
   getProfile: (projectId) => apiService.get(`/ai-visibility/projects/${projectId}/profile`),
   /** changes: only the fields to change (industry, subIndustry, targetCity, services, targetCities, ...); null clears one. */
   saveProfile: (projectId, changes) => apiService.request(`/ai-visibility/projects/${projectId}/profile`, { method: 'PUT', body: JSON.stringify(changes) }),

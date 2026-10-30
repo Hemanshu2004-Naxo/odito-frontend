@@ -11,14 +11,11 @@ import {
   Lightbulb,
   Wrench,
   Webhook,
-  Link,
   FolderOpen,
   FileEdit,
   Quote,
   Database,
   BarChart3,
-  Anchor,
-  Link2,
   Eye,
   RefreshCw,
   Cpu,
@@ -40,6 +37,11 @@ import {
   Bot,
   ListChecks,
   CircleHelp,
+  Radar,
+  ChartLine,
+  ListOrdered,
+  Swords,
+  Network,
 } from "lucide-react"
 
 /**
@@ -48,6 +50,52 @@ import {
  */
 
 export const sidebarSections = [
+  {
+    // The first thing in the sidebar and the page a project opens on. No heading: it is a home link, not a group of tools.
+    id: "domain-overview",
+    label: null,
+    ariaLabel: "Domain overview",
+    items: [
+      {
+        id: "domain-overview",
+        label: "Domain Overview",
+        href: "/app/domain-overview",
+        icon: Radar,
+      },
+      {
+        id: "traffic-history",
+        label: "Traffic History",
+        href: "/app/traffic-history",
+        icon: ChartLine,
+      },
+      {
+        id: "organic-keywords",
+        label: "Organic Keywords",
+        href: "/app/organic-keywords",
+        icon: ListOrdered,
+      },
+      {
+        id: "competitors",
+        label: "Competitors",
+        href: "/app/competitors",
+        icon: Swords,
+      },
+      {
+        // ONE collapsible group for the five backlink pages (their routes are unchanged). It opens whenever any of them is the current page.
+        id: "off-page",
+        label: "Off-Page",
+        href: "/app/backlinks/overview",
+        icon: Network,
+        children: [
+          { id: "off-page-overview", label: "Overview", href: "/app/backlinks/overview" },
+          { id: "off-page-backlinks", label: "Backlinks", href: "/app/backlinks/list" },
+          { id: "off-page-anchors", label: "Anchors", href: "/app/backlinks/anchors" },
+          { id: "off-page-referring-domains", label: "Referring Domains", href: "/app/referring-domains" },
+          { id: "off-page-top-pages", label: "Top Pages", href: "/app/backlinks/top-pages" },
+        ],
+      },
+    ],
+  },
   {
     id: "audit",
     label: "Audit",
@@ -204,31 +252,31 @@ export const sidebarSections = [
     ],
   },
   {
-    id: "chatgpt-visibility",
-    label: "ChatGPT Visibility",
+    id: "google-ai-overview",
+    label: "Google AI Overview",
     items: [
       {
-        id: "chatgpt-visibility-overview",
+        id: "google-ai-overview-overview",
         label: "Overview",
-        href: "/app/chatgpt-visibility",
-        icon: Bot,
+        href: "/app/google-ai-overview",
+        icon: Sparkles,
       },
       {
-        id: "chatgpt-visibility-questions",
+        id: "google-ai-overview-questions",
         label: "Questions",
-        href: "/app/chatgpt-visibility/questions",
+        href: "/app/google-ai-overview/questions",
         icon: CircleHelp,
       },
       {
-        id: "chatgpt-visibility-results",
+        id: "google-ai-overview-results",
         label: "Answers & citations",
-        href: "/app/chatgpt-visibility/results",
+        href: "/app/google-ai-overview/results",
         icon: MessageSquareQuote,
       },
       {
-        id: "chatgpt-visibility-history",
+        id: "google-ai-overview-history",
         label: "History",
-        href: "/app/chatgpt-visibility/history",
+        href: "/app/google-ai-overview/history",
         icon: History,
       },
     ],

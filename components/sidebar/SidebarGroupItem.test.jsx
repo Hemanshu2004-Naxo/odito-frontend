@@ -64,3 +64,34 @@ describe('SidebarGroupItem (Business Profile)', () => {
     expect(toggle()).toHaveAttribute('aria-expanded', 'false')
   })
 })
+
+describe('SidebarGroupItem (Off-Page: the five backlink pages)', () => {
+  const offPage = sidebarSections.find((s) => s.id === 'domain-overview').items.find((i) => i.id === 'off-page')
+  const offToggle = () => screen.getByRole('button', { name: /off-page menu/i })
+
+  it.each([
+    ['/app/backlinks/overview', 'Overview'],
+    ['/app/backlinks/list', 'Backlinks'],
+    ['/app/backlinks/anchors', 'Anchors'],
+    ['/app/referring-domains', 'Referring Domains'],
+    ['/app/backlinks/top-pages', 'Top Pages'],
+  ])('opens by itself on %s, and that page is the current one', (path, label) => {
+    mockPathname = path
+    render(<SidebarGroupItem item={offPage} />)
+    expect(offToggle()).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getAllByRole('link', { name: label }).some((l) => l.getAttribute('aria-current') === 'page')).toBe(true)
+  })
+
+  it('stays closed on an unrelated route (including the other dashboard pages) and the chevron opens it without navigating', () => {
+    for (const path of ['/app/domain-overview', '/app/organic-keywords', '/app/competitors', '/app/dashboard']) {
+      mockPathname = path
+      const { unmount } = render(<SidebarGroupItem item={offPage} />)
+      expect(offToggle()).toHaveAttribute('aria-expanded', 'false')
+      unmount()
+    }
+    mockPathname = '/app/domain-overview'
+    render(<SidebarGroupItem item={offPage} />)
+    fireEvent.click(offToggle())
+    expect(offToggle()).toHaveAttribute('aria-expanded', 'true')
+  })
+})

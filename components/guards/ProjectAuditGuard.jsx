@@ -9,6 +9,13 @@ import { useProject } from "@/contexts/ProjectContext";
 // notifications, etc. are intentionally NOT in this list and pass straight
 // through untouched (see isProtectedPath below).
 const AUDIT_PROTECTED_PREFIXES = [
+  // The default landing page: guarded so a project that is still being set up or audited is sent to onboarding/processing, not to a
+  // half-empty overview.
+  "/app/domain-overview",
+  "/app/traffic-history",
+  "/app/organic-keywords",
+  "/app/competitors",
+  "/app/backlinks",
   "/app/dashboard",
   "/app/onpage",
   "/app/accessibility",

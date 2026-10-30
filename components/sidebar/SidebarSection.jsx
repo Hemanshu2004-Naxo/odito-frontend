@@ -22,7 +22,7 @@ export function SidebarSection({ section, isCollapsed = false }) {
       )}
 
       {/* Nav items */}
-      <nav className="flex flex-col gap-0" role="navigation" aria-label={section.label || "Navigation"}>
+      <nav className="flex flex-col gap-0" role="navigation" aria-label={section.ariaLabel || section.label || "Navigation"}>
         {section.items.map((item) =>
           item.children && !isCollapsed ? (
             <SidebarGroupItem key={item.id} item={item} />

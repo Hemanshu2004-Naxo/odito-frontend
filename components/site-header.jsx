@@ -44,6 +44,11 @@ export function SiteHeader({ user, onLogout }) {
     if (pathname === "/app/technicalchecks") return "Technical Checks"
     if (pathname === "/app/pagespeed") return "PageSpeed Insights"
     if (pathname === "/app/keywords") return "Keywords"
+    if (pathname === "/app/domain-overview") return "Domain Overview"
+    if (pathname === "/app/traffic-history") return "Traffic History"
+    if (pathname === "/app/organic-keywords") return "Organic Keywords"
+    if (pathname === "/app/competitors") return "Competitors"
+    if (pathname === "/app/referring-domains") return "Referring Domains"
     if (pathname === "/off-page-links") return "Off-Page & Links"
     return "Dashboard"
   }

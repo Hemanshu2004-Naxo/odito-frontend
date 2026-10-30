@@ -26,7 +26,10 @@ export function SidebarGroupItem({ item }) {
   const submenuId = useId()
 
   const isParentRoute = pathname === item.href
-  const isInside = isParentRoute || pathname.startsWith(`${item.href}/`)
+  // Inside the group = on the parent's own route or branch, OR on any child's route (a group's children need not live under its href:
+  // Off-Page's pages are /app/backlinks/*, /app/referring-domains).
+  const onRoute = (href) => pathname === href || pathname.startsWith(`${href}/`)
+  const isInside = isParentRoute || onRoute(item.href) || item.children.some((c) => onRoute(c.href))
   const isChildRoute = isInside && !isParentRoute
 
   // Starts open when the page loads inside the group (refresh on a child

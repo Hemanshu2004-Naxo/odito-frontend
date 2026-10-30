@@ -317,7 +317,7 @@ export function PublicGuard({ children }) {
 
           if (hasProjects) {
 
-            router.push('/app/dashboard');
+            router.push('/app/domain-overview');
 
           } else {
 

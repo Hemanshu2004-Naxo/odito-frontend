@@ -154,7 +154,7 @@ function LoginForm({ formData, setFormData, error, setError, isLoading, setIsLoa
   const handleGoogleLogin = async () => {
     try {
       await signIn("google", {
-        callbackUrl: "/app/dashboard",
+        callbackUrl: "/app/domain-overview",
         redirect: true,
       });
     } catch (error) {
@@ -166,7 +166,7 @@ function LoginForm({ formData, setFormData, error, setError, isLoading, setIsLoa
   const handleGitHubLogin = async () => {
     try {
       await signIn("github", {
-        callbackUrl: "/app/dashboard",
+        callbackUrl: "/app/domain-overview",
         redirect: true,
       });
     } catch (error) {
