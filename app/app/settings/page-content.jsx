@@ -5,6 +5,7 @@ import RecrawlCard from "@/components/settings/RecrawlCard"
 import WeeklyRecheckCard from "@/components/settings/WeeklyRecheckCard"
 import DangerZoneCard from "@/components/settings/DangerZoneCard"
 import SettingsTabs from "@/components/settings/SettingsTabs"
+import BusinessInformationSection from "@/components/settings/business/BusinessInformationSection"
 
 export default function SettingsPageContent() {
   const { activeProject } = useProject()
@@ -26,7 +27,11 @@ export default function SettingsPageContent() {
           <p className="text-muted-foreground">Select a project to manage its settings.</p>
         </div>
       ) : (
-        <div className="space-y-6 max-w-2xl">
+        <div className="space-y-6 max-w-3xl">
+          <div className="space-y-3">
+            <h2 className="text-foreground text-lg font-semibold">Business Information</h2>
+            <BusinessInformationSection key={activeProject._id} projectId={activeProject._id} />
+          </div>
           {/* Keyed by project so a previous project's recrawl error/progress state never leaks into the next one. */}
           <RecrawlCard key={activeProject._id} project={activeProject} />
           <WeeklyRecheckCard project={activeProject} />

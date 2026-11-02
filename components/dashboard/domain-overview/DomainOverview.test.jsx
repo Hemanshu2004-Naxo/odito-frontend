@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 // Only the HTTP layer is mocked: the real hook, query keys, mapping and components run.
 const svc = vi.hoisted(() => ({ getSection: vi.fn() }))
 const settingsSvc = vi.hoisted(() => ({ get: vi.fn() }))
+const mineSvc = vi.hoisted(() => ({ list: vi.fn(async () => ({ success: true, data: { competitors: [], limit: 100 } })), get: vi.fn(), refresh: vi.fn() }))
+vi.mock("@/services/myCompetitorsService", () => ({ default: mineSvc, myCompetitorsService: mineSvc }))
 const anchorSvc = vi.hoisted(() => ({ get: vi.fn(), data: { saved: false, brand_terms: [], target_keywords: [] } }))
 const project = vi.hoisted(() => ({ current: { _id: "p1", main_url: "https://www.asgeyehospital.com" } }))
 vi.mock("@/services/domainOverviewService", () => ({
@@ -367,61 +369,6 @@ describe("Domain Overview: the Backlink overview card", () => {
   })
 })
 
-describe("Domain Overview: competitors", () => {
-  test("domain with a favicon, shared keywords, average position and their traffic", async () => {
-    renderPage()
-    await screen.findByText("dragarwal.com")
-    const rows = within(screen.getByTestId("do-competitors")).getAllByRole("row").slice(1)
-    expect(rows).toHaveLength(3)
-    const first = within(rows[0]).getAllByRole("cell")
-    expect(first[0].textContent).toBe("dragarwal.com")
-    expect(first[1].textContent).toBe("2.4K")
-    expect(first[2].textContent).toMatch(/^You 26K · Them 36\.9K/) // head-to-head on the shared keywords (replaces "their traffic")
-    expect(first[3].textContent).toBe("12.8")
-    expect(within(rows[0]).queryByText("328.6K")).toBeNull()
-    const icon = rows[0].querySelector("img")
-    expect(icon.getAttribute("src")).toBe("https://www.google.com/s2/favicons?domain=dragarwal.com&sz=32")
-    expect(icon.getAttribute("alt")).toBe("")
-    expect(icon.getAttribute("referrerpolicy")).toBe("no-referrer")
-  })
-
-  test("a favicon that fails to load is replaced by the domain's first letter", async () => {
-    renderPage()
-    await screen.findByText("dragarwal.com")
-    const row = within(screen.getByTestId("do-competitors")).getAllByRole("row")[1]
-    fireEvent.error(row.querySelector("img"))
-    expect(row.querySelector("img")).toBeNull()
-    expect(within(row).getAllByRole("cell")[0].textContent).toBe("ddragarwal.com")
-  })
-
-  test("the card asks for the Competitors page's DEFAULT view (no parameters at all) and shows the first 5 of its rows", async () => {
-    const many = Array.from({ length: 50 }, (_, i) => ({ ...competitors().result.items[0], domain: `rival-${i + 1}.com`, intersections: 1000 - i }))
-    answer({ competitors: competitors(many) })
-    renderPage()
-    await screen.findByText("rival-1.com")
-    const rows = within(screen.getByTestId("do-competitors")).getAllByRole("row").slice(1)
-    expect(rows.map((r) => within(r).getAllByRole("cell")[0].textContent)).toEqual(["rival-1.com", "rival-2.com", "rival-3.com", "rival-4.com", "rival-5.com"])
-    const call = svc.getSection.mock.calls.find(([, section]) => section === "competitors")
-    expect(call[2]).toEqual({ refresh: false }) // no competitors option: the plain URL, i.e. the page's default view
-  })
-
-  test("the project's own row is never listed, and the project's exclude list is loaded before the competitors are requested", async () => {
-    const order = []
-    settingsSvc.get.mockImplementation(async () => { order.push("settings"); return { success: true, data: { tracked: [], excluded: ["practo.com"], limits: { tracked: 10, excluded: 1000 } } } })
-    svc.getSection.mockImplementation(async (_pid, section) => { order.push(section); return { success: true, data: fixtures()[section] } })
-    renderPage()
-    await screen.findByText("dragarwal.com")
-    expect(order.indexOf("settings")).toBeLessThan(order.indexOf("competitors"))
-    expect(screen.queryByText("asgeyehospital.com", { selector: "[data-testid=do-competitors] *" })).toBeNull()
-  })
-
-  test("the footer links to the competitors page", async () => {
-    renderPage()
-    const link = await screen.findByRole("link", { name: /View all competitors/ })
-    expect(link.getAttribute("href")).toBe("/app/competitors")
-  })
-})
-
 describe("Domain Overview: every section fails on its own", () => {
   test("a failing history call shows an inline error with Retry in the chart only; the rest still works", async () => {
     answer({ history: apiError("The data service took too long to respond. Please try again.", { status: 504, code: "PROVIDER_TIMEOUT" }) })
@@ -435,7 +382,7 @@ describe("Domain Overview: every section fails on its own", () => {
     expect(screen.getByTestId("do-top10")).toBeTruthy()
     expect(screen.getByTestId("do-movement")).toBeTruthy()
     expect(screen.getByText("asg hospital")).toBeTruthy()
-    expect(screen.getByText("dragarwal.com")).toBeTruthy()
+    expect(screen.getByTestId("do-competitors-card")).toBeTruthy()
     // the headline traffic survives; only its trend is unavailable
     expect(within(kpi("traffic")).getByText("100.4K")).toBeTruthy()
     expect(within(kpi("traffic")).getByText("Trend unavailable")).toBeTruthy()
@@ -474,9 +421,7 @@ describe("Domain Overview: every section fails on its own", () => {
     renderPage()
     await screen.findByText("100.4K")
     const topKeywords = screen.getByRole("heading", { name: "Top keywords" }).closest("section")
-    const competitorsCard = screen.getByRole("heading", { name: "Top competitors" }).closest("section")
     expect(within(topKeywords).getByRole("alert").textContent).toMatch(/unexpected response/)
-    expect(within(competitorsCard).getByRole("alert").textContent).toMatch(/could not process/)
     expect(screen.getByTestId("do-kpis")).toBeTruthy()
   })
 
@@ -509,7 +454,7 @@ describe("Domain Overview: empty states", () => {
     expect(await screen.findAllByText("No ranking data yet for this domain.")).toHaveLength(1) // the positions card
     expect(screen.getByText("No traffic history yet for this domain.")).toBeTruthy()
     expect(screen.getByText("No ranking keywords yet for this domain.")).toBeTruthy()
-    expect(screen.getByText("No competing domains found yet.")).toBeTruthy()
+    expect(screen.getByTestId("do-competitors-empty")).toBeTruthy()
     expect(screen.getByText(/No keyword movement yet/)).toBeTruthy()
     for (const name of ["traffic", "keywords", "value"]) {
       expect(within(kpi(name)).getByText("—")).toBeTruthy()

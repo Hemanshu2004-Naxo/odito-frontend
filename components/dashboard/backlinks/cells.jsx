@@ -2,7 +2,7 @@
 
 import { ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Favicon } from "../domain-overview/CompetitorsCard"
+import { Favicon } from "../domain-overview/Favicon"
 import { MISSING, formatCompact, formatExact } from "../domain-overview/format"
 import { MAX_RANK } from "./constants"
 

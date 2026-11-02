@@ -106,7 +106,7 @@ function ProjectDomainOverview({ projectId, project }) {
             <TopPagesCard topPages={hub.topPages} />
           </div>
 
-          <CompetitorsCard state={sections.competitors} hub={hub.competitors} settings={competitorSettings} />
+          <CompetitorsCard />
 
           <BacklinksCard state={sections.backlinks} last30={hub.last30} anchorMix={hub.anchorMix} />
         </>

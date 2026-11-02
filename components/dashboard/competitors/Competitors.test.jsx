@@ -15,6 +15,17 @@ vi.mock("@/services/domainOverviewService", () => ({
   DOMAIN_OVERVIEW_SECTIONS: ["rank-overview", "history", "ranked-keywords", "competitors", "backlinks"],
 }))
 vi.mock("@/services/competitorSettingsService", () => ({ default: settingsSvc, competitorSettingsService: settingsSvc }))
+// The page also shows each competitor's business relevance and which are already in My competitors. These two are inert here (nothing
+// assessed, nothing saved), so every existing assertion about the SEO table is about the SEO table alone; MyCompetitors*.test.jsx and
+// CompetitorRelevance.test.jsx cover the rest.
+const assessSvc = vi.hoisted(() => ({
+  list: vi.fn(async () => ({ success: true, data: { assessments: [] } })),
+  request: vi.fn(async () => ({ success: true, data: { assessments: [] } })),
+  override: vi.fn(), clearOverride: vi.fn(),
+}))
+const mineSvc = vi.hoisted(() => ({ list: vi.fn(async () => ({ success: true, data: { competitors: [], limit: 100 } })), addDiscovered: vi.fn() }))
+vi.mock("@/services/competitorAssessmentsService", () => ({ default: assessSvc, competitorAssessmentsService: assessSvc }))
+vi.mock("@/services/myCompetitorsService", () => ({ default: mineSvc, myCompetitorsService: mineSvc }))
 vi.mock("@/contexts/ProjectContext", () => ({ useProject: () => ({ activeProject: project.current }) }))
 vi.mock("next/link", () => ({ default: ({ href, children, ...p }) => <a href={href} {...p}>{children}</a> }))
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(window.location.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))

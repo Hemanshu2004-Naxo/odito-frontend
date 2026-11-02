@@ -1,8 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useProject } from "@/contexts/ProjectContext"
 import { useCompetitors } from "@/hooks/useCompetitors"
+import { useCompetitorAssessments } from "@/hooks/useCompetitorAssessments"
+import { useMyCompetitors } from "@/hooks/useMyCompetitors"
 import { useTrafficComparison } from "@/hooks/useTrafficComparison"
 import { useToastQueue } from "@/hooks/useToastQueue"
 import ToastStack from "@/components/shared/ToastStack"
@@ -14,6 +16,8 @@ import CompetitorsTable from "./CompetitorsTable"
 import ControlsBar from "./ControlsBar"
 import LandscapeChart from "./LandscapeChart"
 import ManageExclusionsDialog from "./ManageExclusionsDialog"
+import RelevanceFilters from "./RelevanceFilters"
+import { applyFilters, countByClass } from "./relevanceUi"
 import { buildCompetitorsCsv, competitorsCsvFileName, downloadCsv } from "./exportCsv"
 import { lastReachablePage } from "./constants"
 import { settingsChanged } from "./urlState"
@@ -51,11 +55,33 @@ function ProjectCompetitors({ projectId, project }) {
   const [highlight, setHighlight] = useState(null)
   const [excludePending, setExcludePending] = useState(() => new Set())
   const [trackPending, setTrackPending] = useState(() => new Set())
+  const [relFilter, setRelFilter] = useState("all")
+  const [relSearch, setRelSearch] = useState("")
+  const [addPending, setAddPending] = useState(() => new Set())
   const highlightTimer = useRef(null)
   useEffect(() => () => clearTimeout(highlightTimer.current), [])
 
   const domain = cp.target ?? projectDomain
   const trackedSet = new Set(settings.tracked)
+
+  // Business relevance of the competitors on THIS page only (never all the discovered domains). The saved competitors tell which are already in My competitors.
+  const pageDomains = useMemo(() => (page.status === "success" ? page.rows.map((r) => r.domain) : []), [page.status, page.rows])
+  const assessments = useCompetitorAssessments(projectId, pageDomains)
+  const mine = useMyCompetitors(projectId)
+  const mineDomains = useMemo(() => new Set(mine.competitors.map((c) => c.domain).filter(Boolean)), [mine.competitors])
+  const relCounts = useMemo(() => countByClass(pageDomains, assessments.byDomain), [pageDomains, assessments.byDomain])
+  const filteredRows = useMemo(() => applyFilters(page.rows, assessments.byDomain, { filter: relFilter, search: relSearch }), [page.rows, assessments.byDomain, relFilter, relSearch])
+  const filterActive = relFilter !== "all" || relSearch.trim() !== ""
+  const tablePage = useMemo(() => (filterActive ? { ...page, rows: filteredRows } : page), [page, filteredRows, filterActive])
+  const resetFilter = () => { setRelFilter("all"); setRelSearch("") }
+
+  const addToMine = useCallback(async (row) => {
+    setAddPending((s) => new Set(s).add(row.domain))
+    const res = await mine.addDiscovered({ source: "seo", domain: row.domain, name: row.domain })
+    setAddPending((s) => { const n = new Set(s); n.delete(row.domain); return n })
+    if (!res.ok) notify(res.message, "danger")
+    else notify(res.created ? `${row.domain} added to My competitors. Its SEO metrics are being fetched.` : `${row.domain} was already in My competitors, so it was updated instead of duplicated.`, "success")
+  }, [mine, notify])
 
   // A page past the end (a hand-edited link, or a change that left fewer competitors) moves back to the last page that exists.
   useEffect(() => {
@@ -120,8 +146,9 @@ function ProjectCompetitors({ projectId, project }) {
         <>
           <ControlsBar state={state} update={update} excludedCount={settings.excluded.length} onManage={() => setManageOpen(true)} activeCount={activeCount} onReset={cp.resetSettings} />
           <LandscapeChart state={page} rows={page.rows} self={cp.self} highlight={highlight} onSelect={selectDomain} />
+          <RelevanceFilters filter={relFilter} onFilter={setRelFilter} search={relSearch} onSearch={setRelSearch} counts={relCounts} loaded={page.rows.length} total={page.total} shown={filteredRows.length} disabled={page.status !== "success"} />
           <CompetitorsTable
-            page={page}
+            page={tablePage}
             state={state}
             update={update}
             trackedSet={trackedSet}
@@ -133,6 +160,14 @@ function ProjectCompetitors({ projectId, project }) {
             settingsActive={changed}
             onResetSettings={cp.resetSettings}
             viewKey={viewKey}
+            assessments={assessments}
+            onOverride={(d, cls) => assessments.override(d, cls).then((r) => { if (!r.ok) notify(r.message, "danger") })}
+            onClearOverride={(d) => assessments.clear(d).then((r) => { if (!r.ok) notify(r.message, "danger") })}
+            onReassess={(dom) => assessments.reassess(dom).then((r) => { if (!r.ok) notify(r.message, "danger") })}
+            mineDomains={mineDomains}
+            addPending={addPending}
+            onAddMine={addToMine}
+            filterInfo={{ active: filterActive, loaded: page.rows.length, onReset: resetFilter }}
           />
           <CompareSection compare={compare} settings={settings} onNotify={notify} />
           <ManageExclusionsDialog open={manageOpen} onOpenChange={setManageOpen} settings={settings} onNotify={notify} />

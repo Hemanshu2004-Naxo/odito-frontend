@@ -2,7 +2,7 @@
 
 import { ExternalLink, Loader2, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Favicon } from "../domain-overview/CompetitorsCard"
+import { Favicon } from "../domain-overview/Favicon"
 import { MISSING, formatCompact, formatDecimal1, formatExact, formatPercent1 } from "../domain-overview/format"
 
 /** A domain with its favicon; the link opens the site in a new tab. */

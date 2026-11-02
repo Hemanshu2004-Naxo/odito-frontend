@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useEffect, useId, useRef, useState } from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Loader2, Ban } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronRight, Loader2, Ban, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
@@ -13,6 +13,7 @@ import Pagination from "../organic-keywords/Pagination"
 import { SORTS } from "./constants"
 import { AvgPosition, DomainLink, HeadToHead, Num, SharedKeywordsCell, TrackButton, Top1Cell } from "./cells"
 import ExpandedCompetitorDetails from "./ExpandedCompetitorDetails"
+import RelevanceCell from "./RelevanceCell"
 
 /**
  * Column order keeps Track, Domain, Shared keywords and Head-to-head together at the left: on a narrow screen they are what stays in view
@@ -20,6 +21,7 @@ import ExpandedCompetitorDetails from "./ExpandedCompetitorDetails"
  * (constants.SORTS); the competitor's whole-site keywords and traffic cannot be sorted by the provider, so those headers have no arrow.
  */
 const COLUMNS = [
+  { key: "relevance", label: "Business relevance", hint: "Whether this site is a business that competes with yours, or only ranks for the same searches (a directory, a publisher, a government or education site...). Sharing keywords alone never makes a site a direct competitor. Click the i for the reasons." },
   { key: "shared", label: "Shared keywords", sort: "shared", align: "end", hint: "Keywords both you and this site rank for in Google. The bar is that number as a share of all your keywords." },
   { key: "h2h", label: "Head-to-head", sort: "headToHead", hint: "Estimated monthly visits from the shared keywords: yours against theirs, sorted by theirs. Green when you lead, red when they do." },
   { key: "avgPosition", label: "Their avg. position", sort: "avgPosition", align: "end", hint: "The average Google position of this site on the shared keywords (lower is better)." },
@@ -58,8 +60,18 @@ function Head({ column, state, update }) {
   )
 }
 
-function cell(key, row) {
+function cell(key, row, ctx) {
   switch (key) {
+    case "relevance": return (
+      <RelevanceCell
+        domain={row.domain}
+        assessment={ctx.assessments?.byDomain?.get(row.domain)}
+        busy={ctx.assessments?.pending?.has(row.domain)}
+        onOverride={ctx.onOverride}
+        onClear={ctx.onClearOverride}
+        onReassess={ctx.onReassess}
+      />
+    )
     case "shared": return <SharedKeywordsCell row={row} />
     case "h2h": return <HeadToHead row={row} />
     case "avgPosition": return <AvgPosition value={row.avgPosition} />
@@ -105,7 +117,9 @@ function SkeletonRows({ count = 8 }) {
  */
 export default function CompetitorsTable({
   page, state, update, trackedSet, trackPending, excludePending, onToggleTrack, onExclude, highlight, settingsActive, onResetSettings, viewKey,
+  assessments = null, onOverride, onClearOverride, onReassess, mineDomains = null, addPending = null, onAddMine = null, filterInfo = null,
 }) {
+  const ctx = { assessments, onOverride, onClearOverride, onReassess }
   const baseId = `cp-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`
   const [open, setOpen] = useState(null)
   // The open row belongs to the view it was opened in (page, sort, settings): when that changes it closes.
@@ -115,7 +129,11 @@ export default function CompetitorsTable({
 
   const { rows, total } = page
   const first = page.offset + 1
-  const showing = total === null ? null : total === 0 ? "No competitors" : `Showing ${formatExact(first)}–${formatExact(first + rows.length - 1)} of ${formatExact(total)} competitors`
+  // With a relevance filter or a search on, the line says how many of the LOADED page are shown, never a range that would not be true.
+  const showing = total === null ? null
+    : total === 0 ? "No competitors"
+      : filterInfo?.active ? `Showing ${formatExact(rows.length)} of the ${formatExact(filterInfo.loaded)} loaded on this page · ${formatExact(total)} discovered`
+        : `Showing ${formatExact(first)}–${formatExact(first + rows.length - 1)} of ${formatExact(total)} competitors`
 
   let body
   if (page.status === "loading") body = <SkeletonRows />
@@ -151,8 +169,17 @@ export default function CompetitorsTable({
                 <DomainLink domain={row.domain} hideIconOnNarrow />
               </div>
             </TableCell>
-            {COLUMNS.map((c) => <TableCell key={c.key} className={cn("py-3", c.align === "end" && "text-right")}>{cell(c.key, row)}</TableCell>)}
+            {COLUMNS.map((c) => <TableCell key={c.key} className={cn("py-3", c.align === "end" && "text-right")}>{cell(c.key, row, ctx)}</TableCell>)}
             <TableCell className="py-3 pr-4 text-right">
+              {onAddMine ? (
+                mineDomains?.has(row.domain) ? (
+                  <span className="mr-1 inline-flex items-center gap-1 px-2 text-xs text-muted-foreground" data-testid="cp-in-mine"><Check className="size-3.5" aria-hidden /> In My competitors</span>
+                ) : (
+                  <Button type="button" variant="outline" size="sm" className="mr-1" onClick={() => onAddMine(row)} disabled={addPending?.has(row.domain)} aria-label={`Add ${row.domain} to My competitors`} data-testid="cp-add-mine">
+                    {addPending?.has(row.domain) ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Plus className="size-3.5" aria-hidden />} Add
+                  </Button>
+                )
+              ) : null}
               <Button type="button" variant="ghost" size="sm" onClick={() => onExclude(row.domain)} disabled={excludePending.has(row.domain)} aria-label={`Exclude ${row.domain}`} data-testid="cp-exclude">
                 {excludePending.has(row.domain) ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Ban className="size-3.5" aria-hidden />} Exclude
               </Button>
@@ -186,7 +213,12 @@ export default function CompetitorsTable({
         <div className="p-5"><SectionError message={page.error?.message} onRetry={page.refetch} /></div>
       ) : noRows ? (
         <div className="m-5 flex min-h-40 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground" data-testid="cp-empty">
-          {settingsActive ? (
+          {filterInfo?.active ? (
+            <>
+              <p>None of the {formatExact(filterInfo.loaded)} competitors loaded on this page matches this filter.</p>
+              <Button type="button" variant="outline" size="sm" onClick={filterInfo.onReset} data-testid="cp-clear-filter">Clear filter</Button>
+            </>
+          ) : settingsActive ? (
             <>
               <p>No competitors match these settings.</p>
               <Button type="button" variant="outline" size="sm" onClick={onResetSettings}>Reset settings</Button>

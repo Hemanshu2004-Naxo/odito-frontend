@@ -12,6 +12,9 @@ vi.mock("@/services/domainOverviewService", () => ({
   DEFAULT_HISTORY_MONTHS: 12,
   DOMAIN_OVERVIEW_SECTIONS: ["rank-overview", "history", "ranked-keywords", "competitors", "backlinks"],
 }))
+// The Domain Overview card "Your competitors" reads the saved competitors; none here.
+const mineSvc = vi.hoisted(() => ({ list: vi.fn(async () => ({ success: true, data: { competitors: [], limit: 100 } })), get: vi.fn(), refresh: vi.fn() }))
+vi.mock("@/services/myCompetitorsService", () => ({ default: mineSvc, myCompetitorsService: mineSvc }))
 vi.mock("@/services/anchorSettingsService", () => ({
   default: { get: async () => ({ success: true, data: { saved: false, brand_terms: [], target_keywords: [] } }) },
 }))

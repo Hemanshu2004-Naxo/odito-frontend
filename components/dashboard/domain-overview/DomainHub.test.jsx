@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 // Only the HTTP layer is mocked: the real hooks (both the five sections and the hub's extra sources), query keys, mapping and components run.
 const svc = vi.hoisted(() => ({ getSection: vi.fn() }))
 const competitorSvc = vi.hoisted(() => ({ get: vi.fn(), addExcluded: vi.fn(), data: { tracked: [], excluded: [], limits: { tracked: 10, excluded: 1000 } } }))
+const mineSvc = vi.hoisted(() => ({ list: vi.fn(async () => ({ success: true, data: { competitors: [], limit: 100 } })), get: vi.fn(), refresh: vi.fn() }))
+vi.mock("@/services/myCompetitorsService", () => ({ default: mineSvc, myCompetitorsService: mineSvc }))
 const anchorSvc = vi.hoisted(() => ({ get: vi.fn(), data: { saved: false, brand_terms: [], target_keywords: [] } }))
 const project = vi.hoisted(() => ({ current: { _id: "p1", main_url: "https://www.asgeyehospital.com" } }))
 vi.mock("@/services/domainOverviewService", () => ({
@@ -342,95 +344,6 @@ describe("Top keywords: All / Non-brand / Brand", () => {
   })
 })
 
-describe("Top competitors: pinned first, head-to-head", () => {
-  const LISTED = "centreforsight.net" // the second row of the fixture list
-  const rowsText = () => within(screen.getByTestId("do-competitors")).getAllByTestId("do-competitor-row")
-
-  test("without pinned competitors: the list's first rows, no stars, a head-to-head split per row instead of 'their traffic'", async () => {
-    renderPage()
-    await screen.findByText("dragarwal.com")
-    expect(rowsText().map((r) => r.querySelector("td").textContent)).toEqual(["dragarwal.com", "centreforsight.net", "aao.org"])
-    expect(screen.queryAllByTestId("do-tracked-star")).toHaveLength(0)
-    expect(screen.queryByText("Their traffic")).toBeNull()
-    expect(within(screen.getByTestId("do-competitors")).getAllByTestId("do-h2h").length).toBe(3)
-  })
-
-  test("a pinned competitor in the list comes first with a star; the leader's bar is green when we lead and red when they do", async () => {
-    competitorSvc.data = { tracked: [LISTED], excluded: [], limits: { tracked: 10, excluded: 1000 } }
-    renderPage()
-    await screen.findByText(LISTED)
-    const rows = rowsText()
-    expect(rows[0].querySelector("td").textContent).toBe(LISTED)
-    expect(within(rows[0]).getByTestId("do-tracked-star")).toBeTruthy()
-    expect(rows.map((r) => r.querySelector("td").textContent)).toEqual([LISTED, "dragarwal.com", "aao.org"])
-    const leads = rows.map((r) => within(r).getByTestId("do-h2h").getAttribute("data-lead"))
-    expect(leads.every((l) => ["us", "them", "tie"].includes(l))).toBe(true)
-    const them = rows.find((r) => within(r).getByTestId("do-h2h").getAttribute("data-lead") === "them")
-    if (them) expect(within(them).getByTestId("do-h2h-bar").className).toMatch(/red/)
-  })
-
-  test("a pinned competitor that is NOT in the list: no shared keywords or head-to-head (tooltip says why); its traffic comes from the CACHED comparison", async () => {
-    competitorSvc.data = { tracked: ["handmade-rival.com"], excluded: [], limits: { tracked: 10, excluded: 1000 } }
-    serve({ "bulk-traffic": envelope("bulk-traffic", { items: [...REAL_BULK_ITEMS, { target: "handmade-rival.com", organic: { etv: 340, count: 12 }, paid: { etv: 0, count: 0 }, featured_snippet: null, local_pack: null }] }, { peek: true, cached: true }) })
-    renderPage()
-    await screen.findByText("handmade-rival.com")
-    const row = rowsText()[0]
-    expect(row.getAttribute("data-in-list")).toBe("0")
-    expect(row.getAttribute("title")).toBe("Not found among competitors for shared keywords.")
-    const cells = within(row).getAllByRole("cell")
-    expect([cells[1].textContent, cells[2].textContent, cells[3].textContent]).toEqual(["—", "—", "—"])
-    await waitFor(() => expect(within(row).getByTestId("do-compare-traffic").textContent).toBe("Organic traffic 340"))
-    const peekCalls = bySection("bulk-traffic")
-    expect(peekCalls).toHaveLength(1)
-    expect(peekCalls[0].opts).toMatchObject({ peek: true, targets: ["handmade-rival.com"] })
-  })
-
-  test("the comparison is never BOUGHT from here: nothing cached = no traffic shown, still a peek", async () => {
-    competitorSvc.data = { tracked: ["handmade-rival.com"], excluded: [], limits: { tracked: 10, excluded: 1000 } }
-    renderPage()
-    await screen.findByText("handmade-rival.com")
-    await waitFor(() => expect(bySection("bulk-traffic").length).toBe(1))
-    expect(screen.queryByTestId("do-compare-traffic")).toBeNull()
-    expect(bySection("bulk-traffic").every((c) => c.opts.peek === true)).toBe(true)
-  })
-
-  test("no comparison is requested when every pinned competitor is in the list", async () => {
-    competitorSvc.data = { tracked: [LISTED], excluded: [], limits: { tracked: 10, excluded: 1000 } }
-    renderPage()
-    await screen.findByText(LISTED)
-    expect(bySection("bulk-traffic")).toHaveLength(0)
-  })
-
-  test("the request is the Competitors page's default view: no extra parameters (so one cache entry serves both)", async () => {
-    renderPage()
-    await screen.findByText("dragarwal.com")
-    const c = bySection("competitors")
-    expect(c).toHaveLength(1)
-    expect(c[0].opts).toEqual({ refresh: false })
-  })
-
-  test("Exclude uses the Competitors page's handler (addExcluded with the domain), then the card follows the new list", async () => {
-    competitorSvc.addExcluded.mockImplementation(async (_p, domains) => { competitorSvc.data = { ...competitorSvc.data, excluded: [...competitorSvc.data.excluded, ...domains] }; return ok(structuredClone(competitorSvc.data)) })
-    serve({ competitors: (opts) => ok(competitors(competitorSvc.data.excluded.includes("dragarwal.com") ? competitors().result.items.slice(1) : competitors().result.items)) })
-    renderPage()
-    await screen.findByText("dragarwal.com")
-    fireEvent.click(screen.getByRole("button", { name: "Exclude dragarwal.com" }))
-    await waitFor(() => expect(screen.queryByText("dragarwal.com")).toBeNull())
-    expect(competitorSvc.addExcluded).toHaveBeenCalledTimes(1)
-    expect(competitorSvc.addExcluded.mock.calls[0][1]).toEqual(["dragarwal.com"])
-    expect(bySection("competitors")).toHaveLength(2) // refreshed through the new exclude list, nothing else
-  })
-
-  test("a failed exclusion explains itself and keeps the row", async () => {
-    competitorSvc.addExcluded.mockImplementation(async () => { throw Object.assign(new Error("You can exclude up to 1,000 domains."), { status: 409, code: "EXCLUDED_LIMIT_REACHED" }) })
-    renderPage()
-    await screen.findByText("dragarwal.com")
-    fireEvent.click(screen.getByRole("button", { name: "Exclude dragarwal.com" }))
-    expect((await screen.findByTestId("do-competitors-message")).textContent).toMatch(/1,000/)
-    expect(screen.getByText("dragarwal.com")).toBeTruthy()
-  })
-})
-
 describe("Top pages card", () => {
   const rows = () => within(screen.getByTestId("do-top-pages")).getAllByTestId("do-page-row")
 
@@ -550,7 +463,7 @@ describe("layout and cost", () => {
   test("top to bottom: KPI cards, Fix first, traffic + positions, movement, top keywords + top pages, competitors, backlink overview", async () => {
     renderPage()
     await settled()
-    const order = ["do-kpis", "do-fix-first", "do-trend-card", "do-movement", "do-top-keywords", "do-top-pages", "do-competitors", "do-backlinks"].map((id) => screen.getByTestId(id))
+    const order = ["do-kpis", "do-fix-first", "do-trend-card", "do-movement", "do-top-keywords", "do-top-pages", "do-competitors-card", "do-backlinks"].map((id) => screen.getByTestId(id))
     for (let i = 1; i < order.length; i += 1) expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING, `${i}`).toBeTruthy()
   })
 
