@@ -160,6 +160,7 @@ export const SORT_ACCESSORS = {
   keywordsChange: (r) => r.mom.keywords.percent,
   value: (r) => r.value,
   top1: (r) => r.buckets.top1,
+  top3g: (r) => (r.buckets.top1 === null && r.buckets.top3 === null ? null : (r.buckets.top1 ?? 0) + (r.buckets.top3 ?? 0)),
   top3: (r) => r.buckets.top3,
   top10: (r) => r.buckets.top10,
   top20: (r) => r.buckets.top20,

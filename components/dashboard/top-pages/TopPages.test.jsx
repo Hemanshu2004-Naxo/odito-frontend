@@ -121,20 +121,24 @@ describe("Top Pages: first load", () => {
   test("the frame is there at once: title, domain, skeletons — no page-wide spinner or alert", () => {
     svc.getSection.mockImplementation(() => new Promise(() => {}))
     renderPage()
-    expect(screen.getByRole("heading", { level: 1, name: "Top Pages" })).toBeTruthy()
+    expect(screen.getByRole("heading", { level: 1, name: "Top linked pages" })).toBeTruthy()
     expect(screen.getByTestId("tp-domain").textContent).toBe("asgeyehospital.com")
     expect(screen.getAllByTestId("tp-skeleton-row").length).toBeGreaterThanOrEqual(5)
     expect(screen.getByTestId("tp-summary-skeleton")).toBeTruthy()
     expect(screen.queryByRole("alert")).toBeNull()
   })
 
-  test("the four profile cards say they are about the whole profile, and show the counts", async () => {
+  test("'Do your linked pages load?': errors of all pages, the wasted backlinks, the split and the three tiles (whole profile)", async () => {
     renderPage()
     await screen.findByTestId("tp-summary")
     expect(screen.getByTestId("tp-summary-scope").textContent).toBe("Whole profile (live links)")
-    const summary = screen.getByTestId("tp-summary")
-    for (const text of ["Pages with backlinks", "Error pages with links", "Redirected pages with links", "Broken backlinks"]) expect(within(summary).getByText(text)).toBeTruthy()
-    await waitFor(() => expect(summary.textContent).toContain("518"))
+    await waitFor(() => expect(screen.getByTestId("tp-sum-errors-headline").textContent).toBe("2 of 518"))
+    await waitFor(() => expect(screen.getByTestId("tp-sum-broken").textContent).toBe("1.6K backlinks"))
+    expect(screen.getByTestId("tp-sum-errors").textContent).toBe("Error pages4xx or 5xx · links wasted2")
+    expect(screen.getByTestId("tp-sum-redirects").textContent).toBe("Redirected3xx · links still count40")
+    expect(screen.getByTestId("tp-sum-working").textContent).toBe("Working2xx OK476") // 518 − 2 − 40
+    expect(screen.getByTestId("tp-sum-bar").getAttribute("aria-label")).toBe("2 errors, 40 redirected, 476 working")
+    expect(screen.getByTestId("tp-about").textContent).toBe("Your pages that other sites link to · 518 pages")
   })
 
   test("a row: the title in bold, the path under it, the status badge, the blocked homepage reads '403 Blocked'", async () => {
@@ -170,11 +174,13 @@ describe("Top Pages: tabs", () => {
     await waitFor(() => expect(lastPage().req.filters[0]).toEqual(["status_code", ">=", 200]))
   })
 
-  test("clicking the 'Error pages with links' card opens the Errors tab", async () => {
+  test("the Error pages tile opens the Errors tab; Working opens OK", async () => {
     renderPage()
     await screen.findByTestId("tp-summary")
-    fireEvent.click(within(screen.getByTestId("tp-summary")).getByText("Error pages with links"))
+    fireEvent.click(screen.getByTestId("tp-sum-errors"))
     await waitFor(() => expect(tab("errors").getAttribute("aria-selected")).toBe("true"))
+    fireEvent.click(screen.getByTestId("tp-sum-working"))
+    await waitFor(() => expect(tab("ok").getAttribute("aria-selected")).toBe("true"))
   })
 })
 

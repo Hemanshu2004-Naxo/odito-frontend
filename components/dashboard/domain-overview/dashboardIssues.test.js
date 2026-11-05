@@ -31,12 +31,12 @@ describe("rule 1 - broken backlinks (>= 20% critical, >= 5% warning)", () => {
   })
   test("title, why and button", () => {
     const i = one("brokenBacklinks", { brokenBacklinks: 1643, backlinks: 18343 })
-    expect(i.title).toBe("9.0% of backlinks point to broken URLs (1,643 links)")
+    expect(i.title).toBe("1,643 backlinks point to broken URLs (9.0%)")
     expect(i.why).toMatch(/dead pages/)
     expect(i.cta).toEqual({ label: "Fix broken links", href: "/app/backlinks/list?broken=true" })
   })
   test("one broken link is singular; no links, no broken links and unknown figures are no issue", () => {
-    expect(one("brokenBacklinks", at(1, 10)).title).toBe("10.0% of backlinks point to broken URLs (1 link)")
+    expect(one("brokenBacklinks", at(1, 10)).title).toBe("1 backlink points to broken URLs (10.0%)")
     for (const v of [at(0), at(5, 0), { brokenBacklinks: null, backlinks: 100 }, { brokenBacklinks: 5, backlinks: null }, null, undefined]) expect(one("brokenBacklinks", v)).toBeNull()
   })
 })
@@ -54,11 +54,14 @@ describe("rule 2 - error pages with backlinks (any = warning; critical at >= 50 
   })
   test("title with the top page, and the button", () => {
     const i = one("errorPages", { count: 138, top: top({ backlinks: 209 }) })
-    expect(i.title).toBe("138 pages with backlinks return errors — top: /patna/ (404, 209 links)")
+    expect(i.title).toBe("138 pages with backlinks return errors")
+    expect(i.why).toBe("Top one is your page /patna/ (404, 209 links). Unblock or redirect it so those links count again.")
     expect(i.cta).toEqual({ label: "View error pages", href: "/app/backlinks/top-pages?status=error" })
   })
-  test("one page is singular; without the list the title still stands (no 'top:' part); none is no issue", () => {
-    expect(one("errorPages", { count: 1, top: top({ backlinks: 1 }) }).title).toBe("1 page with backlinks returns an error — top: /patna/ (404, 1 link)")
+  test("one page is singular; without the list the why is generic; none is no issue", () => {
+    expect(one("errorPages", { count: 1, top: top({ backlinks: 1 }) }).title).toBe("1 page with backlinks returns an error")
+    expect(one("errorPages", { count: 1, top: top({ backlinks: 1 }) }).why).toMatch(/\(404, 1 link\)/)
+    expect(one("errorPages", { count: 4, top: null }).why).toMatch(/Redirect them to a live page/)
     expect(one("errorPages", { count: 4, top: null }).title).toBe("4 pages with backlinks return errors")
     expect(sev("errorPages", { count: 4, top: null })).toBe("warning")
     expect(one("errorPages", { count: 0, top: top() })).toBeNull()
@@ -76,9 +79,9 @@ describe("rule 3 - high-spam referring domains (>= 30% critical, >= 10% warning)
   })
   test("title uses the share of referring domains, the why names the page's own spam score, the button opens that page's Toxic tab", () => {
     const i = one("highSpam", { count: 3002, referringDomains: 3965 })
-    expect(i.title).toBe("75.7% of referring domains have a high spam score (3,002)")
+    expect(i.title).toBe("3,002 linking sites look spammy (75.7%)")
     expect(i.why).toContain(`above ${TOXIC_SPAM_ABOVE}`)
-    expect(i.cta).toEqual({ label: "Review domains", href: "/app/referring-domains?tab=toxic" })
+    expect(i.cta).toEqual({ label: "Review sites", href: "/app/referring-domains?tab=toxic" })
   })
   test("no referring domains, zero or unknown counts are no issue", () => {
     for (const v of [at(0), at(5, 0), { count: null, referringDomains: 10 }, { count: 5, referringDomains: null }]) expect(one("highSpam", v)).toBeNull()
@@ -102,7 +105,7 @@ describe("rule 4 - traffic drop (<= -40% critical, <= -20% warning)", () => {
   test("title names the month it is compared with, the button opens Traffic History", () => {
     const i = one("trafficDrop", { latest: month(540, 2026, 10), previous: month(1000, 2026, 9) })
     expect(i.title).toBe("Organic traffic fell 46.0% vs Sep 26")
-    expect(i.cta).toEqual({ label: "View traffic history", href: "/app/traffic-history" })
+    expect(i.cta).toEqual({ label: "See traffic", href: "/app/traffic-history" })
   })
   test("an unknown or zero previous month cannot be compared: no issue", () => {
     expect(one("trafficDrop", drop(10, 0))).toBeNull()
@@ -121,7 +124,7 @@ describe("rule 5 - keywords lost (lost > new = warning)", () => {
   test("title and button", () => {
     const i = one("keywordsLost", { new: 12, lost: 20 })
     expect(i.title).toBe("Lost 20 keywords, gained 12")
-    expect(i.cta).toEqual({ label: "View keywords", href: "/app/organic-keywords" })
+    expect(i.cta).toEqual({ label: "See keywords", href: "/app/organic-keywords" })
     expect(one("keywordsLost", { new: 0, lost: 1 }).title).toBe("Lost 1 keyword, gained 0")
   })
   test("unknown figures are no issue", () => {

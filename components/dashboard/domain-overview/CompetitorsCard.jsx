@@ -2,20 +2,20 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowRight } from "lucide-react"
-import { Panel } from "@/components/dashboard/shared/parts"
+import { ArrowRight, Plus } from "lucide-react"
+import OverviewCard, { FooterLink } from "./OverviewCard"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { useProject } from "@/contexts/ProjectContext"
 import { useMyCompetitors } from "@/hooks/useMyCompetitors"
 import { useOwnSeoMetrics } from "@/hooks/useOwnSeoMetrics"
-import { VerdictCell } from "../competitors/YourCompetitorsComparison"
-import { compareToYou, sortByLead } from "../competitors/compareToYou"
+import CompareTable from "../competitors/CompareTable"
+import { COMPARE_METRICS, compareToYou, sortByLead } from "../competitors/compareToYou"
 import InfoHint from "../referring-domains/InfoHint"
 import { Skel } from "./SectionState"
 import { Favicon } from "./Favicon"
 export { Favicon }
-import { MISSING, formatCompact, formatDecimal1, formatExact } from "./format"
+import { MISSING, domainFromUrl, formatCompact, formatDecimal1, formatExact } from "./format"
 import { headToHeadShare } from "./hubData"
 
 export const COMPETITORS_HREF = "/app/competitors"
@@ -66,9 +66,12 @@ export default function CompetitorsCard() {
     return sortByLead(withSite, (r) => r.result)
   }, [mc.competitors, own.metrics])
   const rows = ranked.slice(0, CARD_LIMIT)
+  const ahead = ranked.filter((r) => r.result.verdict === "ahead").length
+  const behind = ranked.filter((r) => r.result.verdict === "behind").length
+  const summary = ranked.length ? `${ahead} ahead of you, ${behind} behind · red ↑ = they beat you on that number` : "Only the competitors you added, compared with you"
 
   return (
-    <Panel title="Your competitors" description="Only the competitors you added, compared with you" className="min-w-0">
+    <OverviewCard title="Your competitors" description={summary} action={<Link href={COMPETITORS_HREF} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border/70 px-3 py-1.5 text-xs font-semibold shadow-sm hover:bg-muted" data-testid="do-competitors-addbtn"><Plus className="size-3.5" aria-hidden />Add competitor</Link>}>
       <div data-testid="do-competitors-card">
       {mc.status === "loading" ? <TableSkeleton /> : mc.status === "error" ? (
         <p role="alert" className="rounded-lg border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200" data-testid="do-competitors-error">
@@ -84,43 +87,14 @@ export default function CompetitorsCard() {
         </div>
       ) : (
         <>
-          <Table data-testid="do-competitors">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-0">Competitor</TableHead>
-                <TableHead>Compared with you</TableHead>
-                <TableHead className="text-right">Organic traffic</TableHead>
-                <TableHead className="pr-0 text-right">Shared keywords</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map(({ c, result }) => (
-                <TableRow key={c.id} data-testid="do-competitor-row" data-verdict={result.verdict}>
-                  <TableCell className="max-w-[220px] pl-0 align-top font-medium">
-                    <span className="flex items-center gap-2">
-                      <Favicon domain={c.domain} />
-                      <span className="min-w-0">
-                        <span className="block truncate" title={c.name}>{c.name}</span>
-                        <span className="block truncate text-[11px] font-normal text-muted-foreground" title={c.domain}>{c.domain}</span>
-                      </span>
-                    </span>
-                  </TableCell>
-                  <TableCell className="align-top"><VerdictCell result={result} /></TableCell>
-                  <TableCell className="text-right align-top tabular-nums" title={formatExact(c.enrichment?.metrics?.organicTraffic)} data-testid="do-competitor-traffic">{typeof c.enrichment?.metrics?.organicTraffic === "number" ? formatCompact(c.enrichment.metrics.organicTraffic) : <span className="text-muted-foreground">{MISSING}</span>}</TableCell>
-                  <TableCell className="pr-0 text-right align-top tabular-nums" title={formatExact(c.enrichment?.metrics?.sharedKeywords)} data-testid="do-competitor-shared">{typeof c.enrichment?.metrics?.sharedKeywords === "number" ? formatCompact(c.enrichment.metrics.sharedKeywords) : <span className="text-muted-foreground">{MISSING}</span>}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-            <Link href={COMPETITORS_HREF} className="inline-flex items-center gap-1 text-sm font-medium hover:underline underline-offset-2">
-              View all competitors <ArrowRight className="size-4" aria-hidden />
-            </Link>
+          <div data-testid="do-competitors"><CompareTable rows={rows} own={own} domain={domainFromUrl(activeProject?.main_url)} rowTestId="do-competitor-row" keys={COMPARE_METRICS.map((m) => m.key)} /></div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <FooterLink href={COMPETITORS_HREF}>Compare in detail</FooterLink>
             {ranked.length > rows.length ? <span className="text-xs text-muted-foreground" data-testid="do-competitors-more">Showing {rows.length} of {ranked.length}</span> : null}
           </div>
         </>
       )}
       </div>
-    </Panel>
+    </OverviewCard>
   )
 }

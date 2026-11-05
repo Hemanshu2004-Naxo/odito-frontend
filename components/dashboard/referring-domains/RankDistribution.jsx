@@ -1,6 +1,6 @@
 "use client"
 
-import { Panel } from "@/components/dashboard/shared/parts"
+import OverviewCard from "../domain-overview/OverviewCard"
 import { SectionBoundary, Skel } from "../domain-overview/SectionState"
 import { formatCompact, formatExact, formatPercent1 } from "../domain-overview/format"
 import InfoHint from "./InfoHint"
@@ -21,10 +21,10 @@ export default function RankDistribution({ buckets, state, onSelect }) {
   const total = data.reduce((s, b) => s + b.count, 0)
   const max = Math.max(1, ...data.map((b) => b.count))
   return (
-    <Panel
+    <OverviewCard
+      className="h-full"
       title={<span className="flex items-center gap-1.5">Authority distribution<InfoHint label="Authority distribution" text="How many referring domains have a link rank in each range (0–1000, higher = stronger). Click a bar to show only those domains in the table below." /></span>}
       description={<span data-testid="rd-rank-scope">{PROFILE_SCOPE_LABEL}</span>}
-      className="min-w-0"
     >
       <SectionBoundary
         state={{ status: buckets.status, error: buckets.error, refetch: buckets.refetch }}
@@ -47,8 +47,8 @@ export default function RankDistribution({ buckets, state, onSelect }) {
                   data-key={b.key}
                 >
                   <span className={applied ? "font-semibold" : ""}>{label(b)}</span>
-                  <span className="h-5 overflow-hidden rounded bg-muted/50" role="presentation">
-                    <span className="block h-full rounded bg-primary" style={{ width: `${b.count === 0 ? 0 : Math.max(2, (b.count / max) * 100)}%` }} />
+                  <span className="h-5 overflow-hidden rounded bg-muted" role="presentation">
+                    <span className="block h-full rounded bg-[#0d1a3a] dark:bg-indigo-400" style={{ width: `${b.count === 0 ? 0 : Math.max(2, (b.count / max) * 100)}%` }} />
                   </span>
                   <span className="min-w-20 text-right tabular-nums text-muted-foreground" title={`${formatExact(b.count)} referring domains`}>
                     {formatCompact(b.count)} <span className="text-xs">· {total > 0 ? formatPercent1((b.count / total) * 100) : "—"}</span>
@@ -60,6 +60,6 @@ export default function RankDistribution({ buckets, state, onSelect }) {
         </ul>
         <p className="mt-2 text-xs text-muted-foreground">Counts do not change with the table&apos;s tab, filters or the Dofollow switch.</p>
       </SectionBoundary>
-    </Panel>
+    </OverviewCard>
   )
 }

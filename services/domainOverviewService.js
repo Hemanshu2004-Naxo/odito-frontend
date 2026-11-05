@@ -63,6 +63,17 @@ function setAnchorsParams(query, a) {
   if (Array.isArray(a.filters) && a.filters.length) query.set('filters', JSON.stringify(a.filters))
 }
 
+/**
+ * Opening a page only READS what Odito has stored. When nothing was ever collected for a view the server says `missing` (and `result` is
+ * null): that is not a successful empty answer, so it surfaces as a NOT_SCANNED error that every section already knows how to show. The
+ * SeoScanBar offers the explicit scan that collects it; `refetch` (Retry) is a free read.
+ */
+export const NOT_SCANNED_MESSAGE = 'Nothing has been collected for this view yet. Run an SEO scan to collect it.'
+function throwWhenNotCollected(res) {
+  if (res?.data?.missing === true) throw Object.assign(new Error(NOT_SCANNED_MESSAGE), { status: 404, code: 'NOT_SCANNED' })
+  return res
+}
+
 export const domainOverviewService = {
   /**
    * One section: { success, data: { section, target, market, fetchedAt, cached, refreshThrottled, ttlSeconds, result } }.
@@ -105,7 +116,8 @@ export const domainOverviewService = {
     // `targets` is for bulk-traffic only: the competitors to compare with the project (the server adds the project itself).
     if (Array.isArray(targets) && targets.length) query.set('targets', targets.join(','))
     const qs = query.toString()
-    return apiService.request(`/projects/${encodeURIComponent(projectId)}/domain-overview/${section}${qs ? `?${qs}` : ''}`, { method: 'GET', signal })
+    return Promise.resolve(apiService.request(`/projects/${encodeURIComponent(projectId)}/domain-overview/${section}${qs ? `?${qs}` : ''}`, { method: 'GET', signal }))
+      .then(throwWhenNotCollected)
   },
 }
 

@@ -213,7 +213,6 @@ export default function KeywordsTable({ page, state, update, activeCount, onClea
           total={total}
           loading={page.stale && page.isFetching}
           onPage={(p) => update({ page: p })}
-          onPageSize={(pageSize) => update({ pageSize })}
         />
       ) : null}
     </section>

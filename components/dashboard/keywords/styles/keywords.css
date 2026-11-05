@@ -259,10 +259,39 @@
 .kw-actions-row { display: flex; gap: 4px; }
 
 .kw-expand {
-  padding: 0 16px 12px 52px;
-  display: flex;
-  flex-direction: column;
+  /* The details panel pads itself (and is fluid inside the table width, so nothing scrolls sideways). */
+  padding: 0;
+  min-width: 0;
+  background: var(--bg);
+}
+
+/* The keyword name is the expand control: a chevron + the name, one big click target. */
+.kw-name-toggle {
+  display: inline-flex;
+  align-items: flex-start;
   gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.kw-name-toggle:hover span { text-decoration: underline; text-underline-offset: 2px; }
+.kw-name-toggle:focus-visible { outline: 2px solid var(--cyan, currentColor); outline-offset: 2px; border-radius: 4px; }
+.kw-name-chevron {
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  flex-shrink: 0;
+  color: var(--text3);
+  transition: transform 0.15s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kw-name-chevron { transition: none; }
 }
 
 .kw-ru-link {
@@ -335,7 +364,8 @@
     min-height: 40px;
   }
 
-  .kw-expand { padding: 0 14px 14px; }
+  .kw-name-toggle { min-height: 40px; align-items: center; }
+  .kw-name-chevron { margin-top: 0; }
   .kw-ru-link { white-space: normal; overflow-wrap: anywhere; }
 }
 

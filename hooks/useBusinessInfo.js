@@ -28,6 +28,8 @@ export function useBusinessInfo(projectId) {
       const res = await businessInfoService.save(projectId, body)
       queryClient.setQueryData(queryKeys.businessInfo.detail(projectId), res)
       queryClient.invalidateQueries({ queryKey: ["local-competitors", projectId] })
+      // Saving a location also moves where keywords are tracked from (server-side): the Keywords page must not keep showing the old one.
+      queryClient.invalidateQueries({ queryKey: queryKeys.keywords.list(projectId) })
       return { ok: true }
     } catch (err) {
       return { ok: false, code: err?.code ?? null, field: err?.field ?? null, message: err && typeof err.status === "number" && err.message ? err.message : "Could not save. Check your connection and try again." }

@@ -51,7 +51,7 @@ function FlagChips({ selected, onToggle }) {
               onClick={() => onToggle(id)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "border-foreground bg-foreground text-background" : "border-border/70 bg-card text-foreground hover:bg-muted",
+                active ? "border-[#0d1a3a] bg-[#0d1a3a] text-white dark:border-indigo-500 dark:bg-indigo-500" : "border-border/70 bg-card text-foreground hover:bg-muted",
               )}
             >
               <span className={cn("size-2 rounded-full", FLAG_TONE[f.tone])} aria-hidden />
@@ -121,7 +121,8 @@ export default function FilterBar({ state, update, built, activeCount, onClearAl
     )
   }
   return (
-    <div className="space-y-3 rounded-xl border border-border/60 bg-card p-4" data-testid="tp-filter-bar">
+    <div className="space-y-3 rounded-2xl border border-border/60 bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]" data-testid="tp-filter-bar">
+      <h2 className="text-[15px] font-semibold tracking-tight">Filters</h2>
       <Controls state={state} update={update} built={built} />
       <TooMany built={built} />
     </div>

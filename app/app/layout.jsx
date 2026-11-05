@@ -3,6 +3,7 @@ import { DashboardThemeProvider } from "@/providers/DashboardThemeProvider"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { AuthGuard } from "@/components/guards/AuthGuard"
 import { ProjectAuditGuard } from "@/components/guards/ProjectAuditGuard"
+import SeoScanBar from "@/components/dashboard/seo-scan/SeoScanBar"
 
 // Every route under /app/* is an authenticated, per-user application screen
 // (dashboard, settings, project data, ...), never public marketing content —
@@ -33,7 +34,10 @@ export default function DashboardGroupLayout({ children }) {
               <div className="@container/main flex flex-1 flex-col gap-2">
                 <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
                   <div className="px-2 sm:px-4 lg:px-6">
-                    <ProjectAuditGuard>{children}</ProjectAuditGuard>
+                    <ProjectAuditGuard>
+                      <SeoScanBar />
+                      {children}
+                    </ProjectAuditGuard>
                   </div>
                 </div>
               </div>

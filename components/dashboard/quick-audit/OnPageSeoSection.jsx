@@ -173,18 +173,18 @@ export default function OnPageSeoSection({ data }) {
   return (
     <section className="space-y-12 pt-8">
       {/* HEADER */}
-      <div className="flex justify-between items-end border-b border-[#263244] pb-8 mb-8">
-        <h2 className="text-3xl font-bold text-white flex items-center gap-4">
+      <div className="flex justify-between items-end border-b border-slate-200 dark:border-[#263244] pb-8 mb-8">
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center">
-            <span className="text-cyan-400 text-xl">🔍</span>
+            <span className="text-cyan-700 dark:text-cyan-400 text-xl">🔍</span>
           </div>
           On Page SEO
         </h2>
-        <div className="flex items-center gap-3 px-4 py-2 bg-[#111827] border border-[#263244] rounded-xl">
-          <span className="text-xs tracking-[0.15em] uppercase text-slate-400">
+        <div className="flex items-center gap-3 px-4 py-2 bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-xl">
+          <span className="text-xs tracking-[0.15em] uppercase text-slate-600 dark:text-slate-400">
             Section Score
           </span>
-          <span className="text-2xl font-bold text-yellow-400">
+          <span className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
             {seoScore}%
           </span>
         </div>
@@ -198,16 +198,16 @@ export default function OnPageSeoSection({ data }) {
           const severity = backendCheck?.severity || 'medium';
           const statusInfo = getStatusInfo(severity);
           const statusColors = {
-            red: 'bg-red-500/10 border-red-500/20 text-red-400',
-            yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400',
-            green: 'bg-green-500/10 border-green-500/20 text-green-400'
+            red: 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400',
+            yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700 dark:text-yellow-400',
+            green: 'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400'
           };
 
           return (
-            <div key={check.id} className="bg-[#111827] border border-[#263244] rounded-3xl overflow-hidden">
+            <div key={check.id} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-3xl overflow-hidden">
               {/* TOP */}
-              <div className="p-6 border-b border-[#263244] flex justify-between items-start">
-                <h3 className="text-xl font-bold text-white">
+              <div className="p-6 border-b border-slate-200 dark:border-[#263244] flex justify-between items-start">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                   {check.name}
                 </h3>
                 <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest ${statusColors[statusInfo.color]}`}>
@@ -222,7 +222,7 @@ export default function OnPageSeoSection({ data }) {
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mb-4">
                     Issues Found
                   </p>
-                  <p className="text-slate-200 leading-7">
+                  <p className="text-slate-800 dark:text-slate-200 leading-7">
                     {check.issues}
                   </p>
                 </div>
@@ -232,8 +232,8 @@ export default function OnPageSeoSection({ data }) {
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mb-4">
                     Current Data
                   </p>
-                  <div className="bg-slate-900/60 border border-[#263244] rounded-xl p-6">
-                    <p className="italic text-slate-400 leading-7">
+                  <div className="bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-[#263244] rounded-xl p-6">
+                    <p className="italic text-slate-600 dark:text-slate-400 leading-7">
                       "{check.currentData}"
                     </p>
                   </div>
@@ -244,17 +244,17 @@ export default function OnPageSeoSection({ data }) {
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mb-4">
                     Why It Matters
                   </p>
-                  <p className="text-slate-400 leading-7">
+                  <p className="text-slate-600 dark:text-slate-400 leading-7">
                     {check.whyItMatters}
                   </p>
                 </div>
 
                 {/* Recommendation */}
                 <div className="bg-cyan-400/5 border border-cyan-400/20 rounded-2xl p-6">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-400 mb-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-400 mb-4">
                     AI Recommendation
                   </p>
-                  <p className="text-cyan-200 font-semibold leading-7">
+                  <p className="text-cyan-800 dark:text-cyan-200 font-semibold leading-7">
                     {check.recommendation}
                   </p>
                 </div>
@@ -269,21 +269,21 @@ export default function OnPageSeoSection({ data }) {
           <div className="flex flex-col items-center justify-center space-y-3">
             {/* Success Icon */}
             <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
-              <div className="text-green-400 text-2xl">✓</div>
+              <div className="text-green-700 dark:text-green-400 text-2xl">✓</div>
             </div>
             
             {/* Success Message */}
             <div className="space-y-1">
-              <h4 className="text-lg font-semibold text-white">
+              <h4 className="text-lg font-semibold text-slate-900 dark:text-white">
                 All On Page SEO Checks Passed
               </h4>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-slate-600 dark:text-gray-400">
                 All {seoChecks.length} checks passed successfully
               </p>
             </div>
             
             {/* Success Indicators */}
-            <div className="flex items-center gap-2 text-sm text-green-400">
+            <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
               <span>Excellent Performance</span>
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>

@@ -91,7 +91,7 @@ describe("Domain Overview: loading", () => {
   test("sections show their own skeletons while loading — no page-wide spinner — and the page frame is already there", async () => {
     svc.getSection.mockImplementation(() => new Promise(() => {}))
     renderPage()
-    expect(screen.getByRole("heading", { name: "Domain Overview" })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Domain overview" })).toBeTruthy()
     expect(screen.getByTestId("do-domain").textContent).toBe("asgeyehospital.com") // from the project, before any answer
     expect(screen.getByTestId("do-kpis").querySelectorAll(".skeleton-shimmer").length).toBeGreaterThanOrEqual(6)
     expect(screen.queryByRole("progressbar")).toBeNull()
@@ -111,8 +111,8 @@ describe("Domain Overview: header", () => {
     renderPage()
     await screen.findByText("100.4K")
     expect(screen.getByTestId("do-domain").textContent).toBe("asgeyehospital.com")
-    expect(screen.getByTestId("do-market").textContent).toBe("India · English")
-    expect(screen.getByTestId("do-updated").textContent).toMatch(/^Last updated .*2026/) // the time itself is shown in the viewer's locale
+    expect(screen.getByTestId("do-market").textContent).toBe("Google India · English")
+    expect(screen.getByTestId("do-updated").textContent).toMatch(/^Updated .*2026/) // the time itself is shown in the viewer's locale
     expect(screen.getByTestId("do-updated").getAttribute("title")).toMatch(/History: /) // each section's own time
   })
 })
@@ -122,10 +122,10 @@ describe("Domain Overview: KPI cards", () => {
     renderPage()
     await screen.findByText("100.4K")
     expect(within(kpi("traffic")).getByText("100.4K").getAttribute("title")).toBe("100,412")
-    expect(within(kpi("traffic")).getByText("Est. monthly traffic")).toBeTruthy()
+    expect(within(kpi("traffic")).getByText("Est. monthly visits from Google")).toBeTruthy()
     expect(within(kpi("keywords")).getByText("4.1K").getAttribute("title")).toBe("4,139")
     expect(within(kpi("value")).getByText("$24.5K")).toBeTruthy()
-    expect(kpi("rank").textContent).toMatch(/352\s*\/ 1000/)
+    expect(kpi("rank").textContent).toMatch(/352\s*\/1000/)
     expect(within(kpi("backlinks")).getByText("18.3K").getAttribute("title")).toBe("18,297")
     expect(within(kpi("refdomains")).getByText("3.9K").getAttribute("title")).toBe("3,949")
     expect(screen.getByTestId("do-kpis").children).toHaveLength(6)
@@ -134,7 +134,7 @@ describe("Domain Overview: KPI cards", () => {
   test("the traffic label carries the 'estimated' hint", async () => {
     renderPage()
     await screen.findByText("100.4K")
-    const hint = within(kpi("traffic")).getByRole("button", { name: "About Organic Traffic" })
+    const hint = within(kpi("traffic")).getByRole("button", { name: "About Organic traffic" })
     expect(document.getElementById(hint.getAttribute("aria-describedby")).textContent).toBe("Estimated from rankings × CTR")
   })
 
@@ -188,7 +188,7 @@ describe("Domain Overview: KPI cards", () => {
     await screen.findByText("100.4K")
     for (const name of ["rank", "backlinks", "refdomains"]) {
       expect(within(kpi(name)).getByText("—")).toBeTruthy()
-      expect(kpi(name).querySelector(".text-3xl").textContent).toBe("—") // the figure itself; the hint text legitimately contains digits
+      expect(within(kpi(name)).getByTestId("do-kpi-figure").textContent).toBe("—") // the figure itself; the hint text legitimately contains digits
     }
     expect(within(kpi("rank")).queryByText("/ 1000")).toBeNull()
   })
@@ -212,7 +212,7 @@ describe("Domain Overview: charts", () => {
   test("keyword positions: the Top 10 headline and a list of the six buckets, each a link to the matching Organic Keywords range", async () => {
     renderPage()
     await screen.findByText("100.4K")
-    expect(screen.getByTestId("do-top10").textContent).toBe("Top 10: 1.5K keywords (36.5%)")
+    expect(screen.getByTestId("do-top10").textContent).toBe("1,510 keywords (36.5%) are on page 1. Most sit between positions 21 and 50, so small content fixes can move many of them up.")
     const list = screen.getByRole("list", { name: "Keywords per position range" })
     const links = within(list).getAllByRole("link")
     expect(links.map((a) => a.getAttribute("aria-label"))).toEqual([
@@ -232,7 +232,7 @@ describe("Domain Overview: the traffic chart card opens Traffic History", () => 
   test("clicking the card (title, chart area) navigates to the Traffic History page", async () => {
     renderPage()
     await screen.findByText("100.4K")
-    fireEvent.click(screen.getByRole("heading", { name: "Organic traffic — last 12 months" }))
+    fireEvent.click(screen.getByRole("heading", { name: "Organic traffic: last 12 months" }))
     expect(router.push).toHaveBeenLastCalledWith("/app/traffic-history")
     fireEvent.click(screen.getByTestId("do-trend-chart"))
     expect(router.push).toHaveBeenCalledTimes(2)
@@ -249,7 +249,7 @@ describe("Domain Overview: the traffic chart card opens Traffic History", () => 
   test("a visible link is the keyboard and screen-reader way in", async () => {
     renderPage()
     await screen.findByText("100.4K")
-    const link = screen.getByRole("link", { name: /View full traffic history/ })
+    const link = screen.getByRole("link", { name: /Full traffic history/ })
     expect(link.getAttribute("href")).toBe("/app/traffic-history")
     fireEvent.click(link)
     expect(router.push).not.toHaveBeenCalled() // the link navigates by itself; the card handler ignores clicks on links
@@ -284,7 +284,7 @@ describe("Domain Overview: top keywords", () => {
     expect(rows).toHaveLength(5)
     const cells = (r) => within(r).getAllByRole("cell")
 
-    expect(cells(rows[0])[0].textContent).toBe("asg hospital")
+    expect(cells(rows[0])[0].textContent).toBe("asg hospital/")
     expect(cells(rows[0])[1].textContent).toMatch(/1\s*New/) // NEW: no previous rank
     expect(within(rows[0]).getByTestId("do-badge-new")).toBeTruthy()
     expect(cells(rows[0])[2].textContent).toBe("74K")
@@ -300,15 +300,16 @@ describe("Domain Overview: top keywords", () => {
     expect(within(rows[2]).getByTestId("do-badge-down").textContent).toBe("▼2")
     expect(within(rows[2]).getByTestId("do-badge-down").className).toMatch(/red/)
 
-    // unchanged and unknown claim no movement at all
-    for (const i of [3, 4]) expect(within(rows[i]).queryByTestId(/do-badge/)).toBeNull()
+    // unchanged is a quiet dash; unknown claims no movement at all
+    expect(within(rows[3]).getByTestId("do-badge-same").textContent).toBe("–")
+    expect(within(rows[4]).queryByTestId(/do-badge/)).toBeNull()
     // missing values are dashes
-    expect(cells(rows[4]).slice(2).map((c) => c.textContent)).toEqual(["—", "—", "—", "—"])
+    expect(cells(rows[4]).slice(2).map((c) => c.textContent)).toEqual(["—", "—", "—"])
   })
 
   test("the footer links to the (placeholder) organic keywords page with the total", async () => {
     renderPage()
-    const link = await screen.findByRole("link", { name: /View all 4,139 keywords/ })
+    const link = await screen.findByRole("link", { name: /All 4,139 keywords/ })
     expect(link.getAttribute("href")).toBe("/app/organic-keywords")
   })
 })
@@ -318,15 +319,15 @@ describe("Domain Overview: the backlink cards", () => {
     renderPage()
     await screen.findByText("100.4K")
     expect(screen.getByTestId("do-kpi-rank").getAttribute("href")).toBe("/app/backlinks/overview")
-    expect(screen.getByTestId("do-kpi-rank").getAttribute("aria-label")).toBe("Domain Rank: open the Backlink Overview")
+    expect(screen.getByTestId("do-kpi-rank").getAttribute("aria-label")).toBe("Domain rank: open the Backlink Overview")
     expect(screen.getByTestId("do-kpi-backlinks").getAttribute("href")).toBe("/app/backlinks/overview")
     expect(screen.getByTestId("do-kpi-refdomains").getAttribute("href")).toBe("/app/referring-domains")
-    expect(screen.getByTestId("do-kpi-refdomains").getAttribute("aria-label")).toBe("Referring Domains: open the Referring Domains page")
+    expect(screen.getByTestId("do-kpi-refdomains").getAttribute("aria-label")).toBe("Linking sites: open the Referring Domains page")
     expect(screen.getByTestId("do-kpi-traffic").getAttribute("href")).toBe("/app/traffic-history")
-    expect(screen.getByTestId("do-kpi-traffic").getAttribute("aria-label")).toBe("Organic Traffic: open Traffic History")
+    expect(screen.getByTestId("do-kpi-traffic").getAttribute("aria-label")).toBe("Organic traffic: open Traffic History")
     expect(screen.getByTestId("do-kpi-value").getAttribute("href")).toBe("/app/traffic-history")
     expect(screen.getByTestId("do-kpi-keywords").getAttribute("href")).toBe("/app/organic-keywords")
-    expect(screen.getByTestId("do-kpi-keywords").getAttribute("aria-label")).toBe("Organic Keywords: open Organic Keywords")
+    expect(screen.getByTestId("do-kpi-keywords").getAttribute("aria-label")).toBe("Organic keywords: open Organic Keywords")
   })
 
   test("it asks for the Backlink Overview's DEFAULT view: no parameters at all (live, no filter), so both pages share one answer", async () => {
@@ -347,10 +348,8 @@ describe("Domain Overview: the Backlink overview card", () => {
     expect(screen.getByTestId("do-bl-spam").textContent).toContain("High")
     expect(screen.getByTestId("do-bl-broken").textContent).toContain("5.0% of links")
     expect(screen.getByTestId("do-bl-broken").querySelector("[class*='text-red']")).toBeTruthy() // broken links above 0 are red
-    // Shares are of the links with a KNOWN country (500 - 200 unknown = 300); Worldwide is known; the unknown part is its own muted item.
-    const countries = screen.getAllByTestId("do-country").map((li) => li.textContent.replace(/\s+/g, " ").trim())
-    expect(countries).toEqual([expect.stringMatching(/India 50\.0%/), expect.stringMatching(/United States 16\.7%/), expect.stringMatching(/Worldwide 13\.3%/)])
-    expect(screen.getByTestId("do-country-unknown").textContent).toBe("Unknown 40.0%")
+    expect(screen.getByTestId("do-bl-pages").textContent).toContain("from 90 IPs")
+    expect(screen.getByTestId("do-bl-dofollow").textContent).toContain("80 of 100 sites")
     expect(screen.getByTestId("do-backlinks-link").getAttribute("href")).toBe("/app/backlinks/overview")
     expect(svc.getSection.mock.calls.filter(([, section]) => section === "backlinks")).toHaveLength(1)
     expect(card).toBeTruthy()
@@ -363,7 +362,7 @@ describe("Domain Overview: the Backlink overview card", () => {
     unmount()
     answer({ backlinks: apiError("The data service is busy.", { status: 429 }) })
     renderPage()
-    const card = (await screen.findByText("Backlink overview")).closest("section")
+    const card = (await screen.findByText("Backlink health")).closest("section")
     expect((await within(card).findByRole("alert")).textContent).toMatch(/busy/)
     expect(within(card).getByRole("button", { name: /Retry/ })).toBeTruthy()
   })
@@ -455,7 +454,6 @@ describe("Domain Overview: empty states", () => {
     expect(screen.getByText("No traffic history yet for this domain.")).toBeTruthy()
     expect(screen.getByText("No ranking keywords yet for this domain.")).toBeTruthy()
     expect(screen.getByTestId("do-competitors-empty")).toBeTruthy()
-    expect(screen.getByText(/No keyword movement yet/)).toBeTruthy()
     for (const name of ["traffic", "keywords", "value"]) {
       expect(within(kpi(name)).getByText("—")).toBeTruthy()
       expect(within(kpi(name)).getByText("No ranking data yet")).toBeTruthy()
@@ -512,7 +510,7 @@ describe("Domain Overview: responsive layout", () => {
     expect(kpiClass).toMatch(/@min-\[1100px\]\/main:grid-cols-6/)
     const pair = screen.getByTestId("do-trend-chart").closest(".grid")
     expect(pair.className).toMatch(/\bgrid-cols-1\b/)
-    expect(pair.className).toMatch(/@min-\[900px\]\/main:grid-cols-\[minmax\(0,3fr\)_minmax\(0,2fr\)\]/)
+    expect(pair.className).toMatch(/@min-\[900px\]\/main:grid-cols-2/)
   })
 })
 

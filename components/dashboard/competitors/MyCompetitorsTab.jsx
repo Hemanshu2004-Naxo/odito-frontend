@@ -14,10 +14,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { SectionError, Skel } from "../domain-overview/SectionState"
 import { formatExact } from "../domain-overview/format"
-import CompetitorDetailsSheet from "./CompetitorDetailsSheet"
 import MyCompetitorsTable from "./MyCompetitorsTable"
 
-const EMPTY = { name: "", domain: "", address: "", notes: "" }
+export const EMPTY = { name: "", domain: "", address: "", notes: "" }
 const PAGE_SIZE = 20
 
 /** Competitors the user chose. They are saved per project and never touched by a refresh or by how far away they are. */
@@ -36,8 +35,8 @@ function ProjectMyCompetitors({ projectId }) {
   const [search, setSearch] = useState("")
   const [form, setForm] = useState(null) // null = closed; { id|null, values } = open
   const [removing, setRemoving] = useState(null) // the competitor awaiting confirmation
-  const [detailsId, setDetailsId] = useState(null) // the competitor whose details sheet is open (read from the list: no request)
-  const details = detailsId ? mc.competitors.find((c) => c.id === detailsId) ?? null : null
+  // The competitor whose details are open under its row (one at a time). The details are drawn from the list itself, so a refresh shows in them.
+  const [detailsId, setDetailsId] = useState(null)
 
   // Queue a manual SEO refresh. Only queues: the numbers arrive in the background and the list re-reads itself while it is waiting.
   const refreshOne = async (c) => {
@@ -104,7 +103,8 @@ function ProjectMyCompetitors({ projectId }) {
               <MyCompetitorsTable
                 rows={shown}
                 pending={mc.pending}
-                onDetails={(c) => setDetailsId(c.id)}
+                expandedId={detailsId}
+                onDetails={(c) => setDetailsId((id) => (id === c.id ? null : c.id))}
                 onRefresh={refreshOne}
                 onEdit={(c) => setForm({ id: c.id, values: { name: c.name, domain: c.domain ?? "", address: c.address ?? "", notes: c.notes ?? "" } })}
                 onRemove={setRemoving}
@@ -161,16 +161,13 @@ function ProjectMyCompetitors({ projectId }) {
         </DialogContent>
       </Dialog>
 
-      <CompetitorDetailsSheet competitor={details} open={!!details} onOpenChange={(o) => !o && setDetailsId(null)} onRefresh={refreshOne} refreshing={details ? mc.pending.has(details.id) : false} assessments={assessments} onOverride={onOverride} onClearOverride={onClearOverride}
-                onReassess={onReassess} />
-
       <ToastStack toasts={toasts} onDismiss={dismiss} />
     </div>
   )
 }
 
 /** Add or edit. A name or a website is enough; the server cleans the website and refuses duplicates and your own site. */
-function CompetitorFormDialog({ form, onClose, onSave }) {
+export function CompetitorFormDialog({ form, onClose, onSave }) {
   const [values, setValues] = useState(form?.values ?? EMPTY)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)

@@ -1,23 +1,27 @@
 "use client"
 
-import { Eye, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
+import { Fragment, useEffect, useRef, useState } from "react"
+import { ChevronDown, ChevronUp, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import InfoHint from "../referring-domains/InfoHint"
 import { DomainLink } from "./cells"
 import { Metric, StatusChip, UpdatedAt } from "./EnrichmentCells"
+import CompetitorDetailsPanel from "./CompetitorDetailsPanel"
 import RelevanceCell from "./RelevanceCell"
 import { canRefresh } from "./enrichmentUi"
 
 const SOURCE_LABEL = { manual: "Added by you", seo: "From SEO", local: "From Local", legacy: "Imported", social: "From Social profile" }
 export { SOURCE_LABEL }
 
-function IconAction({ label, onClick, disabled, children, testId }) {
+function IconAction({ label, onClick, disabled, children, testId, expanded, controls }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
+      aria-expanded={expanded}
+      aria-controls={controls}
       title={label}
       data-testid={testId}
       className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
@@ -27,12 +31,20 @@ function IconAction({ label, onClick, disabled, children, testId }) {
   )
 }
 
-/** The four row actions. Details never calls a provider; Refresh only queues work for the background worker. */
-function RowActions({ c, busy, onDetails, onRefresh, onEdit, onRemove }) {
+/** Opens / closes the details under the row. It is the first thing in the row, so it never scrolls out of view with the wide table. */
+function DetailsToggle({ c, expanded, onDetails }) {
+  return (
+    <IconAction label={expanded ? `Hide details of ${c.name}` : `View details of ${c.name}`} onClick={() => onDetails(c)} testId="mc-details" expanded={expanded} controls={expanded ? `mc-panel-${c.id}` : undefined}>
+      {expanded ? <ChevronUp className="size-4" aria-hidden /> : <ChevronDown className="size-4" aria-hidden />}
+    </IconAction>
+  )
+}
+
+/** The row actions. Details never calls a provider; Refresh only queues work for the background worker. */
+function RowActions({ c, busy, onRefresh, onEdit, onRemove }) {
   const refreshable = canRefresh(c)
   return (
     <div className="flex justify-end gap-0.5">
-      <IconAction label={`View details of ${c.name}`} onClick={() => onDetails(c)} testId="mc-details"><Eye className="size-4" aria-hidden /></IconAction>
       <IconAction label={`Refresh SEO metrics of ${c.name}`} disabled={busy || !refreshable} onClick={() => onRefresh(c)} testId="mc-refresh">
         <RefreshCw className="size-4" aria-hidden />
       </IconAction>
@@ -61,15 +73,61 @@ const head = (label, hint, extra = "") => (
 )
 
 /**
+ * Is the viewport at least `px` wide? The table (sm and up) and the phone cards are both in the page and only CSS hides one of them, so
+ * anything that must exist ONCE (the opened details, with its id and its request) is drawn only in the layout that is showing.
+ * Without matchMedia (tests, old browsers) it is "wide".
+ */
+function useMinWidth(px) {
+  const [wide, setWide] = useState(true)
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined
+    const q = window.matchMedia(`(min-width: ${px}px)`)
+    const update = () => setWide(q.matches)
+    update()
+    q.addEventListener?.("change", update)
+    return () => q.removeEventListener?.("change", update)
+  }, [px])
+  return wide
+}
+
+/**
+ * The width the table's scroll area really shows. The table is wider than the screen on narrow desktops (it scrolls sideways), and a details
+ * row spans ALL of it: without this the opened details would run off the right edge. The panel is pinned to the left and given this width.
+ */
+function useVisibleWidth(ref) {
+  const [width, setWidth] = useState(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    const measure = () => setWidth(Math.round(el.clientWidth))
+    measure()
+    if (typeof ResizeObserver === "undefined") return undefined
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return width
+}
+
+/**
  * My Competitors as a table (sm and up) and as cards (phones). The columns thin out as the screen narrows: competitor + status + actions
  * always, then traffic, ranking keywords, last updated, and on wide screens shared keywords, #1 rankings and referring domains.
  * Every number comes from the saved enrichment; nothing here causes a provider call.
  */
-export default function MyCompetitorsTable({ rows, pending, onDetails, onRefresh, onEdit, onRemove, assessments = null, onOverride, onClearOverride, onReassess }) {
+export default function MyCompetitorsTable({ rows, pending, expandedId = null, onDetails, onRefresh, onEdit, onRemove, assessments = null, onOverride, onClearOverride, onReassess }) {
   const relevance = (domain) => (domain ? <RelevanceCell domain={domain} assessment={assessments?.byDomain?.get(domain)} busy={assessments?.pending?.has(domain)} onOverride={onOverride} onClear={onClearOverride} onReassess={onReassess} /> : <span className="text-xs text-muted-foreground" title="Add a website to check whether this is a business that competes with you">—</span>)
+  const wide = useMinWidth(640)
+  const tableBox = useRef(null)
+  const visibleWidth = useVisibleWidth(tableBox)
+  const panel = (raw) => (
+    <CompetitorDetailsPanel
+      competitor={raw} id={`mc-panel-${raw.id}`} onClose={() => onDetails(raw)} onRefresh={onRefresh} refreshing={pending.has(raw.id)}
+      assessments={assessments} onOverride={onOverride} onClearOverride={onClearOverride} onReassess={onReassess}
+    />
+  )
   return (
     <>
-      <div className="hidden sm:block">
+      <div className="hidden sm:block" ref={tableBox}>
         <Table data-testid="mc-table">
           <TableHeader>
             <TableRow>
@@ -89,9 +147,11 @@ export default function MyCompetitorsTable({ rows, pending, onDetails, onRefresh
             {rows.map((raw) => {
               const c = { ...raw, __open: () => onDetails(raw) }
               const e = c.enrichment
+              const open = expandedId === c.id
               return (
-                <TableRow key={c.id} data-testid="mc-row" data-id={c.id}>
-                  <TableCell className="max-w-[260px]"><Identity c={c} /></TableCell>
+                <Fragment key={c.id}>
+                <TableRow data-testid="mc-row" data-id={c.id} data-expanded={open ? "1" : "0"} className={open ? "border-b-0 bg-muted/30" : undefined}>
+                  <TableCell className="max-w-[300px]"><div className="flex items-start gap-1.5"><DetailsToggle c={raw} expanded={open} onDetails={onDetails} /><div className="min-w-0"><Identity c={c} /></div></div></TableCell>
                   <TableCell className="hidden lg:table-cell" data-testid="mc-relevance">{relevance(raw.domain)}</TableCell>
                   <TableCell className="hidden text-right xl:table-cell" data-testid="mc-shared">
                     {typeof e?.metrics?.sharedKeywords === "number" && e.metrics.sharedKeywords > 0
@@ -104,8 +164,16 @@ export default function MyCompetitorsTable({ rows, pending, onDetails, onRefresh
                   <TableCell className="hidden text-right xl:table-cell"><Metric value={e?.metrics?.referringDomains ?? null} enrichment={e} section="backlinks" /></TableCell>
                   <TableCell><StatusChip enrichment={e} /></TableCell>
                   <TableCell className="hidden lg:table-cell"><UpdatedAt enrichment={e} /></TableCell>
-                  <TableCell><RowActions c={raw} busy={pending.has(raw.id)} onDetails={onDetails} onRefresh={onRefresh} onEdit={onEdit} onRemove={onRemove} /></TableCell>
+                  <TableCell><RowActions c={raw} busy={pending.has(raw.id)} onRefresh={onRefresh} onEdit={onEdit} onRemove={onRemove} /></TableCell>
                 </TableRow>
+                {open && wide ? (
+                  <TableRow data-testid="mc-details-row" className="bg-muted/30 hover:bg-muted/30">
+                    <TableCell colSpan={10} className="whitespace-normal border-t border-dashed p-0">
+                      <div className="sticky left-0 max-w-full" style={visibleWidth ? { width: visibleWidth } : undefined}>{panel(raw)}</div>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                </Fragment>
               )
             })}
           </TableBody>
@@ -117,9 +185,9 @@ export default function MyCompetitorsTable({ rows, pending, onDetails, onRefresh
           const c = { ...raw, __open: () => onDetails(raw) }
           const e = c.enrichment
           return (
-            <li key={`card-${c.id}`} className="rounded-lg border border-border/70 p-3" data-testid="mc-card" data-id={c.id}>
+            <li key={`card-${c.id}`} className="rounded-lg border border-border/70 p-3" data-testid="mc-card" data-id={c.id} data-expanded={expandedId === c.id ? "1" : "0"}>
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0"><Identity c={c} /></div>
+                <div className="flex min-w-0 items-start gap-1.5"><DetailsToggle c={raw} expanded={expandedId === c.id} onDetails={onDetails} /><div className="min-w-0"><Identity c={c} /></div></div>
                 <StatusChip enrichment={e} />
               </div>
               <div className="mt-2">{relevance(raw.domain)}</div>
@@ -130,8 +198,9 @@ export default function MyCompetitorsTable({ rows, pending, onDetails, onRefresh
               </dl>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <UpdatedAt enrichment={e} />
-                <RowActions c={raw} busy={pending.has(raw.id)} onDetails={onDetails} onRefresh={onRefresh} onEdit={onEdit} onRemove={onRemove} />
+                <RowActions c={raw} busy={pending.has(raw.id)} onRefresh={onRefresh} onEdit={onEdit} onRemove={onRemove} />
               </div>
+              {expandedId === c.id && !wide ? <div className="-mx-3 mt-3 border-t border-dashed">{panel(raw)}</div> : null}
             </li>
           )
         })}

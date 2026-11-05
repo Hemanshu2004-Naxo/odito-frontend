@@ -113,7 +113,7 @@ describe("Fix first", () => {
       ["errorPages", "critical"], ["highSpam", "critical"], ["keywordsLost", "warning"], ["brokenBacklinks", "warning"], ["trafficDrop", "warning"],
     ])
     const first = issues()[0]
-    expect(first.textContent).toContain("138 pages with backlinks return errors — top: www.asgeyehospital.com/ (403, 852 links)")
+    expect(first.textContent).toContain("138 pages with backlinks return errorsTop one is your home page (403, 852 links).")
     expect(within(first).getByTestId("do-issue-cta").getAttribute("href")).toBe("/app/backlinks/top-pages?status=error")
     expect(within(issues()[1]).getByTestId("do-issue-cta").getAttribute("href")).toBe("/app/referring-domains?tab=toxic")
     expect(within(issues()[3]).getByTestId("do-issue-cta").getAttribute("href")).toBe("/app/backlinks/list?broken=true")
@@ -153,7 +153,7 @@ describe("Fix first", () => {
     const note = await screen.findByTestId("do-fix-partial")
     expect(note.textContent).toContain("Some checks couldn't load")
     expect(issues().map((i) => i.getAttribute("data-rule"))).toEqual(["errorPages"])
-    expect(issues()[0].textContent).toContain("2 pages with backlinks return errors — top: /patna/ (404, 209 links)")
+    expect(issues()[0].textContent).toContain("2 pages with backlinks return errorsTop one is your page /patna/ (404, 209 links).")
     const before = calls().length
     healthy = true
     fireEvent.click(within(note).getByTestId("do-fix-retry"))
@@ -242,7 +242,7 @@ describe("Keyword positions and movement are clickable", () => {
     renderPage() // 2,788 new - 2,423 lost = +365
     await settled()
     const net = screen.getByTestId("do-net")
-    expect(net.textContent).toBe("Net: +365 keywords this month")
+    expect(net.textContent).toBe("This month: net +365 keywords")
     expect(net.getAttribute("data-direction")).toBe("up")
     expect(net.className).toMatch(/emerald/)
   })
@@ -252,7 +252,7 @@ describe("Keyword positions and movement are clickable", () => {
     renderPage()
     await settled()
     const net = screen.getByTestId("do-net")
-    expect(net.textContent).toBe("Net: −8 keywords this month")
+    expect(net.textContent).toBe("This month: net −8 keywords")
     expect(net.getAttribute("data-direction")).toBe("down")
     expect(net.className).toMatch(/red/)
   })
@@ -261,12 +261,12 @@ describe("Keyword positions and movement are clickable", () => {
     serve({ "rank-overview": rankOverview({ organic: organic({ is_new: 5, is_lost: 4 }) }) })
     const { unmount } = renderPage()
     await settled()
-    expect(screen.getByTestId("do-net").textContent).toBe("Net: +1 keyword this month")
+    expect(screen.getByTestId("do-net").textContent).toBe("This month: net +1 keyword")
     unmount()
     serve({ "rank-overview": rankOverview({ organic: organic({ is_new: 4, is_lost: 4 }) }) })
     renderPage()
     await settled()
-    expect(screen.getByTestId("do-net").textContent).toBe("Net: 0 keywords this month")
+    expect(screen.getByTestId("do-net").textContent).toBe("This month: net 0 keywords")
     expect(screen.getByTestId("do-net").getAttribute("data-direction")).toBe("flat")
   })
 })
@@ -299,7 +299,7 @@ describe("Top keywords: All / Non-brand / Brand", () => {
     expect(within(screen.getByRole("group", { name: "Which keywords" })).getByRole("button", { name: "Non-brand" }).getAttribute("aria-pressed")).toBe("true")
     expect(filteredCalls().map((c) => c.opts.query)).toEqual([{ limit: 5, offset: 0, order_by: "ranked_serp_element.serp_item.etv,desc", filters: NONBRAND }])
     expect(screen.queryByTestId("do-brand-hint")).toBeNull()
-    expect(screen.getByTestId("do-view-all-keywords").textContent.trim()).toBe("View all 3,900 keywords")
+    expect(screen.getByTestId("do-view-all-keywords").textContent.trim()).toBe("All 3,900 keywords")
     expect(screen.getByTestId("do-view-all-keywords").getAttribute("href")).toBe("/app/organic-keywords?brand=non")
   })
 
@@ -419,7 +419,7 @@ describe("Backlink overview: clickable tiles, the last 30 days, known-country sh
     expect(within(tile).getByTestId("do-rd-lost").textContent).toBe("−12 lost")
     expect(within(tile).getByTestId("do-rd-new").getAttribute("href")).toBe("/app/referring-domains?tab=new")
     expect(within(tile).getByTestId("do-rd-lost").getAttribute("href")).toBe("/app/referring-domains?tab=lost")
-    expect(within(tile).getByTestId("do-rd-since").textContent).toBe("Since Sep 28")
+    expect(tile.getAttribute("title")).toBe("Since Sep 28")
     expect(bySection("rd-last-30")).toHaveLength(1)
   })
 
@@ -437,25 +437,6 @@ describe("Backlink overview: clickable tiles, the last 30 days, known-country sh
     healthy = true
     fireEvent.click(within(alert).getByRole("button", { name: "Retry" }))
     await waitFor(() => expect(screen.getByTestId("do-rd-new").textContent).toBe("+3 new"))
-  })
-
-  test("top link countries: shares among KNOWN countries only (Worldwide counts), then a muted 'Unknown 40.0%' of ALL links", async () => {
-    renderPage() // 500 links, 200 unknown, IN 150, US 50, WW 40 -> known 300
-    await settled()
-    const list = screen.getAllByTestId("do-country").map((li) => li.textContent.replace(/\s+/g, " ").trim())
-    expect(list[0]).toMatch(/India 50\.0%/)
-    expect(list[1]).toMatch(/United States 16\.7%/)
-    expect(list[2]).toMatch(/Worldwide 13\.3%/)
-    expect(screen.getByTestId("do-country-unknown").textContent).toBe("Unknown 40.0%")
-    expect(screen.getByTestId("do-country-unknown").className).toMatch(/muted/)
-  })
-
-  test("only the top three known countries are listed", async () => {
-    serve({ backlinks: backlinks({ referring_pages: 1000, referring_links_countries: { IN: 400, US: 300, GB: 200, DE: 100 } }) })
-    renderPage()
-    await settled()
-    expect(screen.getAllByTestId("do-country")).toHaveLength(3)
-    expect(screen.queryByTestId("do-country-unknown")).toBeNull()
   })
 })
 

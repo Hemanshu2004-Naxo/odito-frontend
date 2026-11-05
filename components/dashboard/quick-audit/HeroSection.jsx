@@ -70,7 +70,7 @@ export default function HeroSection({ data }) {
       {/* OVERALL SCORE SECTION */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* LEFT BIG SCORE CARD */}
-        <div className="lg:col-span-4 bg-[#111827] border border-[#263244] rounded-[28px] p-10 flex flex-col items-center justify-center text-center relative overflow-hidden">
+        <div className="lg:col-span-4 bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-[28px] p-10 flex flex-col items-center justify-center text-center relative overflow-hidden">
           {/* Glow */}
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/5 via-purple-400/5 to-blue-400/5"></div>
 
@@ -82,7 +82,7 @@ export default function HeroSection({ data }) {
                 cx="120"
                 cy="120"
                 r="100"
-                stroke="#1E293B"
+                className="stroke-slate-200 dark:stroke-[#1E293B]"
                 strokeWidth="14"
                 fill="none"
               ></circle>
@@ -111,8 +111,8 @@ export default function HeroSection({ data }) {
 
             {/* Score */}
             <div className="flex flex-col items-center">
-              <h1 className="text-7xl font-bold text-white">{overallScore}</h1>
-              <p className="text-xs tracking-[0.25em] uppercase text-slate-400 mt-2">
+              <h1 className="text-7xl font-bold text-slate-900 dark:text-white">{overallScore}</h1>
+              <p className="text-xs tracking-[0.25em] uppercase text-slate-600 dark:text-slate-400 mt-2">
                 Overall Score
               </p>
             </div>
@@ -120,10 +120,10 @@ export default function HeroSection({ data }) {
 
           {/* Bottom Text */}
           <div className="mt-8">
-            <h2 className="text-4xl font-semibold text-white">
+            <h2 className="text-4xl font-semibold text-slate-900 dark:text-white">
               {scoreText.status}
             </h2>
-            <p className="text-slate-400 text-lg mt-4 leading-8 max-w-[320px]">
+            <p className="text-slate-600 dark:text-slate-400 text-lg mt-4 leading-8 max-w-[320px]">
               {scoreText.description}
             </p>
           </div>
@@ -132,16 +132,16 @@ export default function HeroSection({ data }) {
         {/* RIGHT CARDS */}
         <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {/* AI VISIBILITY CARD */}
-          <div className="bg-[#111827] border border-[#263244] rounded-2xl p-7">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-2xl p-7">
             <div className="flex justify-between items-start">
-              <span className="text-xs tracking-[0.15em] text-slate-400 font-semibold">
+              <span className="text-xs tracking-[0.15em] text-slate-600 dark:text-slate-400 font-semibold">
                 AI VISIBILITY
               </span>
-              <span className="text-cyan-400 text-xl">🧠</span>
+              <span className="text-cyan-700 dark:text-cyan-400 text-xl">🧠</span>
             </div>
             <div className="mt-8">
-              <h3 className="text-5xl font-bold text-white">{aiScore}</h3>
-              <div className="w-full h-2 bg-slate-800 rounded-full mt-5 overflow-hidden">
+              <h3 className="text-5xl font-bold text-slate-900 dark:text-white">{aiScore}</h3>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full mt-5 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-purple-400"
                   style={{ width: `${aiScore}%` }}
@@ -151,16 +151,16 @@ export default function HeroSection({ data }) {
           </div>
 
           {/* TECHNICAL CARD */}
-          <div className="bg-[#111827] border border-[#263244] rounded-2xl p-7">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-2xl p-7">
             <div className="flex justify-between items-start">
-              <span className="text-xs tracking-[0.15em] text-slate-400 font-semibold">
+              <span className="text-xs tracking-[0.15em] text-slate-600 dark:text-slate-400 font-semibold">
                 TECHNICAL
               </span>
-              <span className="text-green-400 text-xl">⚙️</span>
+              <span className="text-green-700 dark:text-green-400 text-xl">⚙️</span>
             </div>
             <div className="mt-8">
-              <h3 className="text-5xl font-bold text-white">{technicalScore}</h3>
-              <div className="w-full h-2 bg-slate-800 rounded-full mt-5 overflow-hidden">
+              <h3 className="text-5xl font-bold text-slate-900 dark:text-white">{technicalScore}</h3>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full mt-5 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-500"
                   style={{ width: `${technicalScore}%` }}
@@ -170,20 +170,20 @@ export default function HeroSection({ data }) {
           </div>
 
           {/* PERFORMANCE CARD */}
-          <div className="bg-[#111827] border border-[#263244] rounded-2xl p-7">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-2xl p-7">
             <div className="flex justify-between items-start">
-              <span className="text-xs tracking-[0.15em] text-slate-400 font-semibold">
+              <span className="text-xs tracking-[0.15em] text-slate-600 dark:text-slate-400 font-semibold">
                 PERFORMANCE
               </span>
-              <span className="text-yellow-400 text-xl">⚡</span>
+              <span className="text-yellow-700 dark:text-yellow-400 text-xl">⚡</span>
             </div>
             <div className="mt-8">
               {isPerformanceProcessing ? (
                 <h3 className="text-3xl font-bold text-slate-500 animate-pulse">Analyzing...</h3>
               ) : (
-                <h3 className="text-5xl font-bold text-white">{performanceScore ?? '—'}</h3>
+                <h3 className="text-5xl font-bold text-slate-900 dark:text-white">{performanceScore ?? '—'}</h3>
               )}
-              <div className="w-full h-2 bg-slate-800 rounded-full mt-5 overflow-hidden">
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full mt-5 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-orange-500"
                   style={{ width: `${performanceScore ?? 0}%` }}
@@ -193,20 +193,20 @@ export default function HeroSection({ data }) {
           </div>
 
           {/* ACCESSIBILITY CARD */}
-          <div className="bg-[#111827] border border-[#263244] rounded-2xl p-7">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-2xl p-7">
             <div className="flex justify-between items-start">
-              <span className="text-xs tracking-[0.15em] text-slate-400 font-semibold">
+              <span className="text-xs tracking-[0.15em] text-slate-600 dark:text-slate-400 font-semibold">
                 ACCESSIBILITY
               </span>
-              <span className="text-sky-400 text-xl">♿</span>
+              <span className="text-sky-700 dark:text-sky-400 text-xl">♿</span>
             </div>
             <div className="mt-8">
               {isAccessibilityProcessing ? (
                 <h3 className="text-3xl font-bold text-slate-500 animate-pulse">Analyzing...</h3>
               ) : (
-                <h3 className="text-5xl font-bold text-white">{accessibilityScore ?? '—'}</h3>
+                <h3 className="text-5xl font-bold text-slate-900 dark:text-white">{accessibilityScore ?? '—'}</h3>
               )}
-              <div className="w-full h-2 bg-slate-800 rounded-full mt-5 overflow-hidden">
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full mt-5 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-400"
                   style={{ width: `${accessibilityScore ?? 0}%` }}
@@ -216,16 +216,16 @@ export default function HeroSection({ data }) {
           </div>
 
           {/* ON PAGE CARD (replacing Local SEO) */}
-          <div className="bg-[#111827] border border-[#263244] rounded-2xl p-7">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-2xl p-7">
             <div className="flex justify-between items-start">
-              <span className="text-xs tracking-[0.15em] text-slate-400 font-semibold">
+              <span className="text-xs tracking-[0.15em] text-slate-600 dark:text-slate-400 font-semibold">
                 ON PAGE
               </span>
-              <span className="text-cyan-300 text-xl">📍</span>
+              <span className="text-cyan-700 dark:text-cyan-300 text-xl">📍</span>
             </div>
             <div className="mt-8">
-              <h3 className="text-5xl font-bold text-white">{onPageScore}</h3>
-              <div className="w-full h-2 bg-slate-800 rounded-full mt-5 overflow-hidden">
+              <h3 className="text-5xl font-bold text-slate-900 dark:text-white">{onPageScore}</h3>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full mt-5 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-sky-400"
                   style={{ width: `${onPageScore}%` }}
@@ -235,16 +235,16 @@ export default function HeroSection({ data }) {
           </div>
 
           {/* SECURITY CARD */}
-          <div className="bg-[#111827] border border-[#263244] rounded-2xl p-7">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-2xl p-7">
             <div className="flex justify-between items-start">
-              <span className="text-xs tracking-[0.15em] text-slate-400 font-semibold">
+              <span className="text-xs tracking-[0.15em] text-slate-600 dark:text-slate-400 font-semibold">
                 SECURITY
               </span>
-              <span className="text-red-400 text-xl">🔒</span>
+              <span className="text-red-600 dark:text-red-400 text-xl">🔒</span>
             </div>
             <div className="mt-8">
-              <h3 className="text-5xl font-bold text-white">{securityScore}</h3>
-              <div className="w-full h-2 bg-slate-800 rounded-full mt-5 overflow-hidden">
+              <h3 className="text-5xl font-bold text-slate-900 dark:text-white">{securityScore}</h3>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full mt-5 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-gradient-to-r from-red-400 to-pink-400"
                   style={{ width: `${securityScore}%` }}
@@ -257,35 +257,35 @@ export default function HeroSection({ data }) {
 
       {/* BOTTOM STATS */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-5 mt-8">
-        <div className="bg-[#111827] border border-[#263244] rounded-2xl p-8 text-center">
-          <p className="text-xs tracking-[0.2em] text-slate-400 uppercase">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-2xl p-8 text-center">
+          <p className="text-xs tracking-[0.2em] text-slate-600 dark:text-slate-400 uppercase">
             Total Issues
           </p>
-          <h2 className="text-5xl font-bold text-white mt-4">
+          <h2 className="text-5xl font-bold text-slate-900 dark:text-white mt-4">
             {totalIssues}
           </h2>
         </div>
         <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-8 text-center">
-          <p className="text-xs tracking-[0.2em] text-red-400 uppercase">
+          <p className="text-xs tracking-[0.2em] text-red-600 dark:text-red-400 uppercase">
             Critical
           </p>
-          <h2 className="text-5xl font-bold text-red-400 mt-4">
+          <h2 className="text-5xl font-bold text-red-600 dark:text-red-400 mt-4">
             {criticalIssues}
           </h2>
         </div>
         <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-8 text-center">
-          <p className="text-xs tracking-[0.2em] text-yellow-400 uppercase">
+          <p className="text-xs tracking-[0.2em] text-yellow-700 dark:text-yellow-400 uppercase">
             Warnings
           </p>
-          <h2 className="text-5xl font-bold text-yellow-400 mt-4">
+          <h2 className="text-5xl font-bold text-yellow-700 dark:text-yellow-400 mt-4">
             {warningIssues}
           </h2>
         </div>
         <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-8 text-center">
-          <p className="text-xs tracking-[0.2em] text-green-400 uppercase">
+          <p className="text-xs tracking-[0.2em] text-green-700 dark:text-green-400 uppercase">
             Passed
           </p>
-          <h2 className="text-5xl font-bold text-green-400 mt-4">
+          <h2 className="text-5xl font-bold text-green-700 dark:text-green-400 mt-4">
             {passedIssues}
           </h2>
         </div>
@@ -294,61 +294,61 @@ export default function HeroSection({ data }) {
       {/* RECOMMENDATIONS SECTION (HIDDEN FOR NOW) */}
       {/* 
       <section className="mt-8">
-        <div className="bg-[#111827] border border-[#263244] rounded-[28px] p-10">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-[28px] p-10">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold text-white">Recommendations</h2>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Recommendations</h2>
             <div className="flex space-x-4">
-              <p className="text-slate-400">
+              <p className="text-slate-600 dark:text-slate-400">
                 <span className="text-red-500 font-bold">12</span> Issues Found
               </p>
-              <p className="text-slate-400">
+              <p className="text-slate-600 dark:text-slate-400">
                 <span className="text-blue-500 font-bold">52</span> Hidden Issues
               </p>
             </div>
           </div>
 
           <ul className="mt-8 space-y-4">
-            <li className="flex justify-between items-center py-2 border-b border-[#263244] last:border-b-0">
+            <li className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-[#263244] last:border-b-0">
               <div className="flex items-center space-x-3">
                 <span className="text-slate-500 text-lg">1.</span>
-                <p className="text-blue-400 text-lg">Add meta descriptions to improve SEO visibility</p>
+                <p className="text-blue-700 dark:text-blue-400 text-lg">Add meta descriptions to improve SEO visibility</p>
               </div>
               <div className="flex items-center space-x-3">
-                <span className="text-slate-400 text-sm">SEO</span>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-500/20 text-red-400">
+                <span className="text-slate-600 dark:text-slate-400 text-sm">SEO</span>
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-500/20 text-red-600 dark:text-red-400">
                   Critical
                 </span>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-500/20 text-red-400">
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-500/20 text-red-600 dark:text-red-400">
                   High Priority
                 </span>
               </div>
             </li>
-            <li className="flex justify-between items-center py-2 border-b border-[#263244] last:border-b-0">
+            <li className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-[#263244] last:border-b-0">
               <div className="flex items-center space-x-3">
                 <span className="text-slate-500 text-lg">2.</span>
-                <p className="text-blue-400 text-lg">Optimize images for faster page load times</p>
+                <p className="text-blue-700 dark:text-blue-400 text-lg">Optimize images for faster page load times</p>
               </div>
               <div className="flex items-center space-x-3">
-                <span className="text-slate-400 text-sm">Performance</span>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-orange-500/20 text-orange-400">
+                <span className="text-slate-600 dark:text-slate-400 text-sm">Performance</span>
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-orange-500/20 text-orange-700 dark:text-orange-400">
                   Medium
                 </span>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-orange-500/20 text-orange-400">
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-orange-500/20 text-orange-700 dark:text-orange-400">
                   Med Priority
                 </span>
               </div>
             </li>
-            <li className="flex justify-between items-center py-2 border-b border-[#263244] last:border-b-0">
+            <li className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-[#263244] last:border-b-0">
               <div className="flex items-center space-x-3">
                 <span className="text-slate-500 text-lg">3.</span>
-                <p className="text-blue-400 text-lg">Add alt text to all images for accessibility</p>
+                <p className="text-blue-700 dark:text-blue-400 text-lg">Add alt text to all images for accessibility</p>
               </div>
               <div className="flex items-center space-x-3">
-                <span className="text-slate-400 text-sm">Accessibility</span>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-green-500/20 text-green-400">
+                <span className="text-slate-600 dark:text-slate-400 text-sm">Accessibility</span>
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-green-500/20 text-green-700 dark:text-green-400">
                   Low
                 </span>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-green-500/20 text-green-400">
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-green-500/20 text-green-700 dark:text-green-400">
                   Low Priority
                 </span>
               </div>

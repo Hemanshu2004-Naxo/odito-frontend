@@ -74,7 +74,7 @@ describe('SidebarGroupItem (Off-Page: the five backlink pages)', () => {
     ['/app/backlinks/list', 'Backlinks'],
     ['/app/backlinks/anchors', 'Anchors'],
     ['/app/referring-domains', 'Referring Domains'],
-    ['/app/backlinks/top-pages', 'Top Pages'],
+    ['/app/backlinks/top-pages', 'Top linked pages'],
   ])('opens by itself on %s, and that page is the current one', (path, label) => {
     mockPathname = path
     render(<SidebarGroupItem item={offPage} />)

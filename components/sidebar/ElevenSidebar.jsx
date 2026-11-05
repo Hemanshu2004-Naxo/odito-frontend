@@ -38,12 +38,15 @@ export function ElevenSidebar({ user }) {
     setMobileOpen(false)
   }, [pathname, setMobileOpen])
 
-  const visibleSections = sidebarSections.map((section) => ({
-    ...section,
-    items: section.items.filter((item) =>
-      item.id === "pre-audit" ? !!activeProject?.pre_audit_id : true
-    ),
-  }))
+  // A section marked `hidden` in sidebar-config.js is not shown at all (its pages and routes are untouched).
+  const visibleSections = sidebarSections
+    .filter((section) => !section.hidden)
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) =>
+        item.id === "pre-audit" ? !!activeProject?.pre_audit_id : true
+      ),
+    }))
 
   // Keyboard shortcut: Ctrl/Cmd + B to toggle
   const handleKeyDown = useCallback(

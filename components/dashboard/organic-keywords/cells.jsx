@@ -117,7 +117,7 @@ export function UrlCell({ row, className }) {
   )
 }
 
-const FEATURE_ICON = {
+export const FEATURE_ICON = {
   ai_overview: Sparkles,
   featured_snippet: FileText,
   local_pack: MapPin,

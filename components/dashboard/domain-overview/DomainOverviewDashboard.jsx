@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useProject } from "@/contexts/ProjectContext"
 import { useDomainOverview } from "@/hooks/useDomainOverview"
 import { useDomainHub } from "@/hooks/useDomainHub"
@@ -12,10 +12,14 @@ import FixFirstPanel from "./FixFirstPanel"
 import TopPagesCard from "./TopPagesCard"
 import TrafficTrendCard from "./TrafficTrendCard"
 import KeywordPositionsCard from "./KeywordPositionsCard"
-import MovementStrip from "./MovementStrip"
 import TopKeywordsCard from "./TopKeywordsCard"
 import CompetitorsCard from "./CompetitorsCard"
 import BacklinksCard from "./BacklinksCard"
+import OneLineBanner from "./OneLineBanner"
+import { mapBacklinkSummary } from "../backlinks-overview/mapBacklinkSummary"
+import { downloadCsv } from "../referring-domains/exportCsv"
+import { buildOverviewCsv, overviewCsvFileName } from "./exportOverview"
+import { buildOneLine } from "./overviewInsights"
 import { mapDomainOverview } from "./mapDomainOverview"
 import { domainFromUrl } from "./format"
 
@@ -73,8 +77,18 @@ function ProjectDomainOverview({ projectId, project }) {
   // Every section rejects a project whose URL has no public domain in the same way: say it once.
   const noDomain = entries.every(([, s]) => s.status === "error" && s.error?.code === "INVALID_TARGET")
 
+  // The backlinks summary is read once here: the KPI row, the banner, Backlink health and the export all use it.
+  const backlinkSummary = useMemo(() => mapBacklinkSummary(sections.backlinks?.data?.result), [sections.backlinks?.data])
+  const errorTop = hub.topPages.rows.find((r) => r.pinned) ?? null
+  const oneLine = buildOneLine({ kpis: vm.kpis, trend: vm.trend, issues: hub.issues.issues, errorTop })
+  const oneLineLoading = sections.rankOverview?.status === "loading" || sections.history?.status === "loading" || hub.issues.pending.length > 0
+  const exportCsv = () => downloadCsv(
+    overviewCsvFileName(domain),
+    buildOverviewCsv({ domain, market, vm, issues: hub.issues.issues, topPages: hub.topPages.rows, summary: backlinkSummary }),
+  )
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <DomainOverviewHeader
         domain={domain}
         market={market}
@@ -84,31 +98,33 @@ function ProjectDomainOverview({ projectId, project }) {
         refreshing={refreshClicked && isFetching}
         refreshNote={refreshNote}
         onRefresh={() => { setRefreshClicked(true); refreshAll() }}
+        onExport={exportCsv}
+        canExport={loaded.length > 0}
       />
 
       {noDomain ? (
         <ErrorNote>This project&apos;s website URL does not have a public domain name, so its overview cannot be loaded. Update the project URL in Settings.</ErrorNote>
       ) : (
         <>
-          <KpiCards vm={vm} sections={sections} />
+          <OneLineBanner line={oneLine} loading={oneLineLoading} />
+
+          <KpiCards vm={vm} sections={sections} summary={backlinkSummary} last30={hub.last30} />
 
           <FixFirstPanel issues={hub.issues} />
 
-          <div className="grid grid-cols-1 gap-3 @min-[900px]/main:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="grid grid-cols-1 gap-4 @min-[900px]/main:grid-cols-2">
             <TrafficTrendCard state={sections.history} trend={vm.trend} />
-            <KeywordPositionsCard state={sections.rankOverview} positions={vm.positions} hasRankingData={vm.hasRankingData} />
+            <KeywordPositionsCard state={sections.rankOverview} positions={vm.positions} hasRankingData={vm.hasRankingData} movement={vm.movement} keywordsTotal={vm.kpis.keywords} />
           </div>
 
-          <MovementStrip state={sections.rankOverview} movement={vm.movement} hasRankingData={vm.hasRankingData} />
-
-          <div className="grid grid-cols-1 gap-3 @min-[900px]/main:grid-cols-2">
-            <TopKeywordsCard state={sections.rankedKeywords} topKeywords={vm.topKeywords} brand={hub.brand} />
+          <div className="grid grid-cols-1 gap-4 @min-[900px]/main:grid-cols-2">
+            <TopKeywordsCard state={sections.rankedKeywords} topKeywords={vm.topKeywords} brand={hub.brand} totalTraffic={vm.kpis.traffic} />
             <TopPagesCard topPages={hub.topPages} />
           </div>
 
           <CompetitorsCard />
 
-          <BacklinksCard state={sections.backlinks} last30={hub.last30} anchorMix={hub.anchorMix} />
+          <BacklinksCard state={sections.backlinks} summary={backlinkSummary} last30={hub.last30} anchorMix={hub.anchorMix} />
         </>
       )}
     </div>

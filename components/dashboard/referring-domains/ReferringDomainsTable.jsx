@@ -229,9 +229,9 @@ export default function ReferringDomainsTable({
   const empty = noMatch ? emptyMessage({ state, noFilters, listEmpty }) : typeOnlyEmpty ? { kind: "filtered", text: "No domains match these filters" } : null
 
   return (
-    <section className="rounded-xl border border-border/60 bg-card" aria-label="Referring domains" data-testid="rd-results">
+    <section className="rounded-2xl border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]" aria-label="Referring domains" data-testid="rd-results">
       <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-4">
-        <h2 className="text-base font-semibold">Referring domains</h2>
+        <h2 className="text-[15px] font-semibold tracking-tight">Referring domains</h2>
         <p className="text-sm text-muted-foreground" aria-live="polite" data-testid="rd-showing">{showing ?? <Skel className="inline-block h-4 w-44 align-middle" />}</p>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 pt-1">
@@ -274,7 +274,7 @@ export default function ReferringDomainsTable({
       ) : (
         <div className={cn("mt-2 transition-opacity", page.stale && "opacity-60")} aria-busy={page.stale || undefined} data-testid="rd-table" data-stale={page.stale ? "true" : "false"}>
           <Table className="min-w-[1000px]">
-            <TableHeader>
+            <TableHeader className="bg-muted/50 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground">
               <TableRow>
                 <TableHead className="w-8">
                   <input

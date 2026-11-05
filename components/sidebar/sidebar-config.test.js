@@ -18,7 +18,7 @@ describe('sidebar config: Domain Overview', () => {
     const items = section('domain-overview').items
     expect(items.slice(0, 5).map((i) => [i.id, i.label, i.href])).toEqual([
       ['domain-overview', 'Domain Overview', '/app/domain-overview'],
-      ['traffic-history', 'Traffic History', '/app/traffic-history'],
+      ['traffic-history', 'Traffic', '/app/traffic-history'],
       ['organic-keywords', 'Organic Keywords', '/app/organic-keywords'],
       ['competitors', 'Competitors', '/app/competitors'],
       ['off-page', 'Off-Page', '/app/backlinks/overview'],
@@ -56,14 +56,14 @@ describe('sidebar config: the Off-Page group (the five backlink pages)', () => {
     expect(items.at(-1).id).toBe('off-page')
   })
 
-  it('lists Overview, Backlinks, Anchors, Referring Domains and Top Pages in that order, on their unchanged routes', () => {
+  it('lists Overview, Backlinks, Anchors, Referring Domains and Top linked pages in that order, on their unchanged routes', () => {
     const group = section('domain-overview').items.find((i) => i.id === 'off-page')
     expect(group.children.map((c) => [c.label, c.href])).toEqual([
       ['Overview', '/app/backlinks/overview'],
       ['Backlinks', '/app/backlinks/list'],
       ['Anchors', '/app/backlinks/anchors'],
       ['Referring Domains', '/app/referring-domains'],
-      ['Top Pages', '/app/backlinks/top-pages'],
+      ['Top linked pages', '/app/backlinks/top-pages'],
     ])
   })
 
@@ -87,5 +87,18 @@ describe('sidebar config: the Off-Page group (the five backlink pages)', () => {
     expect(new Set(sectionIds).size).toBe(sectionIds.length)
     const itemIds = sidebarSections.flatMap((s) => s.items.flatMap((i) => [i.id, ...(i.children ?? []).map((c) => c.id)]))
     expect(new Set(itemIds).size).toBe(itemIds.length)
+  })
+})
+
+describe('hidden sections', () => {
+  it('Leads and Social Media are marked hidden (not removed: their pages and routes still exist)', () => {
+    expect(section('leads')?.hidden).toBe(true)
+    expect(section('social-media')?.hidden).toBe(true)
+  })
+  it('every other section is still shown', () => {
+    const shown = sidebarSections.filter((s) => !s.hidden).map((s) => s.id)
+    expect(shown).not.toContain('leads')
+    expect(shown).not.toContain('social-media')
+    expect(shown).toEqual(expect.arrayContaining(['domain-overview', 'google-visibility']))
   })
 })

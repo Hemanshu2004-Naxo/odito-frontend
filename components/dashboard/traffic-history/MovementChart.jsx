@@ -1,55 +1,49 @@
 "use client"
 
-import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { Panel } from "@/components/dashboard/shared/parts"
+import { Bar, BarChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from "recharts"
+import OverviewCard, { Note } from "../domain-overview/OverviewCard"
 import { SectionBoundary, Skel } from "../domain-overview/SectionState"
-import { formatCompact, formatExact } from "../domain-overview/format"
-import { MOVEMENT_COLORS } from "./chartColors"
-import { Legend, Swatch, TooltipRow, TooltipShell, chartClass } from "./ChartParts"
+import { formatExact } from "../domain-overview/format"
+import { TooltipRow, TooltipShell } from "./ChartParts"
+import { KeyLegend } from "./DistributionChart"
 import { buildMovement } from "./mapTrafficHistory"
-
-const SERIES = [
-  { key: "new", label: "New", color: MOVEMENT_COLORS.new },
-  { key: "up", label: "Improved", color: MOVEMENT_COLORS.up },
-  { key: "down", label: "Declined", color: MOVEMENT_COLORS.down },
-  { key: "lost", label: "Lost", color: MOVEMENT_COLORS.lost },
-]
+import { MOVEMENT_SERIES, describeMovement, shortMonth } from "./trafficStory"
 
 function MovementTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
     <TooltipShell title={d.longLabel}>
-      {SERIES.map((s) => (
-        <TooltipRow key={s.key} swatch={<Swatch color={s.color} />} name={s.label}>{formatExact(d[s.key] === null ? null : Math.abs(d[s.key]))}</TooltipRow>
+      {MOVEMENT_SERIES.map((s) => (
+        <TooltipRow key={s.key} name={s.label}>{formatExact(d[s.key] === null ? null : Math.abs(d[s.key]))}</TooltipRow>
       ))}
     </TooltipShell>
   )
 }
 
 /**
- * "Keyword movement per month": keywords that are New or Improved above the zero line (greens), keywords that Declined or were
- * Lost below it (reds), stacked per month. The reds are plotted as negatives; the tooltip and legend show them as plain counts.
+ * "Keyword movement each month": New and Improved above the line (greens), Declined and Lost below it (reds), stacked per month, and one
+ * sentence on how many months lost more than they gained. The reds are plotted as negatives; the tooltip shows them as plain counts.
  */
 export default function MovementChart({ state, range }) {
-  const data = buildMovement(range)
+  const data = buildMovement(range).map((d, i) => ({ ...d, shortLabel: shortMonth(range[i]) }))
   const hasData = data.some((d) => [d.new, d.up, d.down, d.lost].some((v) => v !== null))
   return (
-    <Panel title="Keyword movement per month" description="New and improved keywords above the line, declined and lost below it" action={<Legend items={SERIES} label="Movement types" />} className="min-w-0">
-      <SectionBoundary state={state} skeleton={<Skel className="h-[280px] w-full rounded-lg" />} empty={!hasData} emptyMessage="No keyword movement data for this range.">
-        <div className={chartClass("h-[280px]")} data-testid="th-movement-chart">
+    <OverviewCard title="Keyword movement each month" description="Above the line: new and improved · below: declined and lost" className="h-full" testId="th-movement-card">
+      <SectionBoundary state={state} skeleton={<Skel className="h-[240px] w-full rounded-lg" />} empty={!hasData} emptyMessage="No keyword movement data for this range.">
+        <KeyLegend items={MOVEMENT_SERIES} label="Movement types" />
+        <div className="mt-3 h-[220px] w-full [&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground [&_.recharts-cartesian-axis-tick-value]:text-[10px]" data-testid="th-movement-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} stackOffset="sign" margin={{ top: 8, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
-              <CartesianGrid vertical={false} className="stroke-border" strokeOpacity={0.7} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
-              <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={(v) => formatCompact(Math.abs(v))} />
-              <Tooltip content={<MovementTooltip />} cursor={{ fill: "currentColor", fillOpacity: 0.06 }} />
-              <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.35} />
-              {SERIES.map((s) => <Bar key={s.key} dataKey={s.key} stackId="movement" fill={s.color} maxBarSize={24} isAnimationActive={false} />)}
+            <BarChart data={data} stackOffset="sign" margin={{ top: 4, right: 0, left: 0, bottom: 0 }} barCategoryGap="28%" accessibilityLayer>
+              <XAxis dataKey="shortLabel" tickLine={false} axisLine={false} interval={0} minTickGap={0} />
+              <Tooltip content={<MovementTooltip />} cursor={{ fill: "var(--muted-foreground)", fillOpacity: 0.06 }} />
+              <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.5} />
+              {MOVEMENT_SERIES.map((s) => <Bar key={s.key} dataKey={s.key} stackId="movement" fill={s.color} isAnimationActive={false} />)}
             </BarChart>
           </ResponsiveContainer>
         </div>
+        <Note className="mt-3" testId="th-movement-note">{describeMovement(range)}</Note>
       </SectionBoundary>
-    </Panel>
+    </OverviewCard>
   )
 }

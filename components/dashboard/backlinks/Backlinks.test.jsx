@@ -114,10 +114,11 @@ describe("Backlinks: first load", () => {
     expect(screen.queryByRole("alert")).toBeNull()
   })
 
-  test("header: last updated, Refresh and Export", async () => {
+  test("header: breadcrumb, updated, Refresh and Export", async () => {
     renderPage()
     await screen.findAllByTestId("bl-row")
-    expect(screen.getByTestId("bl-updated").textContent).toMatch(/^Last updated .*2026/)
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toBe("Dashboard/SEO/Off-page")
+    expect(screen.getByTestId("bl-updated").textContent).toMatch(/^Updated .*2026/)
     expect(screen.getByTestId("bl-refresh")).toBeTruthy()
     expect(screen.getByTestId("bl-export")).toBeTruthy()
   })
@@ -312,28 +313,7 @@ describe("Backlinks: filters (server-side, debounced, limited to 8)", () => {
     await waitFor(() => expect(lastList().list.filters).toEqual([["anchor", "like", "%eye hospital%"], "and", ["url_to", "like", "%/hospital/%"]]))
   })
 
-  test("numbers apply on blur or Enter only; a wrong one is explained and not sent", async () => {
-    renderPage()
-    await screen.findAllByTestId("bl-row")
-    const rank = screen.getByRole("textbox", { name: "Minimum domain rank" })
-    fireEvent.change(rank, { target: { value: "2" } })
-    fireEvent.change(rank, { target: { value: "25" } })
-    fireEvent.change(rank, { target: { value: "250" } })
-    await sleep(600)
-    expect(listCalls()).toHaveLength(1)
-    fireEvent.blur(rank)
-    await waitFor(() => expect(lastList().list.filters).toEqual(["domain_from_rank", ">=", 250]))
-    const spam = screen.getByRole("textbox", { name: "Maximum spam score" })
-    fireEvent.change(spam, { target: { value: "500" } })
-    fireEvent.keyDown(spam, { key: "Enter" })
-    expect(await screen.findByText("Spam score: enter a whole number from 0 to 100.")).toBeTruthy()
-    expect(listCalls()).toHaveLength(2) // that one was not sent: only the rank filter is
-    fireEvent.change(spam, { target: { value: "30" } })
-    fireEvent.keyDown(spam, { key: "Enter" })
-    await waitFor(() => expect(lastList().list.filters).toEqual([["domain_from_rank", ">=", 250], "and", ["backlink_spam_score", "<=", 30]]))
-  })
-
-  test("link type chips, item type and placement multi-selects, hide spammy and the date", async () => {
+  test("link type chips and the item type and placement multi-selects", async () => {
     renderPage()
     await screen.findAllByTestId("bl-row")
     fireEvent.click(chipsGroup("bl-filter-follow", "Nofollow"))
@@ -343,26 +323,17 @@ describe("Backlinks: filters (server-side, debounced, limited to 8)", () => {
     await waitFor(() => expect(lastList().list.filters).toContainEqual(["item_type", "in", ["anchor", "image"]]))
     fireEvent.click(chipsGroup("bl-filter-placement", "Footer"))
     await waitFor(() => expect(lastList().list.filters).toContainEqual(["semantic_location", "in", ["footer"]]))
-    fireEvent.click(screen.getByTestId("bl-hide-spammy"))
-    await waitFor(() => expect(lastList().list.filters).toContainEqual(["backlink_spam_score", "<", 30]))
-    const since = screen.getByTestId("bl-since")
-    fireEvent.change(since, { target: { value: "2025-01-15" } })
-    fireEvent.blur(since)
-    await waitFor(() => expect(lastList().list.filters).toContainEqual(["first_seen", ">=", "2025-01-15"]))
-    expect(lastList().list.filters.filter((c) => Array.isArray(c) && c.length === 3)).toHaveLength(5)
+    expect(lastList().list.filters.filter((c) => Array.isArray(c) && c.length === 3)).toHaveLength(3)
   })
 
-  test("source country: type a name, pick it; the filter is the country code, and it can be removed", async () => {
+  test("domain rank, spam score, country, first-seen date and hide-spammy have no control; from a URL they still apply as removable chips", async () => {
+    window.history.replaceState(null, "", "/app/backlinks/list?rank=50")
     renderPage()
     await screen.findAllByTestId("bl-row")
-    fireEvent.change(within(screen.getByTestId("bl-filter-country")).getByRole("combobox"), { target: { value: "indi" } })
-    fireEvent.click(await screen.findByRole("option", { name: /India(?!n)/ }).then((o) => within(o).getByRole("button")))
-    await waitFor(() => expect(lastList().list.filters).toEqual(["domain_from_country", "in", ["IN"]]))
-    fireEvent.change(within(screen.getByTestId("bl-filter-country")).getByRole("combobox"), { target: { value: "united st" } })
-    fireEvent.click(within(await screen.findByRole("option", { name: /United States/ })).getByRole("button"))
-    await waitFor(() => expect(lastList().list.filters).toEqual(["domain_from_country", "in", ["IN", "US"]]))
-    fireEvent.click(screen.getByRole("button", { name: "Remove India" }))
-    await waitFor(() => expect(lastList().list.filters).toEqual(["domain_from_country", "in", ["US"]]))
+    for (const name of ["Minimum domain rank", "Maximum spam score"]) expect(screen.queryByRole("textbox", { name })).toBeNull()
+    for (const id of ["bl-hide-spammy", "bl-since", "bl-filter-country"]) expect(screen.queryByTestId(id)).toBeNull()
+    expect(lastList().list.filters).toEqual(["domain_from_rank", ">=", 50])
+    expect(screen.getAllByTestId("ok-chip").map((c) => c.textContent)).toEqual(["Domain rank ≥ 50"])
   })
 
   test("applied filters are removable chips, plus 'Clear all'; going back to a view already loaded is not a request", async () => {
@@ -370,11 +341,11 @@ describe("Backlinks: filters (server-side, debounced, limited to 8)", () => {
     await screen.findAllByTestId("bl-row")
     fireEvent.click(chipsGroup("bl-filter-follow", "Dofollow"))
     await waitFor(() => expect(listCalls()).toHaveLength(2))
-    fireEvent.click(screen.getByTestId("bl-hide-spammy"))
+    fireEvent.click(chipsGroup("bl-filter-placement", "Footer"))
     await waitFor(() => expect(listCalls()).toHaveLength(3))
     const chips = screen.getAllByTestId("ok-chip")
-    expect(chips.map((c) => c.textContent)).toEqual(["Dofollow", "Spammy links hidden"])
-    fireEvent.click(screen.getByRole("button", { name: "Remove filter: Spammy links hidden" }))
+    expect(chips.map((c) => c.textContent)).toEqual(["Dofollow", "Placement: Footer"])
+    fireEvent.click(screen.getByRole("button", { name: "Remove filter: Placement: Footer" }))
     await waitFor(() => expect(screen.getAllByTestId("ok-chip").map((c) => c.textContent)).toEqual(["Dofollow"]))
     expect(listCalls()).toHaveLength(3) // the dofollow-only view was already loaded
     fireEvent.click(screen.getByTestId("ok-clear-all"))
@@ -384,27 +355,27 @@ describe("Backlinks: filters (server-side, debounced, limited to 8)", () => {
   })
 
   test("at most 8 conditions, counting the tab's own: the 9th is refused with a message and NOTHING is sent", async () => {
-    window.history.replaceState(null, "", "/app/backlinks/list?q=a&anchor=b&target=c&follow=dofollow&types=image&place=footer&rank=5&spam=40")
+    window.history.replaceState(null, "", "/app/backlinks/list?q=a&anchor=b&target=c&follow=dofollow&types=image&rank=5&spam=40&since=2025-01-01")
     renderPage()
     await screen.findAllByTestId("bl-row")
     expect(listCalls()).toHaveLength(1)
     expect(lastList().list.filters).toHaveLength(15) // 8 conditions joined with 7 "and"
-    fireEvent.click(screen.getByTestId("bl-hide-spammy"))
+    fireEvent.click(chipsGroup("bl-filter-placement", "Footer"))
     expect((await screen.findByTestId("bl-too-many")).textContent).toBe("Max 8 filters — remove one to add another")
     await sleep(200)
     expect(listCalls()).toHaveLength(1)
     expect(rowEls().length).toBe(50) // the rows stay
     expect(screen.getByTestId("bl-results").querySelector("[aria-busy=true]")).toBeNull()
-    fireEvent.click(screen.getByRole("button", { name: "Remove filter: Spammy links hidden" }))
+    fireEvent.click(screen.getByRole("button", { name: "Remove filter: Placement: Footer" }))
     await waitFor(() => expect(screen.queryByTestId("bl-too-many")).toBeNull())
   })
 
   test("the tab's filter counts: 7 filters + the Broken tab is fine, and one more is not", async () => {
-    window.history.replaceState(null, "", "/app/backlinks/list?tab=broken&q=a&anchor=b&target=c&follow=dofollow&types=image&place=footer&rank=5")
+    window.history.replaceState(null, "", "/app/backlinks/list?tab=broken&q=a&anchor=b&target=c&follow=dofollow&types=image&rank=5&spam=40")
     renderPage()
     await screen.findAllByTestId("bl-row")
     expect(lastList().list.filters.filter((c) => Array.isArray(c) && c.length === 3)).toHaveLength(8)
-    fireEvent.click(screen.getByTestId("bl-hide-spammy"))
+    fireEvent.click(chipsGroup("bl-filter-placement", "Footer"))
     expect((await screen.findByTestId("bl-too-many")).textContent).toMatch(/Max 8 filters/)
     expect(listCalls()).toHaveLength(1)
   })

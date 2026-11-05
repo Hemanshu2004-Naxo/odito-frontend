@@ -22,6 +22,27 @@ export function useKeywords(projectId) {
 }
 
 /**
+ * One tracked keyword's expanded-row data. `enabled` is true only while the row is open, so nothing is fetched for a collapsed row and
+ * nothing is fetched on page load. The key carries the project AND the keyword id: a project switch can never show another project's
+ * answer, and re-opening a row inside `staleTime` is answered from memory (and the server answers a repeat from its own cache, so a
+ * stale refetch never buys the provider call again). The ranking list above is a separate query and never waits for this one.
+ * No abort signal on purpose: collapsing a row mid-load must not cancel a request the server is already paying for.
+ */
+export function useTrackedKeywordDetails({ projectId, keywordId, enabled }) {
+  return useQuery({
+    queryKey: queryKeys.keywords.detail(projectId, keywordId),
+    queryFn: () => apiService.getTrackedKeywordDetails(projectId, keywordId),
+    select: (response) => response?.data ?? null,
+    enabled: !!enabled && !!projectId && !!keywordId,
+    staleTime: staleTimes.STANDARD,
+    gcTime: gcTimes.STANDARD,
+    refetchOnWindowFocus: false,
+    // The user's "Try again" is the retry policy: an automatic retry would only delay the error (and can repeat a billed provider call).
+    retry: false,
+  })
+}
+
+/**
  * Optimistic INSERT of a placeholder row, but never an optimistic RANK — the
  * distinction the original (non-optimistic) version of this hook was built
  * around still holds: a real DataForSEO lookup runs server-side and its
@@ -157,6 +178,7 @@ export function useDeleteKeyword(projectId) {
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey })
+      queryClient.removeQueries({ queryKey: queryKeys.keywords.details(projectId) })
     },
   })
 }

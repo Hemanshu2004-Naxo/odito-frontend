@@ -34,13 +34,16 @@ export default function MonthlyVolumeChart({ months, keyword }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <table className="sr-only">
+      {/* A <div> carries sr-only: a clipped <table> keeps its own width and would still widen the page on a phone. */}
+      <div className="sr-only">
+      <table>
         <caption>Monthly searches for {keyword}</caption>
         <thead><tr><th scope="col">Month</th><th scope="col">Searches</th></tr></thead>
         <tbody>
           {months.map((m) => <tr key={m.key}><th scope="row">{m.label}</th><td>{m.volume === null ? MISSING : formatExact(m.volume)}</td></tr>)}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

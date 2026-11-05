@@ -59,16 +59,17 @@ describe("buildIssueSources -> buildDashboardIssues (the real asgeyehospital.com
 
   test("the error-pages issue names the top page of the Fix-first list (the www homepage is a 403 with 852 links -> critical)", () => {
     const i = run().issues.find((x) => x.rule === "errorPages")
-    expect(i.title).toBe("138 pages with backlinks return errors — top: www.asgeyehospital.com/ (403, 852 links)")
+    expect(i.title).toBe("138 pages with backlinks return errors")
+    expect(i.why).toBe("Top one is your home page (403, 852 links). Unblock or redirect it so those links count again.")
     expect(i.severity).toBe("critical")
   })
 
   test("the broken-backlinks issue uses the summary's totals (1,643 of 18,343 = 9.0%)", () => {
-    expect(run().issues.find((x) => x.rule === "brokenBacklinks").title).toBe("9.0% of backlinks point to broken URLs (1,643 links)")
+    expect(run().issues.find((x) => x.rule === "brokenBacklinks").title).toBe("1,643 backlinks point to broken URLs (9.0%)")
   })
 
   test("the high-spam share is of the summary's referring domains (3,002 of 3,965)", () => {
-    expect(run().issues.find((x) => x.rule === "highSpam").title).toBe("75.7% of referring domains have a high spam score (3,002)")
+    expect(run().issues.find((x) => x.rule === "highSpam").title).toBe("3,002 linking sites look spammy (75.7%)")
   })
 
   test("no error pages: that rule is checked and silent; a failed list keeps the count's issue without the top page", () => {

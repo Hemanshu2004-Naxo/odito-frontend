@@ -12,7 +12,7 @@ import { MERGE_HINT, TABS } from "./constants"
 export default function TabsBar({ tab, counts, onTab, merge, onMerge }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3" data-testid="tp-tabs-bar">
-      <div role="tablist" aria-label="Which pages" className="inline-flex max-w-full flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5">
+      <div role="tablist" aria-label="Which pages" className="flex max-w-full flex-wrap gap-2">
         {TABS.map((t) => {
           const count = counts[t.id]
           const selected = tab === t.id
@@ -24,16 +24,16 @@ export default function TabsBar({ tab, counts, onTab, merge, onMerge }) {
               aria-selected={selected}
               title={t.hint}
               onClick={() => onTab(t.id)}
-              className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", selected ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
+              className={cn("flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", selected ? "border-[#0d1a3a] bg-[#0d1a3a] text-white dark:border-indigo-500 dark:bg-indigo-500" : "border-border/70 bg-card text-foreground hover:bg-muted")}
               data-testid={`tp-tab-${t.id}`}
             >
               {t.label}
-              {typeof count === "number" ? <span className={cn("rounded-full px-1.5 text-xs tabular-nums", selected ? "bg-background/20" : "bg-muted")} data-testid={`tp-tab-${t.id}-count`} title={`${formatExact(count)} pages`}>{formatExact(count)}</span> : null}
+              {typeof count === "number" ? <span className={cn("rounded-full px-1.5 text-xs tabular-nums", selected ? "bg-white/20" : "bg-muted")} data-testid={`tp-tab-${t.id}-count`} title={`${formatExact(count)} pages`}>{formatExact(count)}</span> : null}
             </button>
           )
         })}
       </div>
-      <div className="flex items-center gap-2.5" data-testid="tp-merge-row">
+      <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-card px-3 py-2" data-testid="tp-merge-row">
         <Switch id="tp-merge" checked={merge} onCheckedChange={onMerge} data-testid="tp-merge" />
         <label htmlFor="tp-merge" className="text-sm font-medium">Merge URL variants</label>
         <span className="text-xs text-muted-foreground" data-testid="tp-merge-hint">{MERGE_HINT}</span>

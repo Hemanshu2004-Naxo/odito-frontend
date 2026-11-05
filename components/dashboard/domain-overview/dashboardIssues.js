@@ -42,6 +42,12 @@ const n = (v) => fmt.format(Math.round(v))
 const pct1 = (v) => `${(Math.round(v * 10) / 10).toFixed(1)}%`
 const plural = (count, one, many) => (count === 1 ? one : many)
 
+/** "/" or "www.x.com/" -> "home page", "/x/" or "x.com/x/" -> "page /x/" (how the panel and the banner name a page). */
+export function describePath(path) {
+  const p = typeof path === "string" ? path.replace(/^(https?:\/\/)?[^/]+(?=\/)/i, "") : ""
+  return !p || p === "/" ? "home page" : `page ${p}`
+}
+
 /** Each rule: ready value -> an issue or null. `impact` is how far past its WARNING threshold the figure is, so unlike units can be ranked. */
 const RULES = {
   brokenBacklinks(v, c) {
@@ -51,8 +57,8 @@ const RULES = {
     if (percent < t.warningPercent) return null
     return {
       severity: percent >= t.criticalPercent ? "critical" : "warning",
-      title: `${pct1(percent)} of backlinks point to broken URLs (${n(v.brokenBacklinks)} ${plural(v.brokenBacklinks, "link", "links")})`,
-      why: "Those links lead visitors and search engines to dead pages, so their value is lost.",
+      title: `${n(v.brokenBacklinks)} ${plural(v.brokenBacklinks, "backlink points", "backlinks point")} to broken URLs (${pct1(percent)})`,
+      why: "These links send people and Google to dead pages, so their value is lost.",
       cta: { label: "Fix broken links", href: ISSUE_LINKS.brokenBacklinks },
       impact: percent / t.warningPercent,
     }
@@ -63,11 +69,12 @@ const RULES = {
     const top = v.top ?? null
     const t = c.errorPages
     const critical = Boolean(top) && ((isNum(top.backlinks) && top.backlinks >= t.criticalBacklinks) || t.criticalStatuses.includes(top.statusCode))
-    const lead = top ? ` — top: ${top.path} (${top.statusCode}, ${n(top.backlinks ?? 0)} ${plural(top.backlinks, "link", "links")})` : ""
     return {
       severity: critical ? "critical" : "warning",
-      title: `${n(v.count)} ${plural(v.count, "page with backlinks returns an error", "pages with backlinks return errors")}${lead}`,
-      why: "Links that point to an error page pass no value. Redirect them to a live page.",
+      title: `${n(v.count)} ${plural(v.count, "page with backlinks returns an error", "pages with backlinks return errors")}`,
+      why: top
+        ? `Top one is your ${describePath(top.path)} (${top.statusCode}, ${n(top.backlinks ?? 0)} ${plural(top.backlinks, "link", "links")}). Unblock or redirect it so those links count again.`
+        : "Links that point to an error page pass no value. Redirect them to a live page.",
       cta: { label: "View error pages", href: ISSUE_LINKS.errorPages },
       impact: top && isNum(top.backlinks) ? Math.max(top.backlinks, 1) / t.criticalBacklinks : 1 / t.criticalBacklinks,
     }
@@ -80,9 +87,9 @@ const RULES = {
     if (percent < t.warningPercent) return null
     return {
       severity: percent >= t.criticalPercent ? "critical" : "warning",
-      title: `${pct1(percent)} of referring domains have a high spam score (${n(v.count)})`,
-      why: `Sites with a spam score above ${t.spamAbove} can hurt how search engines see your link profile.`,
-      cta: { label: "Review domains", href: ISSUE_LINKS.highSpam },
+      title: `${n(v.count)} linking ${plural(v.count, "site looks", "sites look")} spammy (${pct1(percent)})`,
+      why: `Spam score above ${t.spamAbove} can hurt how Google sees your links.`,
+      cta: { label: "Review sites", href: ISSUE_LINKS.highSpam },
       impact: percent / t.warningPercent,
     }
   },
@@ -97,8 +104,8 @@ const RULES = {
     return {
       severity: percent <= t.criticalPercent ? "critical" : "warning",
       title: `Organic traffic fell ${pct1(Math.abs(percent))} vs ${formatMonthLabel(previous.year, previous.month)}`,
-      why: "Fewer people are finding the site through Google than a month ago.",
-      cta: { label: "View traffic history", href: ISSUE_LINKS.trafficDrop },
+      why: "Fewer people found you through Google than a month ago.",
+      cta: { label: "See traffic", href: ISSUE_LINKS.trafficDrop },
       impact: percent / t.warningPercent,
     }
   },
@@ -108,8 +115,8 @@ const RULES = {
     return {
       severity: "warning",
       title: `Lost ${n(v.lost)} ${plural(v.lost, "keyword", "keywords")}, gained ${n(v.new)}`,
-      why: "More keywords stopped ranking than started, so the site is shrinking in search.",
-      cta: { label: "View keywords", href: ISSUE_LINKS.keywordsLost },
+      why: "More keywords stopped ranking than started.",
+      cta: { label: "See keywords", href: ISSUE_LINKS.keywordsLost },
       impact: v.lost / Math.max(v.new, 1),
     }
   },
@@ -131,7 +138,7 @@ const RULES = {
       severity: "warning",
       title: `Your backlink spam score is high (${n(v.score)}/100)`,
       why: "A high overall spam score suggests many low-quality sites link to you.",
-      cta: { label: "Review domains", href: ISSUE_LINKS.highSpam },
+      cta: { label: "Review sites", href: ISSUE_LINKS.highSpam },
       impact: v.score / c.spamScore.highFrom,
     }
   },

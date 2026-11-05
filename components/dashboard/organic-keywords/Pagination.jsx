@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { formatExact } from "../domain-overview/format"
-import { MAX_OFFSET, PAGE_SIZES } from "./constants"
+import { MAX_OFFSET } from "./constants"
+
+/** The page sizes offered unless a page passes its own `pageSizes` (Organic Keywords has just one, so it shows no menu). */
+const DEFAULT_SIZES = Object.freeze([25, 50, 100])
 
 /** [1, "…", 4, 5, 6, "…", 40]: the first and last page, the current one and its neighbours. */
 export function pageWindow(page, last) {
@@ -25,7 +28,7 @@ export function pageWindow(page, last) {
  * The deepest page that can be requested is limited by the provider's offset cap; past it the footer says so instead of offering a
  * page that would fail.
  */
-export default function Pagination({ page, pageSize, total, onPage, onPageSize, loading, noun = "keywords", maxOffset = MAX_OFFSET, idPrefix = "ok" }) {
+export default function Pagination({ page, pageSize, total, onPage, onPageSize, pageSizes = DEFAULT_SIZES, loading, noun = "keywords", maxOffset = MAX_OFFSET, idPrefix = "ok" }) {
   const [goto, setGoto] = useState("")
   if (total === null || total === undefined) return null
   // `maxOffset` is the deepest offset the provider answers (the Organic Keywords' is 9,999; the Anchors page's window is 20,000).
@@ -42,6 +45,7 @@ export default function Pagination({ page, pageSize, total, onPage, onPageSize, 
     <div className="flex flex-col gap-3 border-t border-border/60 px-5 py-3 text-sm text-muted-foreground" data-testid={`${idPrefix}-pagination`}>
       <div className="flex flex-col gap-3 @min-[900px]/main:flex-row @min-[900px]/main:items-center @min-[900px]/main:justify-between">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {pageSizes.length > 1 && onPageSize ? (
           <label className="flex items-center gap-2">
             <span>Rows per page</span>
             <select
@@ -51,9 +55,10 @@ export default function Pagination({ page, pageSize, total, onPage, onPageSize, 
               className="h-8 rounded-md border border-input bg-transparent px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               data-testid={`${idPrefix}-page-size`}
             >
-              {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {pageSizes.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
+          ) : <span data-testid={`${idPrefix}-page-size-fixed`}>{pageSize} per page</span>}
           {loading ? <Loader2 className="size-4 animate-spin" aria-label="Loading page" /> : null}
         </div>
 

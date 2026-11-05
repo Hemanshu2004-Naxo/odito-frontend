@@ -59,7 +59,7 @@ describe("Traffic History: loading and the header", () => {
   test("the page frame is there at once and every section has its own skeleton", async () => {
     svc.getSection.mockImplementation(() => new Promise(() => {}))
     renderPage()
-    expect(screen.getByRole("heading", { name: "Traffic History" })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Traffic" })).toBeTruthy()
     expect(screen.getByTestId("th-domain").textContent).toBe("asgeyehospital.com") // from the project, before any answer
     expect(document.querySelectorAll(".skeleton-shimmer").length).toBeGreaterThanOrEqual(8)
     expect(screen.queryByRole("alert")).toBeNull()
@@ -71,8 +71,9 @@ describe("Traffic History: loading and the header", () => {
     renderPage()
     await screen.findByTestId("th-summary")
     expect(screen.getByTestId("th-domain").textContent).toBe("asgeyehospital.com")
-    expect(screen.getByTestId("th-market").textContent).toBe("India · English")
-    expect(screen.getByTestId("th-updated").textContent).toMatch(/^Last updated .*2026/)
+    expect(screen.getByTestId("th-market").textContent).toBe("Google India, English")
+    expect(screen.getByTestId("th-updated").textContent).toMatch(/^estimated from rankings, updated .*2026/)
+    expect(screen.getByTestId("th-shown").textContent).toBe("Showing Oct 25 – Oct 26")
     expect([6, 12, 24].map(pressed)).toEqual(["false", "true", "false"])
   })
 
@@ -90,35 +91,34 @@ describe("Traffic History: summary cards", () => {
     await screen.findByTestId("th-summary")
     const card = (k) => screen.getByTestId(`th-card-${k}`)
 
-    expect(card("traffic").textContent).toMatch(/Organic Traffic.*100\.9K/)
+    expect(card("traffic").textContent).toMatch(/Organic traffic.*100\.9K/)
     expect(screen.getByTestId("th-change-traffic").getAttribute("data-direction")).toBe("down")
     expect(screen.getByTestId("th-change-traffic").textContent).toMatch(/48\.4%/)
     expect(screen.getByTestId("th-change-traffic").className).toMatch(/red/)
     expect(card("traffic").textContent).toMatch(/vs Oct 25/)
-    expect(screen.getByTestId("th-peak-traffic").textContent).toBe("Peak: 195.8K (Oct 25)")
+    expect(screen.getByTestId("th-peak-traffic").textContent).toBe("Peak 195.8K (Oct 25)")
 
     expect(card("keywords").textContent).toMatch(/4\.2K/)
     expect(screen.getByTestId("th-change-keywords").textContent).toMatch(/71\.1%/)
-    expect(screen.getByTestId("th-peak-keywords").textContent).toBe("Peak: 16.6K (Feb 26)")
+    expect(screen.getByTestId("th-peak-keywords").textContent).toBe("Peak 16.6K (Feb 26)")
 
     expect(card("value").textContent).toMatch(/\$25\.1K/)
     expect(screen.getByTestId("th-change-value").textContent).toMatch(/60\.3%/)
-    expect(screen.getByTestId("th-peak-value").textContent).toBe("Peak: $63.2K (Oct 25)")
+    expect(screen.getByTestId("th-peak-value").textContent).toBe("Peak $63.2K (Oct 25)")
 
     expect(card("top10").textContent).toMatch(/1\.5K/)
     expect(screen.getByTestId("th-change-top10").getAttribute("data-direction")).toBe("up")
     expect(screen.getByTestId("th-change-top10").className).toMatch(/emerald/)
     expect(screen.getByTestId("th-change-top10").textContent).toMatch(/20\.6%/)
-    expect(screen.getByTestId("th-peak-top10").textContent).toBe("Peak: 1.5K (Jan 26)")
+    expect(screen.getByTestId("th-peak-top10").textContent).toBe("Peak 1.5K (Jan 26)")
   })
 
   test("the exact figure is on hover, and traffic is labelled as an estimate with the CTR hint", async () => {
     renderPage()
     await screen.findByTestId("th-summary")
     expect(within(screen.getByTestId("th-card-traffic")).getByText("100.9K").getAttribute("title")).toBe("100,942")
-    expect(within(screen.getByTestId("th-card-traffic")).getByText("Est. traffic")).toBeTruthy()
-    const hint = within(screen.getByTestId("th-card-traffic")).getByRole("button", { name: "About Organic Traffic" })
-    expect(document.getElementById(hint.getAttribute("aria-describedby")).textContent).toBe("Estimated from rankings × CTR")
+    expect(screen.getByTestId("th-label-traffic").getAttribute("title")).toBe("Estimated from rankings × CTR")
+    expect(screen.getByTestId("th-label-traffic").textContent).toMatch(/Estimated from rankings × CTR/) // read out, not only on hover
   })
 
   test("the comparison and the peak follow the selected range", async () => {
@@ -127,7 +127,7 @@ describe("Traffic History: summary cards", () => {
     fireEvent.click(range(6))
     expect(screen.getByTestId("th-change-traffic").textContent).toMatch(/31\.2%/)
     expect(screen.getByTestId("th-card-traffic").textContent).toMatch(/vs Apr 26/)
-    expect(screen.getByTestId("th-peak-traffic").textContent).toBe("Peak: 166.6K (May 26)")
+    expect(screen.getByTestId("th-peak-traffic").textContent).toBe("Peak 166.6K (May 26)")
   })
 
   test("four columns wide, two at medium, one on a phone", async () => {
@@ -233,72 +233,61 @@ describe("Traffic History: refresh", () => {
 })
 
 describe("Traffic History: charts", () => {
-  test("all four charts have a titled section", async () => {
+  test("every section has a titled card", async () => {
     renderPage()
     await screen.findByTestId("th-summary")
-    for (const name of ["Organic traffic & keywords", "Traffic value", "Ranking distribution over time", "Keyword movement per month", "Monthly data"]) {
+    for (const name of ["Estimated organic traffic per month", "Where keywords ranked each month", "Keyword movement each month", "Month by month"]) {
       expect(screen.getByRole("heading", { name })).toBeTruthy()
     }
-    for (const id of ["th-main-chart", "th-value-chart", "th-distribution-chart", "th-movement-chart"]) expect(screen.getByTestId(id)).toBeTruthy()
+    for (const id of ["th-main-chart", "th-distribution-chart", "th-movement-chart"]) expect(screen.getByTestId(id)).toBeTruthy()
   })
 
-  test("main chart: the legend items hide and show a series", async () => {
+  test("the cards switch the main chart: the chosen card is pressed and badged 'On chart', and the title follows", async () => {
     renderPage()
     await screen.findByTestId("th-summary")
-    const legend = screen.getByRole("list", { name: "Series shown in the chart" })
-    const traffic = within(legend).getByRole("button", { name: "Est. traffic" })
-    const keywords = within(legend).getByRole("button", { name: "Keywords" })
-    expect([traffic, keywords].map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "true"])
-    fireEvent.click(keywords)
-    expect(keywords.getAttribute("aria-pressed")).toBe("false")
-    expect(screen.getByTestId("th-main-chart")).toBeTruthy()
-    fireEvent.click(traffic)
-    expect(screen.queryByTestId("th-main-chart")).toBeNull() // nothing left to draw: say so instead of an empty chart
-    expect(screen.getByText("Turn a series back on in the legend to see the chart.")).toBeTruthy()
-    fireEvent.click(keywords)
-    expect(screen.getByTestId("th-main-chart")).toBeTruthy()
+    const card = (k) => screen.getByTestId(`th-card-${k}`)
+    expect(card("traffic").getAttribute("aria-pressed")).toBe("true")
+    expect(card("traffic").textContent).toMatch(/On chart/)
+    fireEvent.click(card("keywords"))
+    expect(card("keywords").getAttribute("aria-pressed")).toBe("true")
+    expect(card("traffic").getAttribute("aria-pressed")).toBe("false")
+    expect(card("traffic").textContent).not.toMatch(/On chart/)
+    expect(screen.getByTestId("th-main-chart").getAttribute("data-metric")).toBe("keywords")
+    expect(screen.getByRole("heading", { name: "Ranking keywords per month" })).toBeTruthy()
+    fireEvent.click(card("top10"))
+    expect(screen.getByRole("heading", { name: "Top 10 keywords per month" })).toBeTruthy()
   })
 
-  test("main chart: the month with the biggest traffic drop is called out", async () => {
+  test("the month strip starts on the latest month and the arrows step through the range", async () => {
     renderPage()
     await screen.findByTestId("th-summary")
-    expect(screen.getByTestId("th-drop-note").textContent).toBe("Biggest traffic drop: August 2026 (−31.1% month over month)")
-    fireEvent.click(range(6)) // Aug 26 is still inside the last 6 months
-    expect(screen.getByTestId("th-drop-note").textContent).toMatch(/August 2026/)
+    expect(screen.getByTestId("th-month-label").textContent).toBe("Oct 26")
+    expect(screen.getByTestId("th-month-traffic").textContent).toMatch(/^100\.9K.*62\.3%/)
+    expect(screen.getByRole("button", { name: "Next month" }).disabled).toBe(true)
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }))
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }))
+    expect(screen.getByTestId("th-month-label").textContent).toBe("Aug 26")
+    expect(screen.getByTestId("th-month-traffic").textContent).toMatch(/31\.1%/)
+    fireEvent.click(range(6)) // Aug 26 is still in the last 6 months: the choice stays
+    expect(screen.getByTestId("th-month-label").textContent).toBe("Aug 26")
   })
 
-  test("paid traffic is hidden entirely when every month's paid traffic is 0", async () => {
+  test("the story box names the peak, the drop since, and the biggest fall", async () => {
     renderPage()
     await screen.findByTestId("th-summary")
-    expect(screen.queryByRole("button", { name: "Paid traffic" })).toBeNull()
+    const story = screen.getByTestId("th-story").textContent
+    expect(story).toMatch(/^Traffic peaked at 195\.8K a month in Oct 2025 and has dropped 48% since\./)
+    expect(story).toMatch(/August \(−31%\)/)
+    expect(within(screen.getByTestId("th-story")).getAllByText(/195\.8K a month/)[0].tagName).toBe("STRONG")
   })
 
-  test("with any paid traffic, a 'Paid traffic' series toggle appears", async () => {
-    const paid = REAL_ITEMS.map((i) => (i.year === 2026 && i.month === 8 ? { ...i, paid: { etv: 120, count: 4, estimated_paid_traffic_cost: 10 } } : i))
-    serve(async () => ok(envelope(paid, 12)))
+  test("the ranking and movement cards have a colour key and a one-line note", async () => {
     renderPage()
     await screen.findByTestId("th-summary")
-    const toggle = within(screen.getByRole("list", { name: "Series shown in the chart" })).getByRole("button", { name: "Paid traffic" })
-    expect(toggle.getAttribute("aria-pressed")).toBe("true")
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute("aria-pressed")).toBe("false")
-  })
-
-  test("distribution: Count / % and Top 20 only", async () => {
-    renderPage()
-    await screen.findByTestId("th-summary")
-    const chart = () => screen.getByTestId("th-distribution-chart")
-    expect(chart().getAttribute("data-mode")).toBe("count")
-    expect(chart().getAttribute("data-buckets")).toBe("top1,top3,top10,top20,top50,top100")
-
-    fireEvent.click(within(screen.getByRole("group", { name: "Buckets shown" })).getByRole("button", { name: "Top 20 only" }))
-    expect(chart().getAttribute("data-buckets")).toBe("top1,top3,top10,top20")
-    fireEvent.click(within(screen.getByRole("group", { name: "Show counts or percentages" })).getByRole("button", { name: "%" }))
-    expect(chart().getAttribute("data-mode")).toBe("percent")
-    expect(chart().getAttribute("data-buckets")).toBe("top1,top3,top10,top20") // the two toggles combine
-    fireEvent.click(within(screen.getByRole("group", { name: "Buckets shown" })).getByRole("button", { name: "All" }))
-    expect(chart().getAttribute("data-buckets")).toBe("top1,top3,top10,top20,top50,top100")
-    expect(within(screen.getByRole("list", { name: "Position buckets" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["#1", "#2–3", "#4–10", "#11–20", "#21–50", "#51–100"])
+    expect(within(screen.getByRole("list", { name: "Position groups" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Top 3", "4–10", "11–20", "21–100"])
+    expect(within(screen.getByRole("list", { name: "Movement types" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["New", "Improved", "Declined", "Lost"])
+    expect(screen.getByTestId("th-distribution-note").textContent).toMatch(/^Keywords in .* most in number/)
+    expect(screen.getByTestId("th-movement-note").textContent).toMatch(/^In \d+ of 13 months, more keywords/)
   })
 })
 
@@ -334,7 +323,7 @@ describe("Traffic History: monthly table", () => {
     renderPage()
     await screen.findByTestId("th-summary")
     const heads = within(screen.getByTestId("th-table")).getAllByRole("columnheader").map((h) => h.querySelector("button").textContent)
-    expect(heads).toEqual(["Month", "Traffic", "Δ Traffic %", "Keywords", "Δ Keywords %", "Traffic value", "#1", "#2–3", "#4–10", "#11–20", "New", "Up", "Down", "Lost"])
+    expect(heads).toEqual(["Month", "Traffic", "Change", "Keywords", "Change", "Value", "Top 3", "4–10", "11–20", "New", "Improved", "Declined", "Lost"])
   })
 
   test("every column sorts: first click descending, second ascending, with aria-sort", async () => {
@@ -353,13 +342,13 @@ describe("Traffic History: monthly table", () => {
     expect(first()).toBe("Sep 26") // 62.2K is the lowest
     expect(header("Traffic").getAttribute("aria-sort")).toBe("ascending")
 
-    fireEvent.click(within(table).getByRole("button", { name: "Δ Traffic %" }))
+    fireEvent.click(within(table).getByRole("button", { name: "Sort by Traffic change" }))
     expect(first()).toBe("Oct 26") // +62.3%
-    fireEvent.click(within(table).getByRole("button", { name: "Δ Traffic %" }))
+    fireEvent.click(within(table).getByRole("button", { name: "Sort by Traffic change" }))
     expect(first()).toBe("Aug 26") // −31.1%; the oldest month (no change) is last either way
     expect(within(rows().at(-1)).getAllByRole("cell")[0].textContent).toBe("Oct 25")
 
-    for (const label of ["Keywords", "Δ Keywords %", "Traffic value", "#1", "#2–3", "#4–10", "#11–20", "New", "Up", "Down", "Lost"]) {
+    for (const label of ["Keywords", "Sort by Keywords change", "Value", "Top 3", "4–10", "11–20", "New", "Improved", "Declined", "Lost"]) {
       fireEvent.click(within(table).getByRole("button", { name: label }))
       expect(header(label).getAttribute("aria-sort")).toBe("descending")
       expect(rows()).toHaveLength(13)
@@ -382,8 +371,8 @@ describe("Traffic History: monthly table", () => {
   test("the table scrolls sideways on a narrow screen instead of squashing", async () => {
     renderPage()
     const table = await screen.findByTestId("th-table")
-    expect(table.className).toMatch(/min-w-\[1100px\]/)
-    expect(table.closest('[data-slot="table-container"]').className).toMatch(/overflow-x-auto/)
+    expect(table.className).toMatch(/min-w-\[980px\]/)
+    expect(table.parentElement.className).toMatch(/overflow-x-auto/)
   })
 })
 
@@ -432,12 +421,12 @@ describe("Traffic History: every section fails and recovers on its own", () => {
     serve(async () => { if (!healthy) throw apiError("The data service is temporarily unavailable. Please try again later."); return win12() })
     renderPage()
     const alerts = await screen.findAllByRole("alert")
-    expect(alerts).toHaveLength(6) // summary, 4 charts, table
+    expect(alerts).toHaveLength(5) // summary, 3 charts, table
     for (const a of alerts) {
       expect(a.textContent).toMatch(/temporarily unavailable/)
       expect(within(a).getByRole("button", { name: "Retry" })).toBeTruthy()
     }
-    expect(screen.getByRole("heading", { name: "Monthly data" })).toBeTruthy() // the sections' frames stay
+    expect(screen.getByRole("heading", { name: "Month by month" })).toBeTruthy() // the sections' frames stay
     healthy = true
     fireEvent.click(within(alerts[0]).getByRole("button", { name: "Retry" }))
     await screen.findByTestId("th-summary")

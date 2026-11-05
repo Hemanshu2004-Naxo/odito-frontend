@@ -1,23 +1,27 @@
 "use client"
 
 import Link from "next/link"
-import { MinusCircle, PlusCircle, TrendingDown, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SectionBoundary, Skel } from "./SectionState"
 import { formatCompact, formatExact } from "./format"
 import { LOST_HINT, movementHref } from "./hubLinks"
+import { describeNetMonth } from "./overviewInsights"
 
-// Each box has an icon AND a word, so the meaning never rests on colour alone.
+// Each tile says its meaning in a word, so it never rests on colour alone.
 const BOXES = [
-  { key: "new", label: "New", Icon: PlusCircle, tone: "text-sky-600 dark:text-sky-400", hint: "Keywords that started ranking since the previous update" },
-  { key: "improved", label: "Improved", Icon: TrendingUp, tone: "text-emerald-600 dark:text-emerald-400", hint: "Keywords that moved up since the previous update" },
-  { key: "declined", label: "Declined", Icon: TrendingDown, tone: "text-red-600 dark:text-red-400", hint: "Keywords that moved down since the previous update" },
-  { key: "lost", label: "Lost", Icon: MinusCircle, tone: "text-amber-600 dark:text-amber-400", hint: LOST_HINT },
+  { key: "new", label: "New", tone: "good", hint: "Keywords that started ranking since the previous update" },
+  { key: "improved", label: "Improved", tone: "good", hint: "Keywords that moved up since the previous update" },
+  { key: "declined", label: "Declined", tone: "bad", hint: "Keywords that moved down since the previous update" },
+  { key: "lost", label: "Lost", tone: "bad", hint: LOST_HINT },
 ]
+const TONE = {
+  good: { box: "bg-emerald-50 dark:bg-emerald-500/10", label: "text-emerald-700 dark:text-emerald-300" },
+  bad: { box: "bg-red-50 dark:bg-red-500/10", label: "text-red-700 dark:text-red-300" },
+}
 
 const Skeleton = () => (
-  <div className="grid grid-cols-2 gap-3 @min-[640px]/main:grid-cols-4">
-    {BOXES.map((b) => <Skel key={b.key} className="h-[72px] rounded-xl" />)}
+  <div className="grid grid-cols-2 gap-2 @min-[640px]/main:grid-cols-4">
+    {BOXES.map((b) => <Skel key={b.key} className="h-[60px] rounded-lg" />)}
   </div>
 )
 
@@ -41,45 +45,34 @@ export function describeNet(net) {
 }
 
 /**
- * Keyword movement (API 1: is_new / is_up / is_down / is_lost — API 1, not API 3, because API 3 reports 0 lost keywords).
- * New / Improved / Declined are links to Organic Keywords with that movement chosen; Lost is not (those keywords no longer rank, so there is
- * nothing to list) and says so in its tooltip.
+ * Keyword movement (API 1: is_new / is_up / is_down / is_lost — API 1, not API 3, because API 3 reports 0 lost keywords) as four tinted
+ * tiles and the month's net change under them. New / Improved / Declined open Organic Keywords with that movement chosen; Lost does not
+ * (those keywords no longer rank, so there is nothing to list) and says so in its tooltip.
  */
 export default function MovementStrip({ state, movement, hasRankingData }) {
   const net = netChange(movement)
-  const netText = describeNet(net)
+  const netText = describeNetMonth(net)
   return (
     <SectionBoundary state={state} skeleton={<Skeleton />} empty={!hasRankingData} emptyMessage="No keyword movement yet: this domain has no ranking data.">
       <div className="space-y-2">
-        {netText ? (
-          <p
-            className={cn("text-sm font-medium tabular-nums", net > 0 && "text-emerald-600 dark:text-emerald-400", net < 0 && "text-red-600 dark:text-red-400", net === 0 && "text-muted-foreground")}
-            data-testid="do-net"
-            data-direction={net > 0 ? "up" : net < 0 ? "down" : "flat"}
-          >
-            {netText}
-          </p>
-        ) : null}
-        <div className="grid grid-cols-2 gap-3 @min-[640px]/main:grid-cols-4" data-testid="do-movement">
-          {BOXES.map(({ key, label, Icon, tone, hint }) => {
+        <div className="grid grid-cols-2 gap-2 @min-[640px]/main:grid-cols-4" data-testid="do-movement">
+          {BOXES.map(({ key, label, tone, hint }) => {
+            const t = TONE[tone]
             const href = movementHref(key)
             const body = (
               <>
-                <Icon className={cn("size-5 shrink-0", tone)} aria-hidden />
-                <div className="min-w-0">
-                  <div className="text-xs text-muted-foreground">{label}</div>
-                  <div className="text-xl font-semibold tabular-nums" title={formatExact(movement[key])} data-testid={`do-movement-${key}`}>{formatCompact(movement[key])}</div>
-                </div>
+                <div className={cn("text-[11px] font-medium", t.label)}>{label}</div>
+                <div className="mt-0.5 text-xl font-semibold tabular-nums" title={formatExact(movement[key])} data-testid={`do-movement-${key}`}>{formatCompact(movement[key])}</div>
               </>
             )
-            const box = "flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3"
+            const box = cn("block rounded-lg px-3 py-2", t.box)
             return href && movement[key] !== null ? (
               <Link
                 key={key}
                 href={href}
                 title={hint}
                 aria-label={`${label}: ${formatExact(movement[key])} keywords. Open them in Organic Keywords`}
-                className={cn(box, "transition-colors hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
+                className={cn(box, "transition-shadow hover:ring-1 hover:ring-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
                 data-testid={`do-movement-link-${key}`}
               >
                 {body}
@@ -89,6 +82,15 @@ export default function MovementStrip({ state, movement, hasRankingData }) {
             )
           })}
         </div>
+        {netText ? (
+          <p
+            className={cn("text-xs font-medium tabular-nums", net > 0 && "text-emerald-600 dark:text-emerald-400", net < 0 && "text-red-600 dark:text-red-400", net === 0 && "text-muted-foreground")}
+            data-testid="do-net"
+            data-direction={net > 0 ? "up" : net < 0 ? "down" : "flat"}
+          >
+            {netText}
+          </p>
+        ) : null}
       </div>
     </SectionBoundary>
   )

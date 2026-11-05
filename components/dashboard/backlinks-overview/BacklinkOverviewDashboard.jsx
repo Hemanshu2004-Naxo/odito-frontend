@@ -6,14 +6,9 @@ import { useBacklinkSummary } from "@/hooks/useBacklinkSummary"
 import { cn } from "@/lib/utils"
 import { SectionError } from "../domain-overview/SectionState"
 import { domainFromUrl } from "../domain-overview/format"
-import AuthorityStrip from "./AuthorityStrip"
+import { useBacklinkExtras } from "@/hooks/useBacklinkExtras"
 import BacklinkOverviewHeader from "./BacklinkOverviewHeader"
-import BreakdownBarCard from "./BreakdownBarCard"
-import FollowDonuts from "./FollowDonuts"
-import KpiGrid from "./KpiGrid"
-import ProfileHealth from "./ProfileHealth"
-import SiteInfo from "./SiteInfo"
-import { PLACEMENT_HINT } from "./constants"
+import { AboutSite, FixFirst, FollowBars, LinkSources, LinkStrengthCard, StatTiles } from "./BacklinkSections"
 
 /**
  * Backlink Overview for the selected project: the whole backlink profile on one screen — authority, link counts, link quality, where the
@@ -25,7 +20,7 @@ export default function BacklinkOverviewDashboard() {
   if (!projectId) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Backlink Overview</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Backlink overview</h1>
         <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-sm text-muted-foreground">Select a project to see its backlink profile.</div>
       </div>
     )
@@ -33,8 +28,6 @@ export default function BacklinkOverviewDashboard() {
   // Keyed by project: nothing about the previous project's controls carries over.
   return <ProjectBacklinks key={projectId} projectId={projectId} project={activeProject} />
 }
-
-const Row = ({ children }) => <div className="grid gap-4 @min-[900px]/main:grid-cols-2">{children}</div>
 
 function ProjectBacklinks({ projectId, project }) {
   const bl = useBacklinkSummary(projectId)
@@ -45,12 +38,15 @@ function ProjectBacklinks({ projectId, project }) {
   const refreshNote = refreshClicked && !bl.isFetching && bl.refreshThrottled ? "This data was refreshed less than a minute ago, so it was not requested again." : null
   const noDomain = bl.status === "error" && bl.error?.code === "INVALID_TARGET"
   const empty = bl.status === "success" && summary?.hasBacklinks === false
+  const extras = useBacklinkExtras(projectId, { domain, totalReferringDomains: summary?.totals.referringDomains ?? null })
+  const STATUS_WORD = { live: "Live links", lost: "Lost links", all: "Live and lost links" }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <BacklinkOverviewHeader
         domain={domain}
         updatedAt={bl.updatedAt}
+        since={summary?.age.short ?? null}
         state={state}
         update={update}
         onRefresh={() => { setRefreshClicked(true); bl.refresh() }}
@@ -70,39 +66,16 @@ function ProjectBacklinks({ projectId, project }) {
           No backlinks found for this domain yet
         </div>
       ) : (
-        <div className={cn("space-y-6 transition-opacity", bl.stale && bl.isFetching && "opacity-60")} aria-busy={bl.status === "loading" || (bl.stale && bl.isFetching)} data-testid="bo-content">
-          <AuthorityStrip state={view} summary={summary} />
-          <KpiGrid state={view} summary={summary} />
-
-          <Row>
-            <FollowDonuts state={view} summary={summary} />
-            <BreakdownBarCard
-              title="Link attributes"
-              description="How the links are marked up (a link can have several)"
-              state={view}
-              breakdown={summary?.breakdowns.attributes}
-              testId="bo-chart-attributes"
-              labelWidth={96}
-              note="Amber bars: sponsored and ugc links. Hover any bar to see what the attribute means."
-            />
-          </Row>
-
-          <Row>
-            <BreakdownBarCard title="Top countries" description="Where the linking pages are hosted" state={view} breakdown={summary?.breakdowns.countries} testId="bo-chart-countries" labelWidth={150} />
-            <BreakdownBarCard title="Top TLDs" description="The domain endings of the linking sites" state={view} breakdown={summary?.breakdowns.tlds} testId="bo-chart-tlds" labelWidth={110} />
-          </Row>
-
-          <Row>
-            <BreakdownBarCard title="Linking site types" description="What kind of site links to you (a site can have several types)" state={view} breakdown={summary?.breakdowns.platformTypes} testId="bo-chart-platforms" labelWidth={130} />
-            <BreakdownBarCard title="Link placement" description="Where on the page the link sits" hint={PLACEMENT_HINT} state={view} breakdown={summary?.breakdowns.semanticLocations} testId="bo-chart-placement" labelWidth={120} />
-          </Row>
-
-          <BreakdownBarCard title="Link types" description="Text links, image links and redirects" state={view} breakdown={summary?.breakdowns.linkTypes} testId="bo-chart-types" labelWidth={120} />
-
-          <Row>
-            <ProfileHealth state={view} summary={summary} />
-            <SiteInfo state={view} summary={summary} />
-          </Row>
+        <div className={cn("space-y-5 transition-opacity", bl.stale && bl.isFetching && "opacity-60")} aria-busy={bl.status === "loading" || (bl.stale && bl.isFetching)} data-testid="bo-content">
+          <div className="grid gap-4 @min-[1100px]/main:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <LinkStrengthCard state={view} summary={summary} />
+            <StatTiles state={view} summary={summary} extras={extras} />
+          </div>
+          <FixFirst state={view} summary={summary} />
+          <FollowBars state={view} summary={summary} />
+          <LinkSources state={view} summary={summary} />
+          <AboutSite state={view} summary={summary} />
+          <p className="text-xs text-muted-foreground">Data from the DataForSEO Backlinks API (backlinks/summary). {STATUS_WORD[state.status] ?? ""}{state.dofollow ? ", dofollow only" : ""}.</p>
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Panel } from "@/components/dashboard/shared/parts"
+import OverviewCard from "../domain-overview/OverviewCard"
 import { SectionBoundary, Skel } from "../domain-overview/SectionState"
 import { formatExact } from "../domain-overview/format"
 import { PROFILE_SCOPE_LABEL } from "./constants"
@@ -16,14 +16,14 @@ export default function ToxicAlert({ toxic, disavowedCount, onReview, onDownload
   const count = toxic.count
   const has = typeof count === "number" && count > 0
   return (
-    <Panel title="Toxic domains" description={<span data-testid="rd-toxic-scope">{PROFILE_SCOPE_LABEL}</span>} className="min-w-0">
+    <OverviewCard title="Toxic domains" description={<span data-testid="rd-toxic-scope">{PROFILE_SCOPE_LABEL}</span>} className="h-full">
       <SectionBoundary
         state={{ status: toxic.status, error: toxic.error, refetch: toxic.refetch }}
         skeleton={<div className="space-y-3" aria-hidden><Skel className="h-6 w-3/4" /><Skel className="h-9 w-28" /></div>}
       >
         <div className="space-y-3">
           {has ? (
-            <div className="flex items-start gap-2.5 rounded-lg border border-red-300/70 bg-red-50 px-3 py-2.5 text-sm text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100" role="alert" data-testid="rd-toxic-alert">
+            <div className="flex items-start gap-2.5 rounded-xl border border-red-200/80 bg-red-50/60 px-4 py-3 text-sm text-red-900 dark:border-red-500/30 dark:bg-red-500/[0.06] dark:text-red-100" role="alert" data-testid="rd-toxic-alert">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
               <p><strong className="tabular-nums" data-testid="rd-toxic-count">{formatExact(count)}</strong> referring domains have spam score above {toxic.spamAbove}</p>
             </div>
@@ -33,7 +33,7 @@ export default function ToxicAlert({ toxic, disavowedCount, onReview, onDownload
               <p>No referring domains have a spam score above {toxic.spamAbove}.</p>
             </div>
           )}
-          {has ? <Button type="button" variant="outline" onClick={onReview} data-testid="rd-toxic-review">Review</Button> : null}
+          {has ? <Button type="button" onClick={onReview} className="bg-[#0d1a3a] font-semibold text-white hover:bg-[#0d1a3a]/90 dark:bg-indigo-500" data-testid="rd-toxic-review">Review</Button> : null}
           {disavowedCount > 0 ? (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm" data-testid="rd-toxic-disavow">
               <span><strong className="tabular-nums">{formatExact(disavowedCount)}</strong> {disavowedCount === 1 ? "domain" : "domains"} in your disavow list</span>
@@ -45,6 +45,6 @@ export default function ToxicAlert({ toxic, disavowedCount, onReview, onDownload
           ) : null}
         </div>
       </SectionBoundary>
-    </Panel>
+    </OverviewCard>
   )
 }

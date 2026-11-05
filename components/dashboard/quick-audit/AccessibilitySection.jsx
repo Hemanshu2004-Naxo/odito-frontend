@@ -171,18 +171,18 @@ export default function AccessibilitySection({ data }) {
   return (
     <section className="space-y-12 pt-8">
       {/* HEADER */}
-      <div className="flex justify-between items-center border-b border-[#263244] pb-8 mb-8">
-        <h2 className="text-3xl font-bold text-white flex items-center gap-4">
+      <div className="flex justify-between items-center border-b border-slate-200 dark:border-[#263244] pb-8 mb-8">
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-purple-400/10 border border-purple-400/20 flex items-center justify-center">
-            <span className="text-purple-400 text-xl">♿</span>
+            <span className="text-purple-700 dark:text-purple-400 text-xl">♿</span>
           </div>
           Accessibility
         </h2>
-        <div className="flex items-center gap-3 px-4 py-2 bg-[#111827] border border-[#263244] rounded-xl">
-          <span className="text-xs tracking-[0.15em] uppercase text-slate-400">
+        <div className="flex items-center gap-3 px-4 py-2 bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-xl">
+          <span className="text-xs tracking-[0.15em] uppercase text-slate-600 dark:text-slate-400">
             Section Score
           </span>
-          <span className="text-2xl font-bold text-purple-400">
+          <span className="text-2xl font-bold text-purple-700 dark:text-purple-400">
             {accessibilityScore}%
           </span>
         </div>
@@ -193,16 +193,16 @@ export default function AccessibilitySection({ data }) {
         {filteredChecks.map((check) => {
           const statusInfo = getStatusInfo(check.status, check.severity);
           const statusColors = {
-            red: 'bg-red-500/10 border-red-500/20 text-red-400',
-            yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400',
-            orange: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
-            green: 'bg-green-500/10 border-green-500/20 text-green-400'
+            red: 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400',
+            yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700 dark:text-yellow-400',
+            orange: 'bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-400',
+            green: 'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400'
           };
 
           return (
-            <div key={check.id} className="bg-[#111827] border border-[#263244] rounded-3xl overflow-hidden">
-              <div className="p-6 border-b border-[#263244] flex justify-between items-start">
-                <h3 className="text-xl font-bold text-white">
+            <div key={check.id} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-3xl overflow-hidden">
+              <div className="p-6 border-b border-slate-200 dark:border-[#263244] flex justify-between items-start">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                   {check.name}
                 </h3>
                 <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest ${statusColors[statusInfo.color]}`}>
@@ -217,7 +217,7 @@ export default function AccessibilitySection({ data }) {
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mb-4">
                     Issues Found
                   </p>
-                  <p className="text-slate-200 leading-7">
+                  <p className="text-slate-800 dark:text-slate-200 leading-7">
                     {check.issues}
                   </p>
                 </div>
@@ -227,8 +227,8 @@ export default function AccessibilitySection({ data }) {
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mb-4">
                     Current Data
                   </p>
-                  <div className="bg-slate-900/60 border border-[#263244] rounded-xl p-6">
-                    <p className="italic text-slate-400 leading-7">
+                  <div className="bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-[#263244] rounded-xl p-6">
+                    <p className="italic text-slate-600 dark:text-slate-400 leading-7">
                       "{check.currentData}"
                     </p>
                   </div>
@@ -239,17 +239,17 @@ export default function AccessibilitySection({ data }) {
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mb-4">
                     Why It Matters
                   </p>
-                  <p className="text-slate-400 leading-7">
+                  <p className="text-slate-600 dark:text-slate-400 leading-7">
                     {check.whyItMatters}
                   </p>
                 </div>
 
                 {/* Recommendation */}
                 <div className="bg-cyan-400/5 border border-cyan-400/20 rounded-2xl p-6">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-400 mb-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-400 mb-4">
                     AI Recommendation
                   </p>
-                  <p className="text-cyan-200 font-semibold leading-7">
+                  <p className="text-cyan-800 dark:text-cyan-200 font-semibold leading-7">
                     {check.recommendation}
                   </p>
                 </div>
@@ -261,9 +261,9 @@ export default function AccessibilitySection({ data }) {
 
       {filteredChecks.length === 0 && (
         <div className="text-center py-16 mt-8">
-          <div className="text-green-400 text-6xl mb-6">✓</div>
-          <h3 className="text-2xl font-bold text-white mb-4">All Accessibility Checks Passed!</h3>
-          <p className="text-slate-400">Excellent! Your site is fully accessible and follows WCAG guidelines.</p>
+          <div className="text-green-700 dark:text-green-400 text-6xl mb-6">✓</div>
+          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">All Accessibility Checks Passed!</h3>
+          <p className="text-slate-600 dark:text-slate-400">Excellent! Your site is fully accessible and follows WCAG guidelines.</p>
         </div>
       )}
     </section>

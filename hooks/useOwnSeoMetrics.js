@@ -38,6 +38,8 @@ export function useOwnSeoMetrics(projectId) {
 
   return {
     metrics,
+    // The project's market ({ location, language }) as the rank section reports it; null until known.
+    market: rank.data?.data?.market ?? null,
     // "loading" until the first answer of BOTH sections; "partial" when only one is known (the other metrics stay null: never compared).
     status: rank.isLoading || links.isLoading ? "loading" : rank.isError && links.isError ? "error" : "ready",
     refetch: () => { rank.refetch(); links.refetch() },

@@ -61,7 +61,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // Details regions only: the results <section> is itself a named landmark region.
 const detailRegions = () => screen.queryAllByRole("region", { name: /^Details for / })
 
-vi.setConfig({ testTimeout: 30000 }) // a 50-row page with Radix controls is slow under jsdom; set before any test is collected
+vi.setConfig({ testTimeout: 30000 }) // a page of rows with Radix controls is slow under jsdom; set before any test is collected
 
 beforeAll(() => {
   configure({ asyncUtilTimeout: 5000 })
@@ -85,13 +85,13 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks() })
 
 describe("Organic Keywords: first load", () => {
-  test("two requests only: the whole-domain totals (the dashboard's own query) and the first page of 50, traffic descending, no filters", async () => {
+  test("two requests only: the whole-domain totals (the dashboard's own query) and the first page of 25, traffic descending, no filters", async () => {
     renderPage()
     await screen.findAllByTestId("ok-row")
     const c = calls()
     expect(c).toHaveLength(2)
     expect(c.find((x) => !x.query)).toMatchObject({ section: "ranked-keywords", refresh: false })
-    expect(c.find((x) => x.query).query).toEqual({ limit: 50, offset: 0, order_by: DEFAULT_ORDER, filters: [] })
+    expect(c.find((x) => x.query).query).toEqual({ limit: 25, offset: 0, order_by: DEFAULT_ORDER, filters: [] })
   })
 
   test("the frame is there at once: title, domain from the project, skeleton rows and card skeletons, no spinner page", () => {
@@ -150,12 +150,12 @@ describe("Organic Keywords: summary cards (whole domain, from the unfiltered tot
     let fail = true
     serve(async (_p, _s, opts) => {
       if (!opts?.query) { if (fail) throw apiError("The data service is temporarily unavailable."); return ok(pageEnvelope([REAL_ROWS[0]], { total: 4139, metrics: REAL_METRICS })) }
-      return ok(pageEnvelope(ALL.slice(0, 50), { total: TOTAL }))
+      return ok(pageEnvelope(ALL.slice(0, 25), { total: TOTAL }))
     })
     renderPage()
     const alert = await screen.findByRole("alert")
     expect(alert.textContent).toContain("temporarily unavailable")
-    expect((await screen.findAllByTestId("ok-row")).length).toBe(50)
+    expect((await screen.findAllByTestId("ok-row")).length).toBe(25)
     fail = false
     fireEvent.click(within(alert).getByRole("button", { name: /retry/i }))
     await waitFor(() => expect(screen.getByTestId("ok-card-total").textContent).toContain("4.1K"))
@@ -262,7 +262,7 @@ describe("Organic Keywords: sorting (server-side)", () => {
     await screen.findAllByTestId("ok-row")
     fireEvent.click(screen.getByRole("button", { name: "Next page" }))
     fireEvent.click(await screen.findByRole("button", { name: "Next page" }))
-    await waitFor(() => expect(lastPageCall().query.offset).toBe(100))
+    await waitFor(() => expect(lastPageCall().query.offset).toBe(50))
     fireEvent.click(screen.getByRole("button", { name: /^Sort by KD/ }))
     await waitFor(() => expect(lastPageCall().query).toMatchObject({ offset: 0, order_by: "keyword_data.keyword_properties.keyword_difficulty,desc" }))
   })
@@ -327,7 +327,7 @@ describe("Organic Keywords: filters", () => {
     expect((await screen.findByText(/minimum is greater than the maximum/i)).getAttribute("role")).toBe("alert")
     // the invalid pair is dropped: no volume chip, and the table is the unfiltered view again (already loaded, so served from the cache)
     await waitFor(() => expect(screen.queryByTestId("ok-active-filters")).toBeNull())
-    expect(showing()).toBe("Showing 1–50 of 137 keywords")
+    expect(showing()).toBe("Showing 1–25 of 137 keywords")
   })
 
   test("position, movement and intent controls: each click is one request with the right condition", async () => {
@@ -385,7 +385,7 @@ describe("Organic Keywords: filters", () => {
     renderPage()
     await screen.findAllByTestId("ok-row")
     fireEvent.click(screen.getByRole("button", { name: "Next page" }))
-    await waitFor(() => expect(lastPageCall().query.offset).toBe(50))
+    await waitFor(() => expect(lastPageCall().query.offset).toBe(25))
     fireEvent.click(chip("ok-filter-position", "Top 3"))
     await waitFor(() => expect(lastPageCall().query.offset).toBe(0))
   })
@@ -425,12 +425,12 @@ describe("Organic Keywords: the 8-condition limit", () => {
 })
 
 describe("Organic Keywords: pagination (total_count drives it)", () => {
-  test("'Showing 1–50 of 137 keywords', 3 pages, previous disabled on the first", async () => {
+  test("'Showing 1–25 of 137 keywords', 6 pages (25 per page), previous disabled on the first", async () => {
     renderPage()
     await screen.findAllByTestId("ok-row")
-    expect(showing()).toBe("Showing 1–50 of 137 keywords")
+    expect(showing()).toBe("Showing 1–25 of 137 keywords")
     const nav = screen.getByRole("navigation", { name: "Pagination" })
-    expect(within(nav).getAllByRole("button", { name: /^Page \d+$/ }).map((b) => b.textContent)).toEqual(["1", "2", "3"])
+    expect(within(nav).getAllByRole("button", { name: /^Page \d+$/ }).map((b) => b.textContent)).toEqual(["1", "2", "6"]) // first, next, last (the rest is "…")
     expect(within(nav).getByRole("button", { name: "Previous page" }).hasAttribute("disabled")).toBe(true)
     expect(within(nav).getByRole("button", { name: "Page 1" }).getAttribute("aria-current")).toBe("page")
   })
@@ -439,27 +439,25 @@ describe("Organic Keywords: pagination (total_count drives it)", () => {
     renderPage()
     await screen.findAllByTestId("ok-row")
     fireEvent.click(screen.getByRole("button", { name: "Next page" }))
-    await waitFor(() => expect(showing()).toBe("Showing 51–100 of 137 keywords"))
-    expect(lastPageCall().query).toMatchObject({ limit: 50, offset: 50 })
-    fireEvent.click(screen.getByRole("button", { name: "Page 3" }))
-    await waitFor(() => expect(showing()).toBe("Showing 101–137 of 137 keywords"))
-    expect(lastPageCall().query.offset).toBe(100)
+    await waitFor(() => expect(showing()).toBe("Showing 26–50 of 137 keywords"))
+    expect(lastPageCall().query).toMatchObject({ limit: 25, offset: 25 })
+    fireEvent.click(screen.getByRole("button", { name: "Page 6" }))
+    await waitFor(() => expect(showing()).toBe("Showing 126–137 of 137 keywords"))
+    expect(lastPageCall().query.offset).toBe(125)
     expect(screen.getByRole("button", { name: "Next page" }).hasAttribute("disabled")).toBe(true)
     fireEvent.click(screen.getByRole("button", { name: "Previous page" }))
-    await waitFor(() => expect(showing()).toBe("Showing 51–100 of 137 keywords")) // page 2 was loaded before: no new request
+    await waitFor(() => expect(showing()).toBe("Showing 101–125 of 137 keywords"))
+    expect(lastPageCall().query.offset).toBe(100)
   })
 
-  test("page size 25 / 50 / 100: a new limit, back to page 1", async () => {
+  test("25 rows per page is the only size: no page-size menu, just the fixed note", async () => {
     renderPage()
     await screen.findAllByTestId("ok-row")
-    fireEvent.click(screen.getByRole("button", { name: "Next page" }))
-    await waitFor(() => expect(lastPageCall().query.offset).toBe(50))
-    fireEvent.change(screen.getByTestId("ok-page-size"), { target: { value: "25" } })
-    await waitFor(() => expect(lastPageCall().query).toMatchObject({ limit: 25, offset: 0 }))
-    await waitFor(() => expect(showing()).toBe("Showing 1–25 of 137 keywords"))
+    expect(screen.queryByTestId("ok-page-size")).toBeNull()
+    expect(screen.queryByLabelText("Rows per page")).toBeNull()
+    expect(screen.getByTestId("ok-page-size-fixed").textContent).toBe("25 per page")
+    expect(screen.getAllByTestId("ok-row")).toHaveLength(25)
     expect(within(screen.getByRole("navigation", { name: "Pagination" })).getByRole("button", { name: "Page 6" })).toBeTruthy() // ceil(137 / 25)
-    fireEvent.change(screen.getByTestId("ok-page-size"), { target: { value: "100" } })
-    await waitFor(() => expect(lastPageCall().query).toMatchObject({ limit: 100, offset: 0 }))
   })
 
   test("Go to page jumps there, and refuses a page that does not exist", async () => {
@@ -470,16 +468,16 @@ describe("Organic Keywords: pagination (total_count drives it)", () => {
     expect(screen.getByRole("button", { name: "Go" }).hasAttribute("disabled")).toBe(true)
     fireEvent.change(box, { target: { value: "3" } })
     fireEvent.click(screen.getByRole("button", { name: "Go" }))
-    await waitFor(() => expect(lastPageCall().query.offset).toBe(100))
+    await waitFor(() => expect(lastPageCall().query.offset).toBe(50))
   })
 
   test("a different total_count changes the number of pages (the pagination follows the filters, not the domain)", async () => {
     serve(async (_p, _s, opts) => (opts?.query
-      ? ok(pageEnvelope(ALL.slice(0, opts.query.filters.length ? 3 : 50), { total: opts.query.filters.length ? 3 : TOTAL }))
+      ? ok(pageEnvelope(ALL.slice(0, opts.query.filters.length ? 3 : 25), { total: opts.query.filters.length ? 3 : TOTAL }))
       : ok(pageEnvelope([], { total: 4139, metrics: REAL_METRICS }))))
     renderPage()
     await screen.findAllByTestId("ok-row")
-    expect(showing()).toBe("Showing 1–50 of 137 keywords")
+    expect(showing()).toBe("Showing 1–25 of 137 keywords")
     fireEvent.click(chip("ok-filter-position", "Top 3"))
     await waitFor(() => expect(showing()).toBe("Showing 1–3 of 3 keywords"))
     expect(within(screen.getByRole("navigation", { name: "Pagination" })).getAllByRole("button", { name: /^Page \d+$/ })).toHaveLength(1)
@@ -491,22 +489,21 @@ describe("Organic Keywords: pagination (total_count drives it)", () => {
       ? ok(pageEnvelope(ALL.slice(opts.query.offset, opts.query.offset + opts.query.limit), { total: TOTAL }))
       : ok(pageEnvelope([], { total: 4139, metrics: REAL_METRICS }))))
     renderPage()
-    await waitFor(() => expect(lastPageCall().query.offset).toBe(100))
-    await waitFor(() => expect(showing()).toBe("Showing 101–137 of 137 keywords"))
+    await waitFor(() => expect(lastPageCall().query.offset).toBe(125))
+    await waitFor(() => expect(showing()).toBe("Showing 126–137 of 137 keywords"))
   })
 })
 
 describe("Organic Keywords: the URL keeps the view", () => {
-  test("filters, sort, page and page size are written to the query string (and nothing when everything is default)", async () => {
+  test("filters, sort and page are written to the query string (and nothing when everything is default, page size included)", async () => {
     renderPage()
     await screen.findAllByTestId("ok-row")
     expect(window.location.search).toBe("")
     fireEvent.click(chip("ok-filter-position", "Top 10"))
     fireEvent.click(screen.getByRole("button", { name: /^Sort by Volume/ }))
-    fireEvent.change(screen.getByTestId("ok-page-size"), { target: { value: "25" } })
-    await waitFor(() => expect(lastPageCall().query.limit).toBe(25))
+    await waitFor(() => expect(lastPageCall().query).toMatchObject({ limit: 25, order_by: "keyword_data.keyword_info.search_volume,desc" }))
     const p = new URLSearchParams(window.location.search)
-    expect(Object.fromEntries(p)).toEqual({ pos: "top10", sort: "volume", size: "25" })
+    expect(Object.fromEntries(p)).toEqual({ pos: "top10", sort: "volume" })
     fireEvent.click(await screen.findByRole("button", { name: "Next page" }))
     await waitFor(() => expect(new URLSearchParams(window.location.search).get("page")).toBe("2"))
   })
@@ -521,14 +518,14 @@ describe("Organic Keywords: the URL keeps the view", () => {
     expect(field("Search keywords").value).toBe("lasik")
     expect(chip("ok-filter-position", "Top 3").getAttribute("aria-pressed")).toBe("true")
     expect(screen.getAllByTestId("ok-chip").map((c) => c.textContent)).toContain("Position: Top 3")
-    expect(screen.getByTestId("ok-page-size").value).toBe("25")
+    expect(screen.queryByTestId("ok-page-size")).toBeNull()
   })
 
   test("an unknown value in the link falls back to the default instead of breaking the page", async () => {
     window.history.replaceState(null, "", "/app/organic-keywords?sort=password&size=7&pos=nope&page=-3")
     renderPage()
     await screen.findAllByTestId("ok-row")
-    expect(pageCalls()[0].query).toEqual({ limit: 50, offset: 0, order_by: DEFAULT_ORDER, filters: [] })
+    expect(pageCalls()[0].query).toEqual({ limit: 25, offset: 0, order_by: DEFAULT_ORDER, filters: [] })
   })
 })
 
@@ -550,7 +547,7 @@ describe("Organic Keywords: requests are cancelled and cannot overwrite newer re
     expect(firstCall.signal.aborted).toBe(true) // the browser cancelled the old request
     await act(async () => { second.resolve(ok(pageEnvelope([REAL_ROWS[1]], { total: 1 }))) })
     await waitFor(() => expect(showing()).toBe("Showing 1–1 of 1 keywords"))
-    await act(async () => { first.resolve(ok(pageEnvelope(ALL.slice(0, 50), { total: TOTAL }))) }) // arrives late
+    await act(async () => { first.resolve(ok(pageEnvelope(ALL.slice(0, 25), { total: TOTAL }))) }) // arrives late
     await sleep(50)
     expect(showing()).toBe("Showing 1–1 of 1 keywords")
     expect(rowEls()).toHaveLength(1)
@@ -562,18 +559,18 @@ describe("Organic Keywords: requests are cancelled and cannot overwrite newer re
     serve(async (_p, _s, opts) => {
       if (!opts?.query) return ok(pageEnvelope([], { total: 4139, metrics: REAL_METRICS }))
       n += 1
-      return n === 1 ? ok(pageEnvelope(ALL.slice(0, 50), { total: TOTAL })) : next.promise
+      return n === 1 ? ok(pageEnvelope(ALL.slice(0, 25), { total: TOTAL })) : next.promise
     })
     renderPage()
     await screen.findAllByTestId("ok-row")
     fireEvent.click(screen.getByRole("button", { name: "Next page" }))
     await waitFor(() => expect(pageCalls()).toHaveLength(2))
-    expect(rowEls()).toHaveLength(50)
+    expect(rowEls()).toHaveLength(25)
     expect(screen.getByTestId("ok-table").closest("[aria-busy]").getAttribute("aria-busy")).toBe("true")
     expect(screen.getByTestId("ok-table").closest("[aria-busy]").className).toMatch(/opacity-60/)
     expect(screen.queryByTestId("ok-skeleton-row")).toBeNull()
-    await act(async () => { next.resolve(ok(pageEnvelope(ALL.slice(50, 100), { total: TOTAL }))) })
-    await waitFor(() => expect(showing()).toBe("Showing 51–100 of 137 keywords"))
+    await act(async () => { next.resolve(ok(pageEnvelope(ALL.slice(25, 50), { total: TOTAL }))) })
+    await waitFor(() => expect(showing()).toBe("Showing 26–50 of 137 keywords"))
     expect(screen.getByTestId("ok-table").closest("[aria-busy]").className).not.toMatch(/opacity-60/)
   })
 
@@ -581,10 +578,10 @@ describe("Organic Keywords: requests are cancelled and cannot overwrite newer re
     renderPage()
     await screen.findAllByTestId("ok-row")
     fireEvent.click(screen.getByRole("button", { name: "Next page" }))
-    await waitFor(() => expect(showing()).toBe("Showing 51–100 of 137 keywords"))
+    await waitFor(() => expect(showing()).toBe("Showing 26–50 of 137 keywords"))
     const n = pageCalls().length
     fireEvent.click(screen.getByRole("button", { name: "Previous page" }))
-    await waitFor(() => expect(showing()).toBe("Showing 1–50 of 137 keywords"))
+    await waitFor(() => expect(showing()).toBe("Showing 1–25 of 137 keywords"))
     expect(pageCalls()).toHaveLength(n)
   })
 })
@@ -592,7 +589,7 @@ describe("Organic Keywords: requests are cancelled and cannot overwrite newer re
 describe("Organic Keywords: empty, error and refresh states", () => {
   test("filters that match nothing: 'No keywords match these filters' with a Clear filters button that works", async () => {
     serve(async (_p, _s, opts) => (opts?.query
-      ? ok(pageEnvelope(opts.query.filters.length ? [] : ALL.slice(0, 50), { total: opts.query.filters.length ? 0 : TOTAL }))
+      ? ok(pageEnvelope(opts.query.filters.length ? [] : ALL.slice(0, 25), { total: opts.query.filters.length ? 0 : TOTAL }))
       : ok(pageEnvelope([], { total: 4139, metrics: REAL_METRICS }))))
     renderPage()
     await screen.findAllByTestId("ok-row")
@@ -602,7 +599,7 @@ describe("Organic Keywords: empty, error and refresh states", () => {
     expect(empty.textContent).toContain("No keywords match these filters")
     expect(screen.queryByText(/doesn.t rank for any keywords/)).toBeNull()
     fireEvent.click(within(empty).getByRole("button", { name: "Clear filters" }))
-    await waitFor(() => expect(screen.getAllByTestId("ok-row")).toHaveLength(50))
+    await waitFor(() => expect(screen.getAllByTestId("ok-row")).toHaveLength(25))
   })
 
   test("a domain with no keywords at all says so (and does not offer to clear filters)", async () => {
@@ -619,7 +616,7 @@ describe("Organic Keywords: empty, error and refresh states", () => {
     serve(async (_p, _s, opts) => {
       if (!opts?.query) return ok(pageEnvelope([], { total: 4139, metrics: REAL_METRICS }))
       if (fail) throw apiError("The data service is temporarily unavailable.")
-      return ok(pageEnvelope(ALL.slice(0, 50), { total: TOTAL }))
+      return ok(pageEnvelope(ALL.slice(0, 25), { total: TOTAL }))
     })
     renderPage()
     const results = await screen.findByTestId("ok-results")
@@ -629,7 +626,7 @@ describe("Organic Keywords: empty, error and refresh states", () => {
     expect(field("Search keywords")).toBeTruthy()
     fail = false
     fireEvent.click(within(alert).getByRole("button", { name: /retry/i }))
-    await waitFor(() => expect(screen.getAllByTestId("ok-row")).toHaveLength(50))
+    await waitFor(() => expect(screen.getAllByTestId("ok-row")).toHaveLength(25))
   })
 
   test("a project without a public domain gets a clear message instead of a retry loop", async () => {
@@ -650,7 +647,7 @@ describe("Organic Keywords: empty, error and refresh states", () => {
   })
 
   test("when the server declines to re-buy data fetched a minute ago the page says so", async () => {
-    serve(async (_p, _s, opts) => ok({ ...pageEnvelope(opts?.query ? ALL.slice(0, 50) : [], { total: opts?.query ? TOTAL : 4139, metrics: opts?.query ? null : REAL_METRICS }), refreshThrottled: Boolean(opts?.refresh) }))
+    serve(async (_p, _s, opts) => ok({ ...pageEnvelope(opts?.query ? ALL.slice(0, 25) : [], { total: opts?.query ? TOTAL : 4139, metrics: opts?.query ? null : REAL_METRICS }), refreshThrottled: Boolean(opts?.refresh) }))
     renderPage()
     await screen.findAllByTestId("ok-row")
     fireEvent.click(screen.getByTestId("ok-refresh"))
@@ -719,7 +716,7 @@ describe("Organic Keywords: expandable row", () => {
     renderPage()
     await open("asg hospital")
     fireEvent.click(screen.getByRole("button", { name: "Next page" }))
-    await waitFor(() => expect(showing()).toBe("Showing 51–100 of 137 keywords"))
+    await waitFor(() => expect(showing()).toBe("Showing 26–50 of 137 keywords"))
     expect(detailRegions()).toHaveLength(0)
   })
 })
@@ -747,7 +744,7 @@ describe("Organic Keywords: CSV export", () => {
     const csv = await text(blobs[0])
     const lines = csv.replace(/^﻿/, "").split("\r\n")
     expect(lines[0]).toBe("Keyword,Position,Previous position (absolute),Volume,KD,CPC (USD),Intent,Traffic,Traffic value (USD),URL,SERP features")
-    expect(lines).toHaveLength(51) // header + the 50 rows on the page
+    expect(lines).toHaveLength(26) // header + the 25 rows on the page
     expect(lines[1].startsWith("asg hospital,1,,74000,0,0.26,Navigational,")).toBe(true)
   })
 
@@ -760,7 +757,7 @@ describe("Organic Keywords: CSV export", () => {
     await screen.findAllByTestId("ok-row")
     // from page 2: the export still starts at the first row, not at the page on screen
     fireEvent.click(screen.getByRole("button", { name: "Next page" }))
-    await waitFor(() => expect(lastPageCall().query.offset).toBe(50))
+    await waitFor(() => expect(lastPageCall().query.offset).toBe(25))
     await screen.findAllByTestId("ok-row")
     const before = pageCalls().length
     serve(async (_p, _s, opts) => (opts?.query ? ok(pageEnvelope(ALL.slice(0, 120), { total: 120 })) : ok(pageEnvelope([], { total: 4139, metrics: REAL_METRICS }))))
@@ -775,7 +772,7 @@ describe("Organic Keywords: CSV export", () => {
 
   test("when more than 1,000 keywords match, the menu warns before the click and the result says it was capped", async () => {
     serve(async (_p, _s, opts) => (opts?.query
-      ? ok(pageEnvelope(ALL.slice(0, opts.query.limit === 1000 ? 100 : 50), { total: 4139 }))
+      ? ok(pageEnvelope(ALL.slice(0, opts.query.limit === 1000 ? 100 : 25), { total: 4139 }))
       : ok(pageEnvelope([], { total: 4139, metrics: REAL_METRICS }))))
     renderPage()
     await screen.findAllByTestId("ok-row")
@@ -794,11 +791,11 @@ describe("Organic Keywords: CSV export", () => {
   test("a failed 'Export all' says so, downloads nothing, and the page keeps working", async () => {
     renderPage()
     await screen.findAllByTestId("ok-row")
-    serve(async (_p, _s, opts) => { if (opts?.query?.limit === 1000) throw apiError("The data service is temporarily unavailable."); return ok(pageEnvelope(ALL.slice(0, 50), { total: TOTAL })) })
+    serve(async (_p, _s, opts) => { if (opts?.query?.limit === 1000) throw apiError("The data service is temporarily unavailable."); return ok(pageEnvelope(ALL.slice(0, 25), { total: TOTAL })) })
     fireEvent.click(screen.getByTestId("ok-export-all"))
     expect(await screen.findByText("The data service is temporarily unavailable.")).toBeTruthy()
     expect(clicked).toHaveLength(0)
-    expect(screen.getAllByTestId("ok-row")).toHaveLength(50)
+    expect(screen.getAllByTestId("ok-row")).toHaveLength(25)
   })
 
   test("exporting twice buys the 1,000 rows once", async () => {

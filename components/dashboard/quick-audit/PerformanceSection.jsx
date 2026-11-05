@@ -245,7 +245,7 @@ export default function PerformanceSection({ data }) {
   // Helper to get color for Core Web Vitals metrics — sourced from the
   // shared cwvThresholds (canonical, matches the video adapter's bands).
   const getCwvColor = (metric, value) => {
-    if (!value || value === "--") return 'text-slate-400';
+    if (!value || value === "--") return 'text-slate-600 dark:text-slate-400';
     const ms = parseCwvValueToMs(metric, value);
     const rating = rateCwvMetric(metric, ms);
     return cwvRatingToTailwindClass(rating);
@@ -282,14 +282,14 @@ export default function PerformanceSection({ data }) {
   return (
     <section className="space-y-12 pt-8">
       {/* HEADER */}
-      <div className="flex justify-between items-end border-b border-[#263244] pb-8 mb-8">
-        <h2 className="text-3xl font-bold text-white flex items-center gap-4">
+      <div className="flex justify-between items-end border-b border-slate-200 dark:border-[#263244] pb-8 mb-8">
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center">
-            <span className="text-orange-400 text-xl">⚡</span>
+            <span className="text-orange-700 dark:text-orange-400 text-xl">⚡</span>
           </div>
           Performance & Core Web Vitals
         </h2>
-        <span className="text-2xl font-bold text-orange-400">
+        <span className="text-2xl font-bold text-orange-700 dark:text-orange-400">
           {isPerformanceProcessing ? (
             <span className="animate-pulse">Analyzing...</span>
           ) : (
@@ -301,13 +301,13 @@ export default function PerformanceSection({ data }) {
       {/* GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* LEFT CARD - Device Performance Comparison */}
-        <div className="bg-[#111827] border border-[#263244] rounded-3xl p-8">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-3xl p-8">
           {/* TOP */}
           <div className="flex justify-between items-center mb-8">
-            <h4 className="text-xl font-bold text-white">
+            <h4 className="text-xl font-bold text-slate-900 dark:text-white">
               Device Performance Comparison
             </h4>
-            <span className="px-3 py-1 rounded-md text-[10px] font-bold bg-orange-400/10 text-orange-400 border border-orange-400/20 uppercase tracking-widest">
+            <span className="px-3 py-1 rounded-md text-[10px] font-bold bg-orange-400/10 text-orange-700 dark:text-orange-400 border border-orange-400/20 uppercase tracking-widest">
               High Priority
             </span>
           </div>
@@ -315,7 +315,7 @@ export default function PerformanceSection({ data }) {
           {/* DEVICE SCORES */}
           <div className="grid grid-cols-2 gap-8">
             {/* MOBILE */}
-            <div className="text-center space-y-4 border-r border-[#263244] pr-8">
+            <div className="text-center space-y-4 border-r border-slate-200 dark:border-[#263244] pr-8">
               <div className="relative inline-flex items-center justify-center">
                 <svg className="w-32 h-32 transform -rotate-90">
                   <circle
@@ -391,31 +391,31 @@ export default function PerformanceSection({ data }) {
 
           {/* CORE WEB VITALS */}
           <div className="flex justify-center mt-8 mb-6">
-            <h3 className="text-xl text-white">
+            <h3 className="text-xl text-slate-900 dark:text-white">
               Core Web Vitals Details
             </h3>
           </div>
 
           <div className="grid grid-cols-2 gap-8">
             {/* MOBILE METRICS */}
-            <div className="space-y-3 border-r border-[#263244] pr-8">
+            <div className="space-y-3 border-r border-slate-200 dark:border-[#263244] pr-8">
               <p className="text-xs uppercase tracking-[0.18em] text-slate-500 mb-4">
                 MOBILE METRICS
               </p>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs">LCP</span>
+                <span className="text-slate-600 dark:text-slate-400 text-xs">LCP</span>
                 <span className={`font-bold ${getCwvColor('lcp', mobileMetrics.lcp)}`}>{mobileMetrics.lcp || "--"}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs">TBT</span>
+                <span className="text-slate-600 dark:text-slate-400 text-xs">TBT</span>
                 <span className={`font-bold ${getCwvColor('tbt', mobileMetrics.tbt)}`}>{mobileMetrics.tbt || "--"}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs">FCP</span>
+                <span className="text-slate-600 dark:text-slate-400 text-xs">FCP</span>
                 <span className={`font-bold ${getCwvColor('fcp', mobileMetrics.fcp)}`}>{mobileMetrics.fcp || "--"}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs">CLS</span>
+                <span className="text-slate-600 dark:text-slate-400 text-xs">CLS</span>
                 <span className={`font-bold ${getCwvColor('cls', mobileMetrics.cls)}`}>{mobileMetrics.cls || "--"}</span>
               </div>
             </div>
@@ -426,19 +426,19 @@ export default function PerformanceSection({ data }) {
                 DESKTOP METRICS
               </p>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs">LCP</span>
+                <span className="text-slate-600 dark:text-slate-400 text-xs">LCP</span>
                 <span className={`font-bold ${getCwvColor('lcp', desktopMetrics.lcp)}`}>{desktopMetrics.lcp || "--"}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs">TBT</span>
+                <span className="text-slate-600 dark:text-slate-400 text-xs">TBT</span>
                 <span className={`font-bold ${getCwvColor('tbt', desktopMetrics.tbt)}`}>{desktopMetrics.tbt || "--"}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs">FCP</span>
+                <span className="text-slate-600 dark:text-slate-400 text-xs">FCP</span>
                 <span className={`font-bold ${getCwvColor('fcp', desktopMetrics.fcp)}`}>{desktopMetrics.fcp || "--"}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs">CLS</span>
+                <span className="text-slate-600 dark:text-slate-400 text-xs">CLS</span>
                 <span className={`font-bold ${getCwvColor('cls', desktopMetrics.cls)}`}>{desktopMetrics.cls || "--"}</span>
               </div>
             </div>
@@ -446,13 +446,13 @@ export default function PerformanceSection({ data }) {
         </div>
 
         {/* RIGHT CARD - Performance Checks */}
-        <div className="bg-[#111827] border border-[#263244] rounded-3xl p-8">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263244] rounded-3xl p-8">
           {/* TOP */}
           <div className="flex justify-between items-center mb-8">
-            <h4 className="text-xl font-bold text-white">
+            <h4 className="text-xl font-bold text-slate-900 dark:text-white">
               Performance Checks
             </h4>
-            <span className="px-3 py-1 rounded-md text-[10px] font-bold bg-red-400/10 text-red-400 border border-red-400/20 uppercase tracking-widest">
+            <span className="px-3 py-1 rounded-md text-[10px] font-bold bg-red-400/10 text-red-600 dark:text-red-400 border border-red-400/20 uppercase tracking-widest">
               {getStatusInfo(perfStatus).text}
             </span>
           </div>
@@ -462,9 +462,9 @@ export default function PerformanceSection({ data }) {
             {performanceChecksData.map((check) => {
               const statusInfo = getStatusInfo(check.status);
               return (
-                <div key={check.id} className="flex justify-between items-center pb-4 border-b border-[#263244] last:border-b-0">
+                <div key={check.id} className="flex justify-between items-center pb-4 border-b border-slate-200 dark:border-[#263244] last:border-b-0">
                   <div>
-                    <p className="font-bold text-white text-sm">
+                    <p className="font-bold text-slate-900 dark:text-white text-sm">
                       {check.name}
                     </p>
                     <p className="text-[11px] text-slate-500 uppercase">
@@ -472,7 +472,7 @@ export default function PerformanceSection({ data }) {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-white">
+                    <p className="text-lg font-bold text-slate-900 dark:text-white">
                       {check.value}
                     </p>
                   </div>
@@ -483,10 +483,10 @@ export default function PerformanceSection({ data }) {
 
           {/* RECOMMENDATION */}
           <div className="mt-8 p-6 bg-cyan-400/5 rounded-xl border border-cyan-400/20">
-            <p className="text-[10px] uppercase tracking-[0.15em] text-cyan-400 mb-2">
+            <p className="text-[10px] uppercase tracking-[0.15em] text-cyan-700 dark:text-cyan-400 mb-2">
               AI Recommendation
             </p>
-            <p className="font-semibold text-cyan-200">
+            <p className="font-semibold text-cyan-800 dark:text-cyan-200">
               Optimize server response time and implement caching strategies to improve overall performance.
             </p>
           </div>

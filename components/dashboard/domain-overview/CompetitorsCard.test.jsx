@@ -44,8 +44,7 @@ describe("Domain Overview: Your competitors card", () => {
     expect(within(rows[0]).getByTestId("yc-verdict").textContent).toMatch(/Ahead of you/)
     expect(within(rows[1]).getByTestId("yc-verdict").textContent).toMatch(/Behind you/)
     expect(within(rows[0]).getAllByTestId("yc-arrow")).toHaveLength(4)
-    expect(within(rows[0]).getByTestId("do-competitor-traffic").textContent).toBe("89.5K")
-    expect(within(rows[0]).getByTestId("do-competitor-shared").textContent).toBe("45")
+    expect(within(rows[0]).getByTestId("yc-organicTraffic").textContent).toMatch(/^89\.5K/)
     expect(rows).toHaveLength(2)
     expect(screen.queryByText("nih.gov")).toBeNull()
   })
@@ -67,7 +66,7 @@ describe("Domain Overview: Your competitors card", () => {
     renderCard()
     expect(await screen.findAllByTestId("do-competitor-row")).toHaveLength(5)
     expect(screen.getByTestId("do-competitors-more").textContent).toBe("Showing 5 of 8")
-    expect(screen.getByRole("link", { name: /View all competitors/ }).getAttribute("href")).toBe(COMPETITORS_HREF)
+    expect(screen.getByRole("link", { name: /Compare in detail/ }).getAttribute("href")).toBe(COMPETITORS_HREF)
   })
 
   test("no added competitors: it says so and links to add some (no table, no zeros)", async () => {
@@ -91,7 +90,8 @@ describe("Domain Overview: Your competitors card", () => {
     mine.list.mockResolvedValue(ok({ limit: 100, competitors: [comp("a", "Half Known", "asgeyehospital.com", { organicTraffic: 50000 })] }))
     renderCard()
     const row = within(await screen.findByTestId("do-competitor-row"))
-    expect(row.getByTestId("do-competitor-shared").textContent).toBe("—")
+    expect(row.getByTestId("yc-rankingKeywords").textContent).toMatch(/^—/)
+    expect(row.getByTestId("yc-rankingKeywords").querySelector("[data-missing]")).not.toBeNull()
   })
 
   test("a load failure is shown inside the card with a retry", async () => {

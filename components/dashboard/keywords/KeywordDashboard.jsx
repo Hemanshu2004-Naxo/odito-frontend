@@ -6,10 +6,13 @@ import apiService from '@/lib/apiService';
 import ProgressBar from '@/components/ui/ProgressBar';
 import UserAddedKeywords from './components/UserAddedKeywords';
 import AddKeywordModal from './components/AddKeywordModal';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/keys';
 import { useKeywords, useDeleteKeyword } from '@/hooks/useKeywordQueries';
 import './styles/keywords.css';
 
 export default function KeywordDashboard() {
+  const queryClient = useQueryClient();
   const { activeProject } = useProject();
   const projectId = activeProject?._id;
 
@@ -63,6 +66,9 @@ export default function KeywordDashboard() {
       // what makes that row's "Scan Error" state show up without a manual
       // page reload.
       await refetch();
+      // The rescan changed this keyword's rank and history: an open row must not keep showing the old ones. Open rows refetch now,
+      // closed ones refetch the next time they are opened.
+      queryClient.invalidateQueries({ queryKey: queryKeys.keywords.details(projectId) });
     } catch (err) {
       // A hard failure of the REQUEST itself (network drop, the 30-minute
       // cooldown's 429, an unexpected 500) — never silently reverted to
@@ -239,6 +245,7 @@ export default function KeywordDashboard() {
       {/* MAIN CONTENT */}
       <div className="kwdash-wrap" style={{ flex: 1 }}>
         <UserAddedKeywords
+          projectId={projectId}
           data={rankingData}
           loading={isLoading}
           error={isError ? (error?.message || 'Failed to load tracked keywords') : null}

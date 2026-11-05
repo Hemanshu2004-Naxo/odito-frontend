@@ -155,7 +155,7 @@ describe("Referring Domains: first load", () => {
   test("the frame is there at once: title, domain, skeletons — no page-wide spinner", () => {
     svc.getSection.mockImplementation(() => new Promise(() => {}))
     renderPage()
-    expect(screen.getByRole("heading", { level: 1, name: "Referring Domains" })).toBeTruthy()
+    expect(screen.getByRole("heading", { level: 1, name: "Referring domains" })).toBeTruthy()
     expect(screen.getByTestId("rd-domain").textContent).toBe("asgeyehospital.com")
     expect(screen.getAllByTestId("rd-skeleton-row").length).toBeGreaterThanOrEqual(5)
     expect(screen.getByTestId("rd-summary-skeleton")).toBeTruthy()
@@ -165,7 +165,7 @@ describe("Referring Domains: first load", () => {
   test("header: last updated, Refresh, Export CSV and Export disavow file (disabled while the list is empty)", async () => {
     renderPage()
     await loaded()
-    expect(screen.getByTestId("rd-updated").textContent).toMatch(/^Last updated .*2026/)
+    expect(screen.getByTestId("rd-updated").textContent).toMatch(/^Updated .*2026/)
     for (const id of ["rd-refresh", "rd-export", "rd-export-disavow"]) expect(screen.getByTestId(id)).toBeTruthy()
     await waitFor(() => expect(screen.getByTestId("rd-export-disavow").disabled).toBe(true))
   })

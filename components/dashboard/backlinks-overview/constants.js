@@ -29,6 +29,8 @@ export const LINKS = Object.freeze({
   referringDomains: "/app/referring-domains",
   brokenBacklinks: "/app/backlinks/list?broken=true",
   brokenPages: "/app/backlinks/top-pages?status=error",
+  backlinksList: "/app/backlinks/list",
+  anchors: "/app/backlinks/anchors",
 })
 
 export const OTHERS_KEY = "__others__"

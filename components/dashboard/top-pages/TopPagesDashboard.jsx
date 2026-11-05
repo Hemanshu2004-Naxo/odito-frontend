@@ -32,7 +32,7 @@ export default function TopPagesDashboard() {
   if (!projectId) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Top Pages</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Top linked pages</h1>
         <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-sm text-muted-foreground">Select a project to see its top pages.</div>
       </div>
     )
@@ -72,10 +72,11 @@ function ProjectTopPages({ projectId, project }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <TopPagesHeader
         domain={domain}
         updatedAt={tp.updatedAt}
+        pageCount={tp.counts.data?.pages ?? null}
         onRefresh={() => { setRefreshClicked(true); tp.refresh() }}
         busy={tp.isFetching}
         refreshing={refreshClicked && tp.isFetching}
@@ -93,7 +94,6 @@ function ProjectTopPages({ projectId, project }) {
       ) : (
         <>
           <SummaryStrip counts={tp.counts} summary={tp.summary} onOpenTab={openTab} />
-          <FixFirst fixFirst={tp.fixFirst} onOpenErrors={() => openTab("errors")} />
 
           <div ref={tableRef} className="scroll-mt-4 space-y-4">
             <TabsBar tab={state.tab} counts={tp.tabCounts} onTab={(tab) => update({ tab })} merge={state.merge} onMerge={(merge) => update({ merge, page: state.page })} />
@@ -123,6 +123,9 @@ function ProjectTopPages({ projectId, project }) {
               trafficTruncated={tp.traffic.truncated}
             />
           </div>
+
+          <FixFirst fixFirst={tp.fixFirst} onOpenErrors={() => openTab("errors")} />
+          <p className="text-xs text-muted-foreground">Data from the DataForSEO Backlinks API (backlinks/domain_pages). Page status from the latest crawl.</p>
 
           <ExportDialog
             open={exportOpen}

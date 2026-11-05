@@ -43,7 +43,7 @@ function SortHead({ column, state, onSort }) {
     <button
       type="button"
       onClick={(e) => onSort(column.sort, { shift: e.shiftKey })}
-      className={cn("inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "text-foreground" : "text-foreground/80")}
+      className={cn("inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "text-foreground" : "text-muted-foreground")}
       aria-label={`Sort by ${column.label}${active ? `, currently ${dir === "asc" ? "ascending" : "descending"}${rules.length > 1 ? `, sort ${index + 1} of ${rules.length}` : ""}` : ""}. Shift-click to add a secondary sort.`}
       data-testid={`bl-sort-${column.sort}`}
     >
@@ -177,9 +177,9 @@ export default function BacklinksTable({ page, state, update, onSort, onFilterDo
   const filtered = activeCount > 0
 
   return (
-    <section className="rounded-xl border border-border/60 bg-card" aria-labelledby="bl-table-title" data-testid="bl-results">
+    <section className="rounded-2xl border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]" aria-labelledby="bl-table-title" data-testid="bl-results">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 pt-4">
-        <h2 id="bl-table-title" className="text-base font-semibold">Backlinks</h2>
+        <h2 id="bl-table-title" className="text-[15px] font-semibold tracking-tight">Backlinks</h2>
         <p className="flex items-center gap-2 text-sm text-muted-foreground tabular-nums" role="status" data-testid="bl-showing">
           {page.stale && page.isFetching ? <Loader2 className="size-3.5 animate-spin" aria-label="Updating results" /> : null}
           {showing}
@@ -213,9 +213,9 @@ export default function BacklinksTable({ page, state, update, onSort, onFilterDo
       ) : (
         <div className={cn("mt-3 border-t border-border/60 transition-opacity", page.stale && "opacity-60")} aria-busy={page.status === "loading" || (page.stale && page.isFetching)}>
           <Table data-testid="bl-table">
-            <TableHeader>
+            <TableHeader className="bg-muted/50 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground">
               <TableRow>
-                <TableHead className="sticky left-0 z-10 min-w-[280px] bg-card pl-3 align-bottom">Source</TableHead>
+                <TableHead className="sticky left-0 z-10 min-w-[280px] bg-muted pl-3 align-bottom">Source</TableHead>
                 {columns.map((c) => <Head key={c.key} column={c} state={state} onSort={onSort} />)}
               </TableRow>
             </TableHeader>

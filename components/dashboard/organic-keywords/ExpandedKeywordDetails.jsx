@@ -9,7 +9,7 @@ import { formatBidRange, formatCompetition, formatCpc } from "./format"
 import MonthlyVolumeChart from "./MonthlyVolumeChart"
 import { SerpFeatureIcons, UrlCell } from "./cells"
 
-function Fact({ label, hint, children }) {
+export function Fact({ label, hint, children }) {
   return (
     <div className="min-w-0 rounded-lg border border-border/60 bg-card px-3 py-2">
       <dt className="flex items-center gap-1 text-xs text-muted-foreground">{label}{hint ? <InfoHint label={label} text={hint} /> : null}</dt>

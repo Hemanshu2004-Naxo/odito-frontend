@@ -22,7 +22,7 @@ export default function ExportPdfButton({ auditId }) {
         type="button"
         onClick={handleClick}
         disabled={loading || !auditId}
-        className="px-5 py-2.5 rounded-2xl bg-[#111827] border border-orange-400/40 text-white font-semibold text-sm flex items-center gap-2 hover:border-orange-400/70 hover:bg-orange-400/5 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-5 py-2.5 rounded-2xl bg-white dark:bg-[#111827] border border-orange-400/60 dark:border-orange-400/40 text-slate-900 dark:text-white font-semibold text-sm flex items-center gap-2 hover:border-orange-400/70 hover:bg-orange-400/5 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? (
           <>
@@ -36,7 +36,7 @@ export default function ExportPdfButton({ auditId }) {
           </>
         )}
       </button>
-      {error && <p className="text-xs text-red-400">PDF export failed: {error}</p>}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">PDF export failed: {error}</p>}
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import UserAddedKeywords from "./UserAddedKeywords"
+
+vi.mock("@/lib/apiService", () => ({ default: { getTrackedKeywordDetails: vi.fn(() => new Promise(() => {})) } }))
 
 const data = {
   domain: "example.com",
@@ -40,11 +43,11 @@ describe("UserAddedKeywords — responsive markup (styles/keywords.css re-flows 
 
   it("keeps rescan / delete / expand reachable and working", () => {
     const onRescan = vi.fn()
-    render(<UserAddedKeywords data={data} onRescan={onRescan} onDelete={() => {}} />)
+    render(<QueryClientProvider client={new QueryClient()}><UserAddedKeywords projectId="p1" data={data} onRescan={onRescan} onDelete={() => {}} /></QueryClientProvider>)
     fireEvent.click(screen.getAllByTitle("Re-scan this keyword")[0])
     expect(onRescan).toHaveBeenCalledWith("best seo agency")
     expect(screen.getAllByTitle("Stop tracking this keyword")).toHaveLength(2)
-    fireEvent.click(screen.getByText("▼"))
+    fireEvent.click(screen.getAllByTestId("kw-toggle")[0])
     expect(document.querySelector(".kw-expand")).toBeTruthy()
   })
 })

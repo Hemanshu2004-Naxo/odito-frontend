@@ -21,8 +21,9 @@ export const FIELD = Object.freeze({
   isDown: `${ROW}.rank_changes.is_down`,
 })
 
-export const PAGE_SIZES = Object.freeze([25, 50, 100])
-export const DEFAULT_PAGE_SIZE = 50
+/** Organic Keywords always shows 25 rows per page (one size, so no page-size menu; an old ?size=50 link falls back to 25). */
+export const PAGE_SIZES = Object.freeze([25])
+export const DEFAULT_PAGE_SIZE = 25
 /** Rows one "export all" request returns (the provider's maximum per request). */
 export const EXPORT_ALL_LIMIT = 1000
 /** The deepest `offset` the backend accepts (it mirrors the provider's cap), so the last page that can be requested depends on the page size. */

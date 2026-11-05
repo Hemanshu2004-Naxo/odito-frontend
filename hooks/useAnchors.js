@@ -37,7 +37,7 @@ import { useAnchorSettings } from "@/hooks/useAnchorSettings"
 
 const consume = (set, name) => set.delete(name)
 
-export function useAnchors(projectId, targetDomain) {
+export function useAnchors(projectId, targetDomain, { withTable = true } = {}) {
   const searchParams = useSearchParams()
   const [state, setStateRaw] = useState(() => parseUrlState(searchParams))
   const stateRef = useRef(state)
@@ -67,7 +67,8 @@ export function useAnchors(projectId, targetDomain) {
   const pageQ = useQuery({
     queryKey: queryKeys.domainOverview.anchors(projectId, request),
     queryFn: ({ signal }) => domainOverviewService.getSection(projectId, "anchors", { refresh: consume(refreshNext.current, "page"), anchors: request }, { signal }),
-    enabled: !!projectId && !built.tooMany,
+    // withTable: false = the page shows only the profile (no per-page table request is made at all).
+    enabled: !!projectId && withTable && !built.tooMany,
     placeholderData: keepPreviousData,
     staleTime: staleTimes.STANDARD,
     retry: false,
@@ -123,9 +124,9 @@ export function useAnchors(projectId, targetDomain) {
   const refresh = useCallback(() => {
     refreshNext.current.add("page")
     refreshNext.current.add("profile")
-    pageQ.refetch()
+    if (withTable) pageQ.refetch()
     profileQ.refetch()
-  }, [pageQ, profileQ])
+  }, [pageQ, profileQ, withTable])
 
   return {
     state,
@@ -150,7 +151,7 @@ export function useAnchors(projectId, targetDomain) {
     },
     profile: {
       status: profileEnvelope ? "success" : profileQ.isError ? "error" : "loading",
-      error: profileQ.isError ? { message: describeSectionError(profileQ.error) } : null,
+      error: profileQ.isError ? { message: describeSectionError(profileQ.error), code: profileQ.error?.code ?? null } : null,
       refetch: () => profileQ.refetch(),
       rows: profileRows,
       total: profile.total,
@@ -162,7 +163,7 @@ export function useAnchors(projectId, targetDomain) {
     totalReferringDomains,
     target: pageEnvelope?.target ?? profileEnvelope?.target ?? null,
     updatedAt: pageEnvelope?.fetchedAt ?? profileEnvelope?.fetchedAt ?? null,
-    refreshThrottled: Boolean(pageEnvelope?.refreshThrottled),
+    refreshThrottled: Boolean(pageEnvelope?.refreshThrottled ?? profileEnvelope?.refreshThrottled),
     isFetching: pageQ.isFetching || profileQ.isFetching,
     refresh,
   }

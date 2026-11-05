@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import TrafficHistoryDashboard from "@/components/dashboard/traffic-history/TrafficHistoryDashboard"
 
-export const metadata = { title: "Traffic History" }
+export const metadata = { title: "Traffic" }
 
 export default function TrafficHistoryPage() {
   return (

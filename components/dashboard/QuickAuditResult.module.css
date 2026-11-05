@@ -8,7 +8,7 @@
   padding: 28px 32px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
-  color: #f3f4f6;
+  color: #0f172a; /* light theme; the dark theme / landing page gets the original light-on-dark below */
   background: transparent;
   border-radius: 0;
   box-shadow: none;
@@ -128,10 +128,23 @@
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 20px;
-  color: #f3f4f6;
+  color: #0f172a;
 }
 
 .auditTitle span {
+  color: #1d4ed8;
+}
+
+/* The landing page always has <html class="dark">, and so does the dashboard in its dark theme: they keep the original colours. */
+:global(.dark) .wrap {
+  color: #f3f4f6;
+}
+
+:global(.dark) .auditTitle {
+  color: #f3f4f6;
+}
+
+:global(.dark) .auditTitle span {
   color: #60a5fa;
 }
 
@@ -425,8 +438,8 @@
 /* ===== Section ===== */
 .section {
   margin-top: 24px;
-  background: #1f2937;
-  border: 1px solid #374151;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   box-shadow: none;
   padding: 20px 24px;
@@ -436,6 +449,15 @@
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 14px;
+  color: #0f172a;
+}
+
+:global(.dark) .section {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+:global(.dark) .sectionTitle {
   color: #f3f4f6;
 }
 

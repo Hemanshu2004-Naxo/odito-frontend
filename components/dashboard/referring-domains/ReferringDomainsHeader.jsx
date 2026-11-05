@@ -1,6 +1,7 @@
 "use client"
 
-import { ChevronDown, Download, FileText, Globe, Loader2, RefreshCw } from "lucide-react"
+import Link from "next/link"
+import { ChevronDown, Download, FileText, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatDateTime } from "./format"
@@ -9,7 +10,7 @@ import { formatExact } from "../domain-overview/format"
 import { estimateExport } from "../backlinks/exportCsv"
 
 /**
- * Title, domain, "Last updated", Refresh (skips the server cache for the table on screen; the server still refuses to re-buy data fetched in
+ * Breadcrumb, title and domain; on the right "Updated …", Refresh (skips the server cache for the table on screen; the server still refuses to re-buy data fetched in
  * the last minute; the two profile cards keep their 7-day cache), Export CSV (the rows on screen, no request — or everything matching the current
  * filters, fetched by the server in batches, which asks for confirmation with the cost first) and "Export disavow file".
  */
@@ -19,30 +20,32 @@ export default function ReferringDomainsHeader({
 }) {
   const plan = estimateExport(total)
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="flex flex-col gap-4 @min-[900px]/main:flex-row @min-[900px]/main:items-end @min-[900px]/main:justify-between">
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight">Referring Domains</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground" data-testid="rd-meta">
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-foreground">
-            <Globe className="size-3.5 text-muted-foreground" aria-hidden />
-            <span className="sr-only">Domain: </span>
-            <span className="font-medium" data-testid="rd-domain">{domain || "—"}</span>
-          </span>
-          <span data-testid="rd-updated">
-            {updatedAt ? <>Last updated <span className="text-foreground">{formatDateTime(updatedAt)}</span></> : <Skel className="inline-block h-4 w-40 align-middle" />}
-          </span>
-        </div>
+        <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
+          <ol className="flex flex-wrap items-center gap-1.5">
+            <li><Link href="/app/dashboard" className="hover:text-foreground hover:underline underline-offset-2">Dashboard</Link></li>
+            <li aria-hidden>/</li><li>SEO</li><li aria-hidden>/</li><li>Off-page</li>
+          </ol>
+        </nav>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Referring domains</h1>
+        <p className="mt-1 text-sm text-muted-foreground" data-testid="rd-meta">
+          <span className="sr-only">Domain: </span><span className="font-medium text-foreground" data-testid="rd-domain">{domain || "—"}</span>
+        </p>
       </div>
 
-      <div className="flex shrink-0 flex-col items-start gap-1.5 lg:items-end">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-col items-start gap-1.5 @min-[900px]/main:items-end">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs text-muted-foreground" data-testid="rd-updated">
+            {updatedAt ? <>Updated {formatDateTime(updatedAt)}</> : <Skel className="inline-block h-3.5 w-36 align-middle" />}
+          </span>
           <Button type="button" variant="outline" onClick={onRefresh} disabled={busy} aria-busy={busy} data-testid="rd-refresh">
             {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
             {refreshing ? "Refreshing…" : "Refresh"}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" data-testid="rd-export">
+              <Button type="button" className="bg-emerald-400 font-semibold text-[#0d1a3a] hover:bg-emerald-300" data-testid="rd-export">
                 <Download className="size-4" aria-hidden /> Export CSV <ChevronDown className="size-4 opacity-60" aria-hidden />
               </Button>
             </DropdownMenuTrigger>
@@ -67,7 +70,7 @@ export default function ReferringDomainsHeader({
             <FileText className="size-4" aria-hidden /> Export disavow file
           </Button>
         </div>
-        {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground lg:text-right" role="status">{refreshNote}</p> : null}
+        {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground @min-[900px]/main:text-right" role="status">{refreshNote}</p> : null}
       </div>
     </div>
   )

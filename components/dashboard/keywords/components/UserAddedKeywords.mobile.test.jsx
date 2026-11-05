@@ -1,6 +1,11 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, within, fireEvent } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import UserAddedKeywords, { getRankChange, getMobileState } from "./UserAddedKeywords"
+
+// The expanded row fetches through apiService; nothing here may reach the network.
+vi.mock("@/lib/apiService", () => ({ default: { getTrackedKeywordDetails: vi.fn(() => new Promise(() => {})) } }))
+const withClient = (ui) => <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>
 
 const wrap = (keywords) => ({
   domain: "example.com",
@@ -129,12 +134,13 @@ describe("UserAddedKeywords — Desktop and Mobile columns", () => {
     expect(cell.textContent).toContain("#4")
   })
 
-  it("lists mobile ranking URLs, tagged by device, in the expanded row", () => {
-    const { container, getByText } = render(
-      <UserAddedKeywords data={wrap([{ keyword: "k", current_rank: 4, ranking_urls: [{ rank: 4, type: "homepage", url: "https://example.com/" }], mobile: { last_scan_status: "ok", current_rank: 9, ranking_urls: [{ rank: 9, type: "internal_page", url: "https://example.com/m" }] } }])} />
-    )
-    fireEvent.click(getByText("▼"))
-    const rows = container.querySelectorAll(".kw-expand [data-device]")
-    expect([...rows].map((r) => r.getAttribute("data-device"))).toEqual(["desktop", "mobile"])
+  it("opens the details region from the keyword toggle (the old triangle button is gone)", () => {
+    const { container, getByTestId, queryByText } = render(withClient(
+      <UserAddedKeywords projectId="p1" data={wrap([{ keyword: "k", current_rank: 4, ranking_urls: [{ rank: 4, type: "homepage", url: "https://example.com/" }], mobile: { last_scan_status: "ok", current_rank: 9 } }])} />
+    ))
+    expect(queryByText("▼")).toBeNull()
+    expect(container.querySelector(".kw-expand")).toBeNull()
+    fireEvent.click(getByTestId("kw-toggle"))
+    expect(container.querySelector(".kw-expand [data-testid='kw-details']")).toBeTruthy()
   })
 })

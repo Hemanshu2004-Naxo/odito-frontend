@@ -75,3 +75,22 @@ describe("backlinks-list section (the Backlinks page): the default view is the p
     expect(new URLSearchParams(urlOf().split("?")[1]).has("offset")).toBe(false)
   })
 })
+
+describe("opening a page only reads what is stored", () => {
+  it("a view nothing was collected for (missing) is a NOT_SCANNED error, not an empty success", async () => {
+    api.request.mockResolvedValue({ success: true, data: { missing: true, result: null } })
+    await expect(get("history")).rejects.toMatchObject({ code: "NOT_SCANNED", status: 404 })
+  })
+
+  it("stored data, fresh or stale, is passed through untouched", async () => {
+    const res = { success: true, data: { missing: false, stale: true, result: { a: 1 } } }
+    api.request.mockResolvedValue(res)
+    await expect(get("history")).resolves.toBe(res)
+  })
+
+  it("a peek miss (result null, not missing) is still a normal answer", async () => {
+    const res = { success: true, data: { peek: true, missing: false, result: null } }
+    api.request.mockResolvedValue(res)
+    await expect(get("anchor-profile", { peek: true })).resolves.toBe(res)
+  })
+})

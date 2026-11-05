@@ -64,7 +64,7 @@ export const sidebarSections = [
       },
       {
         id: "traffic-history",
-        label: "Traffic History",
+        label: "Traffic",
         href: "/app/traffic-history",
         icon: ChartLine,
       },
@@ -91,7 +91,7 @@ export const sidebarSections = [
           { id: "off-page-backlinks", label: "Backlinks", href: "/app/backlinks/list" },
           { id: "off-page-anchors", label: "Anchors", href: "/app/backlinks/anchors" },
           { id: "off-page-referring-domains", label: "Referring Domains", href: "/app/referring-domains" },
-          { id: "off-page-top-pages", label: "Top Pages", href: "/app/backlinks/top-pages" },
+          { id: "off-page-top-pages", label: "Top linked pages", href: "/app/backlinks/top-pages" },
         ],
       },
     ],
@@ -147,6 +147,7 @@ export const sidebarSections = [
   {
     id: "leads",
     label: "Leads",
+    hidden: true, // not shown in the sidebar for now; the pages and routes still exist. Remove this line to show it again.
     items: [
       {
         id: "leads-all",
@@ -159,6 +160,7 @@ export const sidebarSections = [
   {
     id: "social-media",
     label: "Social Media",
+    hidden: true, // not shown in the sidebar for now; the pages and routes still exist. Remove this line to show it again.
     items: [
       {
         id: "social-media-overview",

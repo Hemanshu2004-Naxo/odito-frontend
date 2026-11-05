@@ -1,4 +1,6 @@
-import React, { useState, memo, useCallback } from 'react';
+import React, { useState, memo, useCallback, useId } from 'react';
+import { ChevronRight } from 'lucide-react';
+import TrackedKeywordDetails from './TrackedKeywordDetails';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -11,18 +13,6 @@ import {
 } from '@/components/ui/alert-dialog';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function getUrlLabel(url) {
-  try {
-    const path = new URL(url).pathname.replace(/\/$/, '');
-    if (!path) return 'Homepage';
-    return path.split('/').filter(Boolean).pop()
-      .replace(/-/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase());
-  } catch {
-    return url;
-  }
-}
 
 function formatDate(dateString) {
   if (!dateString) return '';
@@ -231,43 +221,6 @@ function MapsRankBadge({ mapsRank }) {
   );
 }
 
-/** Maps listing card shown in the expanded row */
-function MapsListingCard({ listing }) {
-  if (!listing || !listing.title) return null;
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-start', gap: '10px',
-      padding: '9px 14px',
-      background: 'var(--bg)', border: '0.5px solid var(--color-status-success-border)',
-      borderRadius: '8px', marginTop: '4px'
-    }}>
-      <span style={{ fontSize: '14px', flexShrink: 0, marginTop: '1px' }}>📍</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gr)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {listing.title}
-        </div>
-        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-          {listing.rating != null && (
-            <span style={{ fontSize: '11px', color: 'var(--text2)' }}>
-              ⭐ {listing.rating}
-            </span>
-          )}
-          {listing.reviews != null && (
-            <span style={{ fontSize: '11px', color: 'var(--text3)' }}>
-              {listing.reviews.toLocaleString()} reviews
-            </span>
-          )}
-          {listing.address && (
-            <span style={{ fontSize: '11px', color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {listing.address}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** Per-keyword re-scan button with spinner while in-flight */
 function RescanButton({ keyword, isRescanning, onRescan }) {
   return (
@@ -332,8 +285,9 @@ function DeleteButton({ isDeleting, onRequestDelete }) {
  * handlers) so the memo comparison is actually effective, not defeated by a
  * fresh function/array identity on every parent render.
  */
-const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanning, isDeleting, onRescan, onRequestDelete }) {
+const KeywordRow = memo(function KeywordRow({ projectId, keyword, index, isLast, isRescanning, isDeleting, onRescan, onRequestDelete }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const detailsId = useId();
 
   // Support both canonical doc fields (current_rank) and legacy archive
   // docs that never had a current_rank field at all. Fall back to
@@ -351,7 +305,6 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
   const prevMonthRank = keyword.prev_month_rank ?? null;
   const benchmarkRank = keyword.benchmark_rank  ?? null;
   const mapsRank      = keyword.maps_rank       ?? null;
-  const mapsListing   = keyword.maps_listing    ?? null;
 
   // Set by buildKeywordUpdate (rankingHistoryService.js) when the last scan's
   // organic SERP request/parse itself failed (DataForSEO API/task error,
@@ -374,9 +327,8 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
 
   const status      = currentRank != null ? getStatusFromRank(currentRank) : null;
   const rankingUrls = keyword.ranking_urls || [];
-  const mobileUrls  = keyword.mobile?.ranking_urls || [];
-  const hasUrls     = rankingUrls.length > 0 || mobileUrls.length > 0;
-  const hasMapsListing = !!(mapsListing && mapsListing.title);
+  // The optimistic placeholder (still scanning) has no database id yet, so there is nothing to look up: no expand until the real row arrives.
+  const canExpand   = !!keyword._id && !isScanning;
 
   return (
     <div style={{ borderBottom: isLast ? 'none' : '0.5px solid var(--border)' }}>
@@ -390,10 +342,28 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
 
         {/* Keyword */}
         <div className="kw-c-name">
-          <div style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>
-            <span className="kw-idx-inline">{index + 1}.</span>
-            {keyword.keyword}
-          </div>
+          {canExpand ? (
+            <button
+              type="button"
+              className="kw-name-toggle"
+              onClick={() => setIsExpanded(e => !e)}
+              aria-expanded={isExpanded}
+              aria-controls={isExpanded ? detailsId : undefined}
+              title={isExpanded ? 'Hide keyword details' : 'Show keyword details'}
+              data-testid="kw-toggle"
+            >
+              <ChevronRight className="kw-name-chevron" aria-hidden style={{ transform: isExpanded ? 'rotate(90deg)' : 'none' }} />
+              <span style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>
+                <span className="kw-idx-inline">{index + 1}.</span>
+                {keyword.keyword}
+              </span>
+            </button>
+          ) : (
+            <div style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>
+              <span className="kw-idx-inline">{index + 1}.</span>
+              {keyword.keyword}
+            </div>
+          )}
           {keyword.scan_count != null && (
             <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '1px' }}>
               {keyword.scan_count} scan{keyword.scan_count !== 1 ? 's' : ''}
@@ -532,66 +502,13 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
               />
             )}
           </div>
-          {(hasUrls || hasMapsListing) && (
-            <button
-              className="tap-target"
-              onClick={() => setIsExpanded(e => !e)}
-              style={{
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: '4px', color: 'var(--text3)',
-                cursor: 'pointer', fontSize: '11px', padding: '3px 7px', lineHeight: 1
-              }}
-            >
-              {isExpanded ? '▲' : '▼'}
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Expanded section: ranking URLs + Maps listing */}
-      {isExpanded && (hasUrls || hasMapsListing) && (
-        <div className="kw-expand">
-          {hasMapsListing && <MapsListingCard listing={mapsListing} />}
-          {[...rankingUrls.map(ru => ({ ru, device: 'desktop' })), ...mobileUrls.map(ru => ({ ru, device: 'mobile' }))].map(({ ru, device }, ri) => (
-            <div key={`${device}-${ri}`} data-device={device} style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              padding: '7px 12px',
-              background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: '8px'
-            }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                minWidth: '30px', height: '22px', padding: '0 6px', borderRadius: '5px',
-                fontSize: '11px', fontWeight: 700, flexShrink: 0,
-                ...getRankBadgeStyle(ru.rank)
-              }}>
-                #{ru.rank}
-              </span>
-              <span style={{
-                fontSize: '10px', fontWeight: 700,
-                color: ru.type === 'homepage' ? 'var(--cyan)' : 'var(--text3)',
-                textTransform: 'uppercase', letterSpacing: '0.05em',
-                flexShrink: 0, width: '80px'
-              }}>
-                {ru.type === 'homepage' ? 'Homepage' : 'Page'}
-              </span>
-              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
-                {device === 'mobile' ? 'Mobile' : 'Desktop'}
-              </span>
-              <a
-                href={ru.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="kw-ru-link"
-                style={{
-                  fontSize: '12px', color: 'var(--text2)',
-                  textDecoration: 'none', flex: 1, minWidth: 0
-                }}
-                title={ru.url}
-              >
-                {getUrlLabel(ru.url)}
-              </a>
-            </div>
-          ))}
+      {/* Expanded section: fetched only while open (see TrackedKeywordDetails) */}
+      {isExpanded && canExpand && (
+        <div className="kw-expand" style={{ borderTop: '0.5px solid var(--border)' }}>
+          <TrackedKeywordDetails id={detailsId} projectId={projectId} keywordId={String(keyword._id)} keyword={keyword.keyword} />
         </div>
       )}
     </div>
@@ -600,7 +517,7 @@ const KeywordRow = memo(function KeywordRow({ keyword, index, isLast, isRescanni
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-function UserAddedKeywords({ data, loading, error, onRefresh, onRescan, onDelete, rescanningKeywords = new Set(), deletingKeyword = null }) {
+function UserAddedKeywords({ projectId, data, loading, error, onRefresh, onRescan, onDelete, rescanningKeywords = new Set(), deletingKeyword = null }) {
   const [pendingDeleteKeyword, setPendingDeleteKeyword] = useState(null);
 
   // Stable references so KeywordRow's memo comparison actually holds across
@@ -727,6 +644,7 @@ function UserAddedKeywords({ data, loading, error, onRefresh, onRescan, onDelete
         {keywords.map((keyword, index) => (
           <KeywordRow
             key={keyword._id || keyword.keyword}
+            projectId={projectId}
             keyword={keyword}
             index={index}
             isLast={index === keywords.length - 1}
