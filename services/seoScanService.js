@@ -40,6 +40,18 @@ export const seoScanService = {
     return apiService.request(`${base(projectId)}/seo-datasets/${kind}${qs ? `?${qs}` : ''}`, { method: 'GET', signal })
   },
 
+  /** Each dataset of one page on its own: fresh / stale / missing, last success and scan, rows, capped, last error (MongoDB only). */
+  freshness: (projectId, page, { signal } = {}) => apiService.request(`${base(projectId)}/seo-datasets/freshness${page ? `?${new URLSearchParams({ page })}` : ''}`, { method: 'GET', signal }),
+
+  /** What scans and explicit refreshes really bought: requests, failures, records, and the costs the provider reported. */
+  usage: (projectId, { days, scanId } = {}, { signal } = {}) => {
+    const q = new URLSearchParams()
+    if (scanId) q.set('scanId', scanId)
+    else if (days) q.set('days', String(days))
+    const qs = q.toString()
+    return apiService.request(`${base(projectId)}/seo-usage${qs ? `?${qs}` : ''}`, { method: 'GET', signal })
+  },
+
   /** New / lost (and, for keywords, improved / declined) between the newest stored scan and the previous / a week-old / a month-old one. */
   changes: (projectId, { dataset, status, period = 'previous' }, { signal } = {}) => {
     const q = new URLSearchParams({ dataset, period })

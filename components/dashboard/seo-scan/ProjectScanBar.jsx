@@ -3,19 +3,12 @@
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSeoScan } from "@/hooks/useSeoScan"
+import { timeAgo } from "@/lib/history/compare"
 
 /** Stored SEO data older than this is called stale. Pages keep showing it; the bar offers the explicit update. */
 export const STALE_AFTER_MS = 24 * 60 * 60 * 1000
 
-export function timeAgo(date, now = Date.now()) {
-  const ms = Math.max(0, now - new Date(date).getTime())
-  const mins = Math.round(ms / 60_000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins} min ago`
-  const hours = Math.round(mins / 60)
-  if (hours < 48) return `${hours} h ago`
-  return `${Math.round(hours / 24)} days ago`
-}
+export { timeAgo }
 
 export function ProjectScanBar({ projectId, scope, now = Date.now() }) {
   const { status, latest, lastSuccessful, running, starting, startError, start } = useSeoScan(projectId)
@@ -24,6 +17,8 @@ export function ProjectScanBar({ projectId, scope, now = Date.now() }) {
   const busy = running || starting
   const stale = lastSuccessful?.finishedAt && now - new Date(lastSuccessful.finishedAt).getTime() > STALE_AFTER_MS
   const failedCount = latest?.datasetsFailed ?? 0
+  const failed = (latest?.datasets ?? []).filter((d) => d.status === "failed")
+  const failedNames = failed.slice(0, 3).map((d) => d.id.replace(/-/g, " ")).join(", ") + (failed.length > 3 ? ` +${failed.length - 3} more` : "")
 
   let tone = "text-muted-foreground"
   let Icon = CheckCircle2
@@ -32,7 +27,18 @@ export function ProjectScanBar({ projectId, scope, now = Date.now() }) {
 
   if (running) {
     Icon = Loader2
-    message = `Collecting SEO data… ${(latest.datasetsCompleted ?? 0) + (latest.datasetsFailed ?? 0)} of ${latest.totalDatasets} datasets done`
+    const done = (latest.datasetsCompleted ?? 0) + (latest.datasetsFailed ?? 0)
+    const retrying = (latest.datasets ?? []).filter((d) => d.status === "running" && d.attempts > 1).length
+    if (latest.stalled) {
+      // The scan lives in the database; nothing is working on it right now, and the next worker that starts will continue it.
+      Icon = AlertTriangle
+      tone = "text-amber-700 dark:text-amber-300"
+      message = `This scan is waiting for a worker (${done} of ${latest.totalDatasets} datasets done). It will continue by itself; nothing already collected is bought again.`
+    } else if (latest.status === "queued" && done === 0) {
+      message = "Scan queued — it starts as soon as a worker picks it up…"
+    } else {
+      message = `Collecting SEO data… ${done} of ${latest.totalDatasets} datasets done${latest.datasetsFailed ? `, ${latest.datasetsFailed} failed` : ""}${retrying ? ", retrying after a temporary error" : ""}`
+    }
   } else if (!latest) {
     Icon = AlertTriangle
     tone = "text-amber-700 dark:text-amber-300"
@@ -41,7 +47,7 @@ export function ProjectScanBar({ projectId, scope, now = Date.now() }) {
   } else if (latest.status === "partially_completed") {
     Icon = AlertTriangle
     tone = "text-amber-700 dark:text-amber-300"
-    message = `Last scan finished ${timeAgo(latest.finishedAt, now)}, but ${failedCount} dataset${failedCount === 1 ? "" : "s"} could not be collected. The rest is saved.`
+    message = `Last scan finished ${timeAgo(latest.finishedAt, now)}, but ${failedCount} dataset${failedCount === 1 ? "" : "s"} could not be collected${failedNames ? ` (${failedNames})` : ""}. The rest is saved and the previous data of the failed ones is kept.`
     action = { label: "Retry failed", run: () => start({ retryOf: latest.id }) }
   } else if (latest.status === "failed") {
     Icon = AlertTriangle
