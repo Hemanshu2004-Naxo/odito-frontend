@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { useRunEvidence } from "@/hooks/useGoogleAioVisibility"
+import { useRunEvidence, useRetryFailedGoogleAioQuestions } from "@/hooks/useGoogleAioVisibility"
 import { Panel, ErrorNote } from "../shared/parts"
 import { ObservationPill } from "./EvidenceBody"
 import EvidenceSheet from "./EvidenceSheet"
@@ -11,12 +11,21 @@ import { QUESTIONS_PER_RUN, intentLabel, reasonText } from "./format"
 const Tick = ({ v }) => (v == null ? <span className="text-muted-foreground">—</span> : <span className={v ? "font-medium text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>{v ? "Yes" : "No"}</span>)
 
 /** The five questions of one run with what Google did for each. A row opens the stored evidence. */
-export default function QuestionResultsTable({ projectId, runId }) {
+export default function QuestionResultsTable({ projectId, runId, busy = false }) {
   const { data, isLoading, error } = useRunEvidence(projectId, runId)
+  const retry = useRetryFailedGoogleAioQuestions(projectId)
   const [openId, setOpenId] = useState(null)
   const rows = data?.data || []
+  const failedCount = rows.filter((r) => r.observation === "request_failed").length
   return (
-    <Panel title={`The ${QUESTIONS_PER_RUN} questions`} description="Open a question to see the exact search, Google's AI Overview and its sources.">
+    <Panel title={`The ${QUESTIONS_PER_RUN} questions`} description="Open a question to see the exact search, Google's AI Overview and its sources."
+      action={failedCount ? (
+        <Button size="sm" variant="outline" onClick={() => retry.mutate(runId)} disabled={busy || retry.isPending} title="Searches only the failed questions again. Answered questions are not searched or billed again.">
+          {retry.isPending ? "Retrying…" : `Retry failed (${failedCount})`}
+        </Button>
+      ) : null}
+    >
+      {retry.error ? <ErrorNote>{retry.error.message || "Could not retry the failed questions."}</ErrorNote> : null}
       {error ? <ErrorNote>Could not load the questions of this run.</ErrorNote> : null}
       {isLoading ? <div className="h-40 rounded-lg skeleton-base skeleton-shimmer" aria-busy="true" /> : null}
       {rows.length ? (

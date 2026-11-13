@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Loader2, RefreshCw } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { formatDate } from "../referring-domains/format"
@@ -48,13 +48,8 @@ export default function TrafficHistoryHeader({ domain, market, updatedAt, select
                 </button>
               ))}
             </div>
-            <Button type="button" variant="outline" onClick={onRefresh} disabled={busy} aria-busy={busy}>
-              {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </Button>
           </div>
           {loadingMore ? <p className="text-xs text-muted-foreground" role="status">Loading {selected} months of history…</p> : null}
-          {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground @min-[800px]/main:text-right" role="status">{refreshNote}</p> : null}
         </div>
       </div>
 

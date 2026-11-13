@@ -1,6 +1,6 @@
 "use client"
 
-import { Download, Globe, Loader2, RefreshCw } from "lucide-react"
+import { Download, Globe } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatDateTime } from "../referring-domains/format"
 import { Skel } from "../domain-overview/SectionState"
@@ -29,15 +29,10 @@ export default function CompetitorsHeader({ domain, market, updatedAt, onRefresh
 
       <div className="flex shrink-0 flex-col items-start gap-1.5 lg:items-end">
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" onClick={onRefresh} disabled={busy} aria-busy={busy} data-testid="cp-refresh">
-            {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
           <Button type="button" variant="outline" onClick={onExport} disabled={exportDisabled} data-testid="cp-export" title="Downloads the competitors on screen">
             <Download className="size-4" aria-hidden /> Export CSV
           </Button>
         </div>
-        {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground lg:text-right" role="status">{refreshNote}</p> : null}
       </div>
     </div>
   )

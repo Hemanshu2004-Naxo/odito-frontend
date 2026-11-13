@@ -40,7 +40,6 @@ function ProjectOrganicKeywords({ projectId, project }) {
   const kw = useOrganicKeywords(projectId)
   const { state, update, page, totals } = kw
   const { toasts, notify, dismiss } = useToastQueue()
-  const [refreshClicked, setRefreshClicked] = useState(false)
   const [exporting, setExporting] = useState(false)
 
   const chips = useMemo(() => describeActiveFilters(kw.effective), [kw.effective])
@@ -54,9 +53,6 @@ function ProjectOrganicKeywords({ projectId, project }) {
     if (state.page > last) update({ page: last })
   }, [page.status, page.stale, page.total, state.page, state.pageSize, update])
 
-  const refreshNote = refreshClicked && !kw.isFetching && kw.refreshThrottled
-    ? "This data was refreshed less than a minute ago, so it was not requested again."
-    : null
 
   const exportPage = () => {
     downloadCsv(keywordsCsvFileName(domain, "page"), buildKeywordsCsv(page.rows))
@@ -91,10 +87,7 @@ function ProjectOrganicKeywords({ projectId, project }) {
         domain={domain}
         market={kw.market}
         updatedAt={kw.updatedAt}
-        onRefresh={() => { setRefreshClicked(true); kw.refresh() }}
         busy={kw.isFetching}
-        refreshing={refreshClicked && kw.isFetching}
-        refreshNote={refreshNote}
         exportProps={{
           pageRowCount: page.rows.length,
           total: page.total,

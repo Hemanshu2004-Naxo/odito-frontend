@@ -2,7 +2,7 @@
 
 import { useId } from "react"
 import Link from "next/link"
-import { Download, Loader2, RefreshCw } from "lucide-react"
+import { Download, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { formatDateTime } from "../referring-domains/format"
@@ -45,15 +45,10 @@ export default function BacklinkOverviewHeader({ domain, updatedAt, since, state
               <div data-testid="bo-updated">{updatedAt ? <>Updated {formatDateTime(updatedAt)}</> : <Skel className="inline-block h-3.5 w-36 align-middle" />}</div>
               {since ? <div data-testid="bo-since">Backlink profile {since.charAt(0).toLowerCase()}{since.slice(1)}</div> : null}
             </div>
-            <Button type="button" variant="outline" onClick={onRefresh} disabled={busy} aria-busy={busy} data-testid="bo-refresh">
-              {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </Button>
             <Button type="button" onClick={() => window.print()} title="Opens your browser's print dialog: choose Save as PDF" className="bg-emerald-400 font-semibold text-[#0d1a3a] hover:bg-emerald-300 print:hidden" data-testid="bo-pdf">
               <Download className="size-4" aria-hidden />Download PDF
             </Button>
           </div>
-          {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground @min-[800px]/main:text-right" role="status">{refreshNote}</p> : null}
         </div>
       </div>
 

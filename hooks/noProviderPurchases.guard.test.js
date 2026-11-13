@@ -90,3 +90,51 @@ describe("no SEO page can buy provider data by being opened", () => {
     }
   })
 })
+
+describe("collection is automatic: no page has a manual scan / refresh control", () => {
+  const HEADERS = [
+    "domain-overview/DomainOverviewHeader", "traffic-history/TrafficHistoryHeader", "organic-keywords/OrganicKeywordsHeader", "competitors/CompetitorsHeader",
+    "backlinks-overview/BacklinkOverviewHeader", "backlinks/BacklinksHeader", "anchors/AnchorsHeader", "referring-domains/ReferringDomainsHeader", "top-pages/TopPagesHeader",
+  ]
+
+  it("none of the nine page headers renders a Refresh / Update data button", () => {
+    for (const h of HEADERS) {
+      const src = read(`components/dashboard/${h}.jsx`)
+      expect(src, h).not.toMatch(/onClick=\{onRefresh\}/)
+      expect(src, h).not.toMatch(/RefreshCw/)
+      expect(src, h).not.toMatch(/>\s*Refresh\s*</)
+    }
+  })
+
+  it("none of the nine dashboards arms a refresh from a button (the page hooks' refresh handlers have no caller in the UI)", () => {
+    for (const d of ["domain-overview/DomainOverviewDashboard", "traffic-history/TrafficHistoryDashboard", "organic-keywords/OrganicKeywordsDashboard", "competitors/CompetitorsDashboard",
+      "backlinks-overview/BacklinkOverviewDashboard", "backlinks/BacklinksDashboard", "anchors/AnchorsDashboard", "referring-domains/ReferringDomainsDashboard", "top-pages/TopPagesDashboard"]) {
+      const src = read(`components/dashboard/${d}.jsx`)
+      expect(src, d).not.toMatch(/onRefresh=/)
+      expect(src, d).not.toMatch(/refreshAll\(|(kw|cp|bl|an|rd|tp)\.refresh\(/)
+    }
+  })
+
+  it("the only callers of the explicit scan / refresh endpoints are the scan observer and the optional, rate-limited refresh", () => {
+    const callers = (needle) => ["hooks", "components", "lib", "app", "contexts", "providers"]
+      .flatMap((d) => (fs.existsSync(path.join(root, d)) ? walk(path.join(root, d)) : []))
+      .filter((f) => needle.test(fs.readFileSync(f, "utf8")))
+      .map((f) => path.relative(root, f).replaceAll("\\", "/"))
+      .sort()
+    expect(callers(/seoScanService\.refresh\(/)).toEqual(["hooks/useManualRefresh.js"])
+    expect(callers(/seoScanService\.start\(/)).toEqual(["hooks/useSeoScan.js"])
+    expect(callers(/seoScanService\.ensure\(/)).toEqual(["hooks/useAutoCollect.js"])
+  })
+
+  it("nothing but the page-open hook asks the server to ensure a page, and it is not called by paging / search / sort / filter hooks", () => {
+    for (const rel of SEO_HOOKS) expect(read(rel), rel).not.toMatch(/useAutoCollect|seoScanService/)
+  })
+
+  it("the page-open hook does not poll or refetch on focus / reconnect by itself (the scan observer owns the controlled polling)", () => {
+    const src = read("hooks/useAutoCollect.js")
+    expect(src).not.toMatch(/refetchInterval/)
+    expect(src).toMatch(/refetchOnWindowFocus:\s*false/)
+    expect(src).toMatch(/refetchOnReconnect:\s*false/)
+    expect(src).toMatch(/staleTime:\s*ENSURE_STALE_MS/)
+  })
+})

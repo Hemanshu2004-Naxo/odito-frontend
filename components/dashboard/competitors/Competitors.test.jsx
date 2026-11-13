@@ -163,7 +163,7 @@ describe("Competitors: first load", () => {
     await screen.findAllByTestId("cp-row")
     expect(screen.getByTestId("cp-market").textContent).toBe("India · English")
     expect(screen.getByTestId("cp-updated").textContent).toMatch(/^Last updated .*2026/)
-    expect(screen.getByTestId("cp-refresh")).toBeTruthy()
+    expect(screen.queryByTestId("cp-refresh")).toBeNull() // data is collected and refreshed automatically: no manual button
     expect(screen.getByTestId("cp-export")).toBeTruthy()
   })
 
@@ -813,24 +813,6 @@ describe("Competitors: Compare section (API 5)", () => {
 })
 
 describe("Competitors: refresh and export", () => {
-  test("Refresh asks the server to skip its cache for the list (and the comparison when something is tracked)", async () => {
-    saved.tracked = ["dragarwal.com"]
-    renderPage()
-    await screen.findByTestId("cp-compare-table")
-    fireEvent.click(screen.getByTestId("cp-refresh"))
-    await waitFor(() => expect(compCalls().at(-1).refresh).toBe(true))
-    await waitFor(() => expect(bulkCalls().at(-1).refresh).toBe(true))
-    expect(compCalls()[0].refresh).toBe(false)
-  })
-
-  test("a refresh the server declined (data under a minute old) says so", async () => {
-    const base = svc.getSection.getMockImplementation()
-    svc.getSection.mockImplementation(async (...a) => { const r = await base(...a); if (a[1] === "competitors" && a[2].refresh) r.data.refreshThrottled = true; return r })
-    renderPage()
-    await screen.findAllByTestId("cp-row")
-    fireEvent.click(screen.getByTestId("cp-refresh"))
-    expect(await screen.findByText(/refreshed less than a minute ago/)).toBeTruthy()
-  })
 
   test("Export CSV downloads the competitors on screen and makes no request", async () => {
     saved.tracked = ["dragarwal.com"]

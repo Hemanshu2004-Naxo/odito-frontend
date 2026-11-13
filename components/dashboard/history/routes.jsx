@@ -39,7 +39,7 @@ const KEYWORDS_CHANGES = {
   type: "changes",
   dataset: "keywords",
   title: "Keyword changes",
-  emptyMessage: "No keywords have been collected yet. Run an SEO scan to store them; comparisons need two scans.",
+  emptyMessage: "No keywords have been collected yet. They are collected automatically; comparisons need two collections.",
   headline: (d) => {
     const a = d.totals?.latest; const b = d.totals?.reference
     if (!a || !b) return null
@@ -64,7 +64,7 @@ const BACKLINKS_CHANGES = {
   dataset: "backlinks",
   status: "live",
   title: "Backlink changes (live links)",
-  emptyMessage: "No backlinks have been collected yet. Run an SEO scan to store them; comparisons need two scans.",
+  emptyMessage: "No backlinks have been collected yet. They are collected automatically; comparisons need two collections.",
   tiles: [
     { id: "new", label: "New backlinks", read: (d) => d.new, columns: BACKLINK_COLS, empty: "No new backlinks." },
     { id: "lost", label: "Lost backlinks", read: (d) => d.lost, columns: BACKLINK_COLS, empty: "No backlinks were lost." },
@@ -76,7 +76,7 @@ const DOMAINS_CHANGES = {
   dataset: "referring-domains",
   status: "live",
   title: "Referring domain changes (live domains)",
-  emptyMessage: "No referring domains have been collected yet. Run an SEO scan to store them; comparisons need two scans.",
+  emptyMessage: "No referring domains have been collected yet. They are collected automatically; comparisons need two collections.",
   tiles: [
     { id: "new", label: "New domains", read: (d) => d.new, columns: DOMAIN_COLS.slice(0, 2).concat(DOMAIN_COLS[3]), empty: "No new referring domains." },
     { id: "lost", label: "Lost domains", read: (d) => d.lost, columns: DOMAIN_COLS.slice(0, 2).concat(DOMAIN_COLS[3]), empty: "No referring domains were lost." },
@@ -95,7 +95,7 @@ const ORGANIC_METRICS = [
   { id: "p23", label: "Keywords in positions 2–3", path: "organic.pos_2_3" },
   { id: "p410", label: "Keywords in positions 4–10", path: "organic.pos_4_10" },
 ]
-const DOMAIN_SNAPSHOT = { type: "snapshot", datasetType: "domain_overview", part: "rank-overview", title: "Domain metrics: before and now", metrics: ORGANIC_METRICS, emptyMessage: "No domain metrics have been collected yet. Run an SEO scan." }
+const DOMAIN_SNAPSHOT = { type: "snapshot", datasetType: "domain_overview", part: "rank-overview", title: "Domain metrics: before and now", metrics: ORGANIC_METRICS, emptyMessage: "No domain metrics have been collected yet. They are collected automatically." }
 
 const BACKLINK_METRICS = [
   { id: "backlinks", label: "Backlinks", path: "backlinks" },
@@ -120,10 +120,10 @@ export const HISTORY_ROUTES = Object.freeze([
     panels: [{
       type: "keyed-snapshot", datasetType: "competitor_summary", part: "competitors", title: "Competitors: before and now", key: "domain", rowLabel: "Competitor", labelOf: (r) => r.domain,
       metrics: [{ id: "etv", label: "Traffic", get: (r) => r.total?.etv ?? null }], addedLabel: "New in the list", removedLabel: "No longer listed",
-      emptyMessage: "No competitors have been collected yet. Run an SEO scan.",
+      emptyMessage: "No competitors have been collected yet. They are collected automatically.",
     }],
   },
-  { prefix: "/app/backlinks/overview", page: "offpage-overview", panels: [{ type: "snapshot", datasetType: "backlink_summary", part: "backlinks", title: "Backlink profile: before and now", metrics: BACKLINK_METRICS, emptyMessage: "No backlink summary has been collected yet. Run an SEO scan." }] },
+  { prefix: "/app/backlinks/overview", page: "offpage-overview", panels: [{ type: "snapshot", datasetType: "backlink_summary", part: "backlinks", title: "Backlink profile: before and now", metrics: BACKLINK_METRICS, emptyMessage: "No backlink summary has been collected yet. They are collected automatically." }] },
   { prefix: "/app/backlinks/list", page: "backlinks", panels: [BACKLINKS_CHANGES] },
   {
     prefix: "/app/backlinks/anchors",
@@ -132,7 +132,7 @@ export const HISTORY_ROUTES = Object.freeze([
     panels: [{
       type: "keyed-snapshot", datasetType: "anchor_summary", part: "anchor-profile", title: "Anchors: before and now", key: "anchor", rowLabel: "Anchor text", labelOf: (r) => r.anchor ?? "(no anchor text)",
       metrics: [{ id: "domains", label: "Referring domains", get: (r) => r.referring_domains ?? null }], addedLabel: "New anchors", removedLabel: "Anchors no longer in the top list",
-      emptyMessage: "No anchor profile has been collected yet. Run an SEO scan.",
+      emptyMessage: "No anchor profile has been collected yet. They are collected automatically.",
     }],
   },
   { prefix: "/app/referring-domains", page: "referring-domains", panels: [DOMAINS_CHANGES] },
@@ -142,7 +142,7 @@ export const HISTORY_ROUTES = Object.freeze([
     note: "The table's default views are the provider's data; any other page, sort or filter is counted from the stored backlinks (rank and link breakdowns are provider-only and show \"—\" there).",
     panels: [{ type: "snapshot", datasetType: "top_linked_pages_summary", part: "tp-counts", title: "Linked pages: before and now", metrics: [
       { id: "pages", label: "Linked pages", path: "pages" }, { id: "errors", label: "Pages with errors", path: "errors", good: "down" }, { id: "redirects", label: "Redirecting pages", path: "redirects", good: "down" },
-    ], emptyMessage: "No page counts have been collected yet. Run an SEO scan." }],
+    ], emptyMessage: "No page counts have been collected yet. They are collected automatically." }],
   },
 ])
 

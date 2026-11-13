@@ -456,13 +456,4 @@ describe("layout and cost", () => {
     expect(calls().every((c) => c.opts.refresh !== true)).toBe(true)
   })
 
-  test("Refresh on the header still refreshes only the five sections (the hub's longer caches are left alone)", async () => {
-    renderPage()
-    await settled()
-    const before = calls().length
-    fireEvent.click(screen.getByRole("button", { name: /refresh/i }))
-    await waitFor(() => expect(calls().length).toBeGreaterThan(before))
-    expect(calls().slice(before).map((c) => c.section).sort()).toEqual([...FIVE].sort())
-    expect(calls().slice(before).every((c) => c.opts.refresh === true)).toBe(true)
-  })
 })

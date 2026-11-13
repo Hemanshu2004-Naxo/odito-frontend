@@ -1,12 +1,15 @@
 "use client"
 
-import { Suspense, useState } from "react"
+import { Suspense, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useProject } from "@/contexts/ProjectContext"
-import IssueTable from "@/components/dashboard/issues/IssueTable"
+import OnPageIssuesView from "@/components/dashboard/issues/OnPageIssuesView"
 import IssueDetailView from "@/components/dashboard/issues/IssueDetailView"
 import PageDetailView from "@/app/onpage/components/PageDetailView"
 import { useAccessibilityIssues, usePageIssues } from '@/hooks/useDashboardQueries'
+
+// Nothing on this screen is written for the user automatically, so every issue is "You".
+const NO_AUTO_FIX = new Set()
 
 function AccessibilityContent() {
   const { activeProject } = useProject()
@@ -17,7 +20,7 @@ function AccessibilityContent() {
   const { data: accessibilityResponse, isLoading: loading } = useAccessibilityIssues(activeProject?._id)
   const { data: pageIssuesData, isLoading: pageLoading, error: pageError } = usePageIssues(activeProject?._id, selectedUrl)
 
-  const issues = accessibilityResponse?.issues || []
+  const issues = useMemo(() => accessibilityResponse?.issues || [], [accessibilityResponse])
   const summary = accessibilityResponse?.summary || null
 
   if (loading) {
@@ -101,32 +104,18 @@ function AccessibilityContent() {
           initialMode={modeParam || 'ai'}
         />
       ) : (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold">Accessibility Issues</h1>
-              <p className="text-muted-foreground">
-                {summary
-                  ? `${summary.total_issue_types ?? 0} issue types · ${summary.total_issues_found ?? 0} total issues · ${summary.total_pages_analyzed ?? 0} pages analyzed`
-                  : "View and manage accessibility issues"}
-              </p>
-            </div>
-            {issues.length > 0 && (
-              <span className="text-xs font-bold px-2 py-1 rounded bg-primary/10 text-primary whitespace-nowrap shrink-0">
-                {issues.length} FOUND
-              </span>
-            )}
-          </div>
-          <div className="bg-card rounded-lg border p-3 sm:p-6">
-            {issues.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                No accessibility issues found. Your site looks great!
-              </div>
-            ) : (
-              <IssueTable issues={issues} selected={selected} onSelect={handleIssueSelect} />
-            )}
-          </div>
-        </>
+        <OnPageIssuesView
+          issues={issues}
+          summary={summary}
+          projectId={activeProject?._id}
+          autoFixIds={NO_AUTO_FIX}
+          title="Accessibility issues"
+          crumb="Accessibility"
+          emptyMessage="No accessibility issues found. Your site looks great!"
+          onOpenIssue={(code, url) =>
+            router.push(`/app/accessibility?issue=${encodeURIComponent(code)}${url ? `&url=${encodeURIComponent(url)}` : ""}`)
+          }
+        />
       )}
     </div>
   )

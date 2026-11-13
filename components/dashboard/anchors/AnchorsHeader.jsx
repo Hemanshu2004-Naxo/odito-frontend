@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Download, Loader2, RefreshCw, Settings2 } from "lucide-react"
+import { Download, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatDateTime } from "../referring-domains/format"
 import { formatExact } from "../domain-overview/format"
@@ -36,15 +36,10 @@ export default function AnchorsHeader({ domain, updatedAt, total, onRefresh, ref
           <Button type="button" variant="outline" onClick={onSettings} data-testid="an-settings">
             <Settings2 className="size-4" aria-hidden /> Anchor settings
           </Button>
-          <Button type="button" variant="outline" onClick={onRefresh} disabled={busy} aria-busy={busy} data-testid="an-refresh">
-            {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
           <Button type="button" variant="outline" onClick={onExport} disabled={exportDisabled} className="font-semibold" data-testid="an-export">
             <Download className="size-4" aria-hidden /> Export CSV
           </Button>
         </div>
-        {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground @min-[900px]/main:text-right" role="status">{refreshNote}</p> : null}
       </div>
     </div>
   )

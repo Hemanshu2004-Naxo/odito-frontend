@@ -41,7 +41,6 @@ function ProjectBacklinks({ projectId, project }) {
   const bl = useBacklinks(projectId)
   const { state, update, page, summary } = bl
   const { toasts, notify, dismiss } = useToastQueue()
-  const [refreshClicked, setRefreshClicked] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const domain = bl.target ?? domainFromUrl(project?.main_url)
 
@@ -55,7 +54,6 @@ function ProjectBacklinks({ projectId, project }) {
     if (state.page > last) update({ page: last })
   }, [page.status, page.stale, page.total, state.page, state.pageSize, update])
 
-  const refreshNote = refreshClicked && !bl.isFetching && bl.refreshThrottled ? "This data was refreshed less than a minute ago, so it was not requested again." : null
 
   const exportPage = () => {
     downloadCsv(backlinksCsvFileName(domain, state.tab, "page"), buildBacklinksCsv(page.rows))
@@ -71,10 +69,7 @@ function ProjectBacklinks({ projectId, project }) {
       <BacklinksHeader
         domain={domain}
         updatedAt={bl.updatedAt}
-        onRefresh={() => { setRefreshClicked(true); bl.refresh() }}
         busy={bl.isFetching}
-        refreshing={refreshClicked && bl.isFetching}
-        refreshNote={refreshNote}
         rowCount={page.rows.length}
         total={page.total}
         exportDisabled={page.status !== "success" || bl.built.tooMany}
@@ -87,9 +82,9 @@ function ProjectBacklinks({ projectId, project }) {
       ) : (
         <>
           <SummaryStrip summary={summary} state={state} update={update} />
-          <TabsBar tab={state.tab} group={state.group} counts={bl.tabCounts} onTab={(tab) => update({ tab })} onGroup={(group) => update({ group })} />
           <FilterBar state={state} update={update} built={bl.built} activeCount={bl.chips.length} onClearAll={bl.clearFilters} />
           <ActiveFilters chips={bl.chips} onRemove={(chip) => update(chip.clear)} onClearAll={bl.clearFilters} />
+          <TabsBar tab={state.tab} group={state.group} counts={bl.tabCounts} onTab={(tab) => update({ tab })} onGroup={(group) => update({ group })} />
           <BacklinksTable
             page={page}
             state={state}

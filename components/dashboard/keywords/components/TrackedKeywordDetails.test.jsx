@@ -216,6 +216,107 @@ describe("expandable tracked keyword rows", () => {
     expect(api.getTrackedKeywordDetails).toHaveBeenCalledTimes(1)
   })
 
+  it("a retained rank after a failed check is NOT shown as newly verified: it says previous position retained and when it was last verified", async () => {
+    api.getTrackedKeywordDetails.mockImplementation(() => ok(payload({
+      rankings: {
+        desktop: device({ status: "scan_error", position: 12, bestPosition: 12, rankingUrl: null, rankingUrls: [], scanError: "partial results", lastScannedAt: "2026-11-05T10:00:00Z", lastVerifiedAt: "2026-11-01T09:00:00Z" }),
+        mobile: device({ status: "scan_error", position: 15, bestPosition: 15, rankingUrl: null, rankingUrls: [], scanError: "failed", lastVerifiedAt: null }),
+        maps: { position: null, listing: null },
+      },
+    })))
+    renderTable()
+    fireEvent.click(toggles()[0])
+    const desktop = await screen.findByTestId("rank-desktop")
+    expect(desktop).toHaveAttribute("data-status", "scan_error")
+    expect(desktop).toHaveTextContent("#12")
+    expect(desktop).toHaveTextContent("Previous position retained")
+    expect(desktop).toHaveTextContent("not newly verified")
+    expect(desktop).toHaveTextContent(/last verified/i)
+    expect(screen.getByTestId("rank-mobile")).toHaveTextContent("Previous position retained")
+    expect(screen.getByTestId("rank-mobile")).not.toHaveTextContent(/last verified/i)
+  })
+
+  it("a position found in partial results is shown as real but incomplete, with how much of the SERP came back", async () => {
+    api.getTrackedKeywordDetails.mockImplementation(() => ok(payload({
+      rankings: {
+        desktop: device({ status: "ranked", position: 6, rankingUrl: null, rankingUrls: [], partial: true, returnedResults: 80, requestedDepth: 100 }),
+        mobile: device({ status: "ranked", position: 4, rankingUrl: null, rankingUrls: [] }),
+        maps: { position: null, listing: null },
+      },
+    })))
+    renderTable()
+    fireEvent.click(toggles()[0])
+    const desktop = await screen.findByTestId("rank-desktop")
+    expect(desktop).toHaveTextContent("#6")
+    expect(desktop).toHaveTextContent("Found in partial results (80 of 100 requested results returned)")
+    expect(screen.getByTestId("rank-mobile")).not.toHaveTextContent(/partial/i)
+  })
+
+  it("verified not found vs not found within a SHORT result list vs unresolved links vs provider failure are four different messages; null is never rank 0", async () => {
+    api.getTrackedKeywordDetails.mockImplementation(() => ok(payload({
+      rankings: {
+        desktop: device({ status: "not_ranked", position: null, rankingUrl: null, rankingUrls: [], trackedDepth: 48, resultCompleteness: "short", deepestOrganicRank: 48, requestedDepth: 100, coverageComplete: false }),
+        mobile: device({ status: "scan_error", position: 15, rankingUrl: null, rankingUrls: [], scanError: "Some search results were Google redirect links whose website could not be read, so the ranking could not be verified; the previous ranking is kept.", unresolvedCandidates: 2, lastVerifiedAt: "2026-11-01T09:00:00Z" }),
+        maps: { position: 7, listing: null },
+      },
+    })))
+    renderTable()
+    fireEvent.click(toggles()[0])
+    const desktop = await screen.findByTestId("rank-desktop")
+    expect(desktop).toHaveTextContent("Not found in the 48 organic results returned (100 requested)")
+    expect(desktop).toHaveTextContent("Positions beyond that were not covered")
+    expect(desktop).not.toHaveTextContent("top 100")
+    const mobile = screen.getByTestId("rank-mobile")
+    expect(mobile).toHaveTextContent("#15")
+    expect(mobile).toHaveTextContent("Previous position retained")
+    expect(screen.getByTestId("rank-reason-mobile")).toHaveTextContent(/redirect links/)
+    expect(screen.getByTestId("rank-reason-mobile")).not.toHaveTextContent(/could not be reached/)
+    expect(screen.getByTestId("kw-details").textContent).not.toMatch(/#0/)
+  })
+
+  it("partial / uncertain not-found and a low-confidence rank each say what they are", async () => {
+    api.getTrackedKeywordDetails.mockImplementation(() => ok(payload({
+      rankings: {
+        desktop: device({ status: "not_ranked", position: null, rankingUrl: null, rankingUrls: [], trackedDepth: 9, notRankedKind: "partial" }),
+        mobile: device({ status: "not_ranked", position: null, rankingUrl: null, rankingUrls: [], trackedDepth: 40, notRankedKind: "uncertain", unresolvedCandidates: 2 }),
+        maps: { position: null, listing: null },
+      },
+    })))
+    renderTable()
+    fireEvent.click(toggles()[0])
+    expect(await screen.findByTestId("rank-desktop")).toHaveTextContent("Not in top 9 (partial)")
+    expect(screen.getByTestId("rank-mobile")).toHaveTextContent("Not in top 40 (2 unreadable)")
+    expect(screen.getByTestId("kw-details")).not.toHaveTextContent("Scan failed")
+  })
+
+  it("a brand-name (low confidence) position is shown approximate", async () => {
+    api.getTrackedKeywordDetails.mockImplementation(() => ok(payload({
+      rankings: {
+        desktop: device({ status: "ranked", position: 4, rankingUrl: null, rankingUrls: [], lowConfidence: true }),
+        mobile: device({ status: "not_collected", position: null, rankingUrl: null, rankingUrls: [] }),
+        maps: { position: null, listing: null },
+      },
+    })))
+    renderTable()
+    fireEvent.click(toggles()[0])
+    const d = await screen.findByTestId("rank-desktop")
+    expect(d).toHaveTextContent("≈ #4")
+    expect(d).toHaveTextContent("Matched by brand name only")
+  })
+
+  it("a complete check still says 'top N'", async () => {
+    api.getTrackedKeywordDetails.mockImplementation(() => ok(payload({
+      rankings: {
+        desktop: device({ status: "not_ranked", position: null, rankingUrl: null, rankingUrls: [], trackedDepth: 100, resultCompleteness: "full", coverageComplete: true, deepestOrganicRank: 100, requestedDepth: 100 }),
+        mobile: device({ status: "not_collected", position: null, rankingUrl: null, rankingUrls: [] }),
+        maps: { position: null, listing: null },
+      },
+    })))
+    renderTable()
+    fireEvent.click(toggles()[0])
+    expect(await screen.findByTestId("rank-desktop")).toHaveTextContent("Not found in the top 100 results.")
+  })
+
   it("keeps not ranked, scan failed and never checked apart, and never prints a position of 0", async () => {
     api.getTrackedKeywordDetails.mockImplementation(() => ok(payload({
       rankings: {

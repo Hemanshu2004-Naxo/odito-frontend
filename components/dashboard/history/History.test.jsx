@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
-const api = vi.hoisted(() => ({ list: vi.fn(), start: vi.fn(), freshness: vi.fn(), changes: vi.fn(), comparison: vi.fn(), keywordHistory: vi.fn() }))
+const api = vi.hoisted(() => ({ list: vi.fn(), start: vi.fn(), refresh: vi.fn(), freshness: vi.fn(), changes: vi.fn(), comparison: vi.fn(), keywordHistory: vi.fn() }))
 vi.mock("@/services/seoScanService", () => ({ default: api, seoScanService: api }))
 vi.mock("@/lib/apiService", () => ({ default: { request: vi.fn() } }))
 
@@ -59,6 +59,30 @@ describe("PageHistory", () => {
     expect(api.freshness).toHaveBeenCalledWith("p1", "organic-keywords", expect.anything())
     await waitFor(() => expect(api.changes).toHaveBeenCalledWith("p1", { dataset: "keywords", status: null, period: "previous" }, expect.anything()))
     expect(api.start).not.toHaveBeenCalled()
+  })
+
+  it("the optional refresh is informational + rate-limited: it asks the server to queue ONE page refresh, never the provider", async () => {
+    api.freshness.mockReturnValue(ok({ datasets: [] }))
+    api.changes.mockReturnValue(ok({ hasData: false }))
+    api.keywordHistory.mockReturnValue(ok({}))
+    api.refresh.mockResolvedValue({ success: true, data: { accepted: true, scan: { id: "s1" } } })
+    wrap(<ProjectPageHistory projectId="p1" route={historyRouteFor("/app/organic-keywords")} defaultOpen />)
+    expect(await screen.findByText(/data updates by itself/i)).toBeInTheDocument()
+    expect(api.refresh).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId("refresh-now-button"))
+    await waitFor(() => expect(api.refresh).toHaveBeenCalledWith("p1", "organic-keywords"))
+    expect(await screen.findByText(/update started/i)).toBeInTheDocument()
+    expect(api.start).not.toHaveBeenCalled()
+  })
+
+  it("a refresh the server refuses (cooldown / running) says so and keeps the data", async () => {
+    api.freshness.mockReturnValue(ok({ datasets: [] }))
+    api.changes.mockReturnValue(ok({ hasData: false }))
+    api.keywordHistory.mockReturnValue(ok({}))
+    api.refresh.mockRejectedValue(Object.assign(new Error("x"), { status: 409, code: "COOLDOWN", data: { accepted: false, reason: "COOLDOWN", retryAt: "2026-11-05T13:00:00Z" } }))
+    wrap(<ProjectPageHistory projectId="p1" route={historyRouteFor("/app/organic-keywords")} defaultOpen />)
+    fireEvent.click(await screen.findByTestId("refresh-now-button"))
+    expect(await screen.findByText(/refreshed manually recently/i)).toBeInTheDocument()
   })
 
   it("shows the page's note about derived figures", async () => {

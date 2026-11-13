@@ -50,7 +50,6 @@ function ProjectCompetitors({ projectId, project }) {
   const { state, update, page, settings } = cp
   const compare = useTrafficComparison(projectId, cp.projectDomain, settings.tracked)
   const { toasts, notify, dismiss } = useToastQueue()
-  const [refreshClicked, setRefreshClicked] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
   const [highlight, setHighlight] = useState(null)
   const [excludePending, setExcludePending] = useState(() => new Set())
@@ -120,7 +119,6 @@ function ProjectCompetitors({ projectId, project }) {
     notify(`Exported ${formatExact(page.rows.length)} competitors from this page.`, "success")
   }
 
-  const refreshNote = refreshClicked && !cp.isFetching && cp.refreshThrottled ? "This data was refreshed less than a minute ago, so it was not requested again." : null
   const noDomain = page.status === "error" && page.error?.code === "INVALID_TARGET"
   const viewKey = JSON.stringify(cp.request)
   const changed = settingsChanged(state)
@@ -132,10 +130,7 @@ function ProjectCompetitors({ projectId, project }) {
         domain={domain}
         market={cp.market}
         updatedAt={cp.updatedAt}
-        onRefresh={() => { setRefreshClicked(true); cp.refresh(); if (settings.tracked.length) compare.refresh() }}
         busy={cp.isFetching || compare.isFetching}
-        refreshing={refreshClicked && (cp.isFetching || compare.isFetching)}
-        refreshNote={refreshNote}
         onExport={exportPage}
         exportDisabled={page.status !== "success" || page.rows.length === 0}
       />

@@ -5,8 +5,6 @@ import AISOHeroSection          from "./aiso/AISOHeroSection"
 import CrawlabilityCenter       from "./aiso/CrawlabilityCenter"
 import IssueDistributionSection from "./aiso/IssueDistributionSection"
 import OptimizationPipeline     from "./aiso/OptimizationPipeline"
-import TopFailedRulesSection    from "./aiso/TopFailedRulesSection"
-import TopOpportunitiesSection  from "./aiso/TopOpportunitiesSection"
 
 export default function AISOHubPageContent({ projectId }) {
   const { data: hubResponse, isLoading, error } = useAISOHub(projectId)
@@ -52,8 +50,7 @@ export default function AISOHubPageContent({ projectId }) {
   }
 
   // Issues already sorted by pages_affected DESC from the API
-  const topIssues       = issues.slice(0, 5)
-  const topOpportunities = issues.slice(0, 3)
+  const topIssues = issues.slice(0, 5)
 
   return (
     <div className="space-y-8">
@@ -83,11 +80,6 @@ export default function AISOHubPageContent({ projectId }) {
       {/* Section 5 — Optimization Pipeline table */}
       <OptimizationPipeline issues={topIssues} />
 
-      {/* Section 6 — Top Failed Rules + Top Opportunities (2-col) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <TopFailedRulesSection   rules={topIssues}         />
-        <TopOpportunitiesSection opportunities={topOpportunities} />
-      </div>
     </div>
   )
 }

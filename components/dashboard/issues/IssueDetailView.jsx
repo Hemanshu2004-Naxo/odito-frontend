@@ -69,7 +69,7 @@ import { ORGANIZATION_ISSUE_IDS } from "@/components/recommendations/organizatio
 // fields and Person remain architecturally scaffolded but not yet
 // implemented — see providerCapabilityRegistry.js). h1_missing is the one
 // page-CONTENT fix (see CONTENT_FIELD_TYPES below).
-const WORDPRESS_FIXABLE_ISSUE_TYPES = {
+export const WORDPRESS_FIXABLE_ISSUE_TYPES = {
   title_missing: "title", title_too_short: "title", title_too_long: "title",
   meta_description_missing: "meta_description", meta_description_too_short: "meta_description", meta_description_too_long: "meta_description",
   canonical_tag_errors: "canonical",

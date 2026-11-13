@@ -146,7 +146,7 @@ export default function GoogleAioDashboard() {
           <Metrics overview={overview} />
           <MetricHelp />
           {(overview.limitations || []).filter((l) => LIMITATION_TEXT[l]).map((l) => <Notice key={l}>{LIMITATION_TEXT[l]}</Notice>)}
-          <QuestionResultsTable projectId={projectId} runId={overview.runId} />
+          <QuestionResultsTable projectId={projectId} runId={overview.runId} busy={inFlight} />
           <Competitors overview={overview} />
           <p className="text-xs text-muted-foreground tabular-nums">Provider cost of this run: {formatCost(overview.cost)}</p>
         </>

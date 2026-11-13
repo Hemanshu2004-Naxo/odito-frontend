@@ -114,7 +114,7 @@ describe("Backlink Overview: first load", () => {
     await screen.findByTestId("bo-rank-value")
     expect(text("bo-updated")).toMatch(/^Updated .*2026/)
     expect(text("bo-since")).toBe("Backlink profile since Mar 2019")
-    expect(screen.getByTestId("bo-refresh")).toBeTruthy()
+    expect(screen.queryByTestId("bo-refresh")).toBeNull() // data is collected and refreshed automatically: no manual button
     expect(text("bo-pdf")).toBe("Download PDF")
     expect(mode("Live").getAttribute("aria-pressed")).toBe("true")
     expect(mode("Lost").getAttribute("aria-pressed")).toBe("false")
@@ -386,22 +386,6 @@ describe("Backlink Overview: Live / Lost / All and Dofollow only", () => {
     expect(last().backlinks).toEqual({ status: "live", dofollow: false })
   })
 
-  test("Refresh asks the server to skip its cache, once", async () => {
-    renderPage()
-    await screen.findByTestId("bo-rank-value")
-    fireEvent.click(screen.getByTestId("bo-refresh"))
-    await waitFor(() => expect(calls()).toHaveLength(2))
-    expect(last().refresh).toBe(true)
-    expect(calls()[0].refresh).toBe(false)
-  })
-
-  test("a refresh the server declined (data under a minute old) says so", async () => {
-    serve((opts) => ok(envelope(REAL_LIVE, { refreshThrottled: Boolean(opts.refresh) })))
-    renderPage()
-    await screen.findByTestId("bo-rank-value")
-    fireEvent.click(screen.getByTestId("bo-refresh"))
-    expect(await screen.findByText(/refreshed less than a minute ago/)).toBeTruthy()
-  })
 })
 
 describe("Backlink Overview: states", () => {

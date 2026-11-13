@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ChevronDown, Download, FileText, Loader2, RefreshCw } from "lucide-react"
+import { ChevronDown, Download, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatDateTime } from "./format"
@@ -39,10 +39,6 @@ export default function ReferringDomainsHeader({
           <span className="text-xs text-muted-foreground" data-testid="rd-updated">
             {updatedAt ? <>Updated {formatDateTime(updatedAt)}</> : <Skel className="inline-block h-3.5 w-36 align-middle" />}
           </span>
-          <Button type="button" variant="outline" onClick={onRefresh} disabled={busy} aria-busy={busy} data-testid="rd-refresh">
-            {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" className="bg-emerald-400 font-semibold text-[#0d1a3a] hover:bg-emerald-300" data-testid="rd-export">
@@ -70,7 +66,6 @@ export default function ReferringDomainsHeader({
             <FileText className="size-4" aria-hidden /> Export disavow file
           </Button>
         </div>
-        {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground @min-[900px]/main:text-right" role="status">{refreshNote}</p> : null}
       </div>
     </div>
   )

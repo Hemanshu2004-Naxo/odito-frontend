@@ -7,6 +7,15 @@ import { SidebarGroupItem } from "./SidebarGroupItem"
 export function SidebarSection({ section, isCollapsed = false }) {
   return (
     <div className="px-2 py-0.5">
+      {/* Optional parent heading (e.g. "SEO") above the first group of a flow */}
+      {section.parentLabel && !isCollapsed && (
+        <div className="px-3 pt-2 pb-1">
+          <span className="text-[13px] font-bold uppercase tracking-[0.1em] text-sidebar-active-foreground">
+            {section.parentLabel}
+          </span>
+        </div>
+      )}
+
       {/* Section label */}
       {section.label && !isCollapsed && (
         <div className="mb-0.5 px-3 pt-2 pb-0.5">

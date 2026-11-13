@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Download, Loader2, RefreshCw } from "lucide-react"
+import { Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatDateTime } from "../referring-domains/format"
 import { Skel } from "./SectionState"
@@ -39,15 +39,10 @@ export default function DomainOverviewHeader({ domain, market, updatedAt, update
           <span className={`${PILL} text-muted-foreground`} data-testid="do-updated" title={updatedDetail || undefined}>
             {updatedAt ? <>Updated {formatDateTime(updatedAt)}</> : <Skel className="inline-block h-3.5 w-32 align-middle" />}
           </span>
-          <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={busy} aria-busy={busy}>
-            {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
           <Button type="button" size="sm" onClick={onExport} disabled={!canExport} className="bg-foreground text-background hover:bg-foreground/90" data-testid="do-export">
             <Download className="size-4" aria-hidden />Export
           </Button>
         </div>
-        {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground @min-[900px]/main:text-right" role="status">{refreshNote}</p> : null}
       </div>
     </div>
   )

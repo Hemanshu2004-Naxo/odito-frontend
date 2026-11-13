@@ -67,20 +67,33 @@ export function Delta({ value, label }) {
 
 const RANK_COPY = {
   not_collected: (d, name) => ({ main: "Not checked", sub: `${name} ranking has not been collected for this keyword yet. Rescan it to collect it.` }),
-  scan_error: (d) => ({ main: d.position !== null ? `#${d.position}` : "Scan failed", sub: d.position !== null ? "Last known position. The most recent check failed, so this may be out of date." : "The last check failed, so the position is unknown. This is not a confirmed ranking." }),
-  not_ranked: (d) => ({ main: "Not ranked", sub: d.depth ? `Not found in the top ${d.depth} results.` : "Not found in the results returned." }),
-  ranked: (d) => ({ main: `#${d.position}`, sub: null }),
+  scan_error: (d) => ({ main: d.position !== null ? `#${d.position}` : "Scan failed", sub: d.position !== null ? `Previous position retained. The most recent check failed, so this is not newly verified${d.lastVerifiedAt ? ` — last verified ${d.lastVerifiedAt.toLocaleDateString()}` : ""}.` : "The last check failed, so the position is unknown. This is not a confirmed ranking." }),
+  not_ranked: (d) => ({
+    main: "Not ranked",
+    // Verified only to the depth the response established: a complete check says "top N"; a short one says exactly how many results came back.
+    sub: d.notRankedKind === "partial"
+      ? `Not in top ${d.depth ?? d.deepestOrganicRank ?? "the returned"} (partial). The data provider returned only part of the results, so the site may rank beyond them.`
+      : d.notRankedKind === "uncertain"
+        ? `Not in top ${d.depth ?? "the returned"} (${d.unresolvedCandidates || "some"} unreadable). ${d.unresolvedCandidates === 1 ? "One result has" : "Some results have"} no readable website, so the site could be among them.`
+        : d.resultCompleteness === "short" && d.deepestOrganicRank !== null
+      ? `Not found in the ${d.deepestOrganicRank} organic results returned${d.requestedDepth ? ` (${d.requestedDepth} requested)` : ""}. Positions beyond that were not covered.`
+      : d.depth ? `Not found in the top ${d.depth} results.` : "Not found in the results returned.",
+  }),
+  ranked: (d) => ({ main: `${d.lowConfidence ? "≈ " : ""}#${d.position}`, sub: d.lowConfidence ? "Matched by brand name only: the result's website could not be read, so this position is approximate." : d.partial ? `Found in partial results${d.returnedResults !== null && d.requestedDepth !== null ? ` (${d.returnedResults} of ${d.requestedDepth} requested results returned)` : ""}. The position is real, but the check was not complete.` : null }),
 }
 
 /** One device's position: its state in words, never a 0. */
 function DeviceRank({ name, d }) {
   const copy = RANK_COPY[d.status](d, name)
+  // Why a check could not verify the ranking (provider failure, partial coverage, redirect links with no readable destination).
+  const reason = d.status === "scan_error" && d.error ? d.error : null
   const tone = d.status === "ranked" ? "text-foreground" : d.status === "scan_error" ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"
   return (
     <div className="min-w-0 rounded-lg border border-border/60 bg-card px-3 py-2.5" data-testid={`rank-${name.toLowerCase()}`} data-status={d.status}>
       <div className="text-xs text-muted-foreground">{name}</div>
       <div className={cn("mt-0.5 text-lg font-semibold tabular-nums", tone)}>{copy.main}</div>
       {copy.sub ? <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{copy.sub}</p> : null}
+      {reason ? <p className="mt-0.5 text-[11px] leading-4 text-amber-800 dark:text-amber-300" data-testid={`rank-reason-${name.toLowerCase()}`}>{reason}</p> : null}
       {d.status === "ranked" || d.status === "scan_error" ? (
         <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
           <dt className="text-muted-foreground">Previous scan</dt>

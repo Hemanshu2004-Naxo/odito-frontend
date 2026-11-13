@@ -42,6 +42,8 @@ import {
   ListOrdered,
   Swords,
   Network,
+  Link2,
+  Anchor,
 } from "lucide-react"
 
 /**
@@ -51,96 +53,82 @@ import {
 
 export const sidebarSections = [
   {
-    // The first thing in the sidebar and the page a project opens on. No heading: it is a home link, not a group of tools.
-    id: "domain-overview",
-    label: null,
-    ariaLabel: "Domain overview",
+    id: "site-audit",
+    label: "Site audit",
+    parentLabel: "SEO", // small heading shown once above the whole SEO flow
     items: [
-      {
-        id: "domain-overview",
-        label: "Domain Overview",
-        href: "/app/domain-overview",
-        icon: Radar,
-      },
-      {
-        id: "traffic-history",
-        label: "Traffic",
-        href: "/app/traffic-history",
-        icon: ChartLine,
-      },
-      {
-        id: "organic-keywords",
-        label: "Organic Keywords",
-        href: "/app/organic-keywords",
-        icon: ListOrdered,
-      },
-      {
-        id: "competitors",
-        label: "Competitors",
-        href: "/app/competitors",
-        icon: Swords,
-      },
-      {
-        // ONE collapsible group for the five backlink pages (their routes are unchanged). It opens whenever any of them is the current page.
-        id: "off-page",
-        label: "Off-Page",
-        href: "/app/backlinks/overview",
-        icon: Network,
-        children: [
-          { id: "off-page-overview", label: "Overview", href: "/app/backlinks/overview" },
-          { id: "off-page-backlinks", label: "Backlinks", href: "/app/backlinks/list" },
-          { id: "off-page-anchors", label: "Anchors", href: "/app/backlinks/anchors" },
-          { id: "off-page-referring-domains", label: "Referring Domains", href: "/app/referring-domains" },
-          { id: "off-page-top-pages", label: "Top linked pages", href: "/app/backlinks/top-pages" },
-        ],
-      },
+      { id: "overview", label: "Overview", href: "/app/dashboard", icon: LayoutDashboard },
+      { id: "onpage", label: "On-Page", href: "/app/onpage", icon: FileText },
+      { id: "technical-checks", label: "Technical", href: "/app/technicalchecks", icon: Settings },
+      { id: "accessibility", label: "Accessibility", href: "/app/accessibility", icon: Accessibility },
+      { id: "pagespeed", label: "Performance", href: "/app/pagespeed", icon: Zap },
+      { id: "keywords", label: "Keywords", href: "/app/keywords", icon: Key },
     ],
   },
   {
-    id: "audit",
-    label: "Audit",
+    id: "domain-overview",
+    label: "Rankings & traffic",
+    items: [
+      { id: "domain-overview", label: "Domain overview", href: "/app/domain-overview", icon: Radar },
+      { id: "traffic-history", label: "Traffic", href: "/app/traffic-history", icon: ChartLine },
+      {
+        id: "keyword-ranking",
+        label: "Keyword ranking",
+        href: "/app/organic-keywords",
+        icon: ListOrdered,
+        children: [{ id: "organic-keywords", label: "All keywords", href: "/app/organic-keywords" }],
+      },
+      { id: "competitors", label: "Competitors", href: "/app/competitors", icon: Swords },
+    ],
+  },
+  {
+    id: "off-page",
+    label: "Off-page",
+    items: [
+      { id: "off-page-overview", label: "Backlink overview", href: "/app/backlinks/overview", icon: Network },
+      { id: "off-page-backlinks", label: "Backlinks", href: "/app/backlinks/list", icon: Link2 },
+      { id: "off-page-anchors", label: "Anchors", href: "/app/backlinks/anchors", icon: Anchor },
+      { id: "off-page-referring-domains", label: "Linking sites", href: "/app/referring-domains", icon: Globe },
+      { id: "off-page-top-pages", label: "Top linked pages", href: "/app/backlinks/top-pages", icon: FileText },
+    ],
+  },
+  {
+    id: "ai-search",
+    label: "AI search",
     items: [
       {
-        id: "pre-audit",
-        label: "Pre Audit",
-        href: "/app/pre-audit",
-        icon: ClipboardList,
+        id: "google-ai-overview-overview",
+        label: "AI Visibility",
+        href: "/app/google-ai-overview",
+        icon: Sparkles,
+        children: [
+          { id: "google-ai-overview-home", label: "Overview", href: "/app/google-ai-overview" },
+          { id: "google-ai-overview-questions", label: "Questions", href: "/app/google-ai-overview/questions" },
+          { id: "google-ai-overview-results", label: "Answers & citations", href: "/app/google-ai-overview/results" },
+          { id: "google-ai-overview-history", label: "History", href: "/app/google-ai-overview/history" },
+        ],
       },
+      { id: "aeo-hub", label: "AEO", href: "/app/aeo-hub", icon: MessageSquareQuote },
+      { id: "aiso", label: "AISO", href: "/app/aiso", icon: BrainCircuit },
+      { id: "geo-hub", label: "GEO", href: "/app/geo-hub", icon: Globe },
+    ],
+  },
+  {
+    id: "google-data",
+    label: "Google data",
+    items: [
+      { id: "google-visibility-search-console", label: "Search Console", href: "/app/google-visibility/search-console", icon: Search },
+      { id: "google-visibility-analytics", label: "Analytics", href: "/app/google-visibility/analytics", icon: BarChart3 },
       {
-        id: "overview",
-        label: "Overview",
-        href: "/app/dashboard",
-        icon: LayoutDashboard,
-      },
-      {
-        id: "onpage",
-        label: "On-Page Issues",
-        href: "/app/onpage",
-        icon: FileText,
-      },
-      {
-        id: "accessibility",
-        label: "Accessibility Issues",
-        href: "/app/accessibility",
-        icon: Accessibility,
-      },
-      {
-        id: "technical-checks",
-        label: "Technical Checks",
-        href: "/app/technicalchecks",
-        icon: Settings,
-      },
-      {
-        id: "pagespeed",
-        label: "PageSpeed",
-        href: "/app/pagespeed",
-        icon: Zap,
-      },
-      {
-        id: "keywords",
-        label: "Keywords",
-        href: "/app/keywords",
-        icon: Key,
+        id: "google-visibility-business-profile",
+        label: "Business Profile",
+        href: "/app/google-visibility/business-profile",
+        icon: Building,
+        children: [
+          { id: "google-visibility-business-profile-overview", label: "Overview", href: "/app/google-visibility/business-profile" },
+          { id: "google-visibility-business-profile-reviews", label: "Reviews", href: "/app/google-visibility/business-profile/reviews" },
+          { id: "google-visibility-business-profile-posts", label: "Posts", href: "/app/google-visibility/business-profile/posts" },
+        ],
       },
     ],
   },
@@ -173,113 +161,6 @@ export const sidebarSections = [
         label: "Social Media AI",
         href: "/app/social-media",
         icon: Sparkles,
-      },
-    ],
-  },
-  {
-    id: "google-visibility",
-    label: "Google Visibility",
-    items: [
-      {
-        id: "google-visibility-overview",
-        label: "Overview",
-        href: "/app/google-visibility",
-        icon: LayoutDashboard,
-      },
-      {
-        id: "google-visibility-business-profile",
-        label: "Business Profile",
-        href: "/app/google-visibility/business-profile",
-        icon: Building,
-        children: [
-          {
-            id: "google-visibility-business-profile-overview",
-            label: "Overview",
-            href: "/app/google-visibility/business-profile",
-          },
-          {
-            id: "google-visibility-business-profile-reviews",
-            label: "Reviews",
-            href: "/app/google-visibility/business-profile/reviews",
-          },
-          {
-            id: "google-visibility-business-profile-posts",
-            label: "Posts",
-            href: "/app/google-visibility/business-profile/posts",
-          },
-        ],
-      },
-      {
-        id: "google-visibility-search-console",
-        label: "Search Console",
-        href: "/app/google-visibility/search-console",
-        icon: Search,
-      },
-      {
-        id: "google-visibility-analytics",
-        label: "Analytics",
-        href: "/app/google-visibility/analytics",
-        icon: BarChart3,
-      },
-      {
-        id: "google-visibility-google-ads",
-        label: "Google Ads",
-        href: "/app/google-visibility/google-ads",
-        icon: Megaphone,
-      },
-    ],
-  },
-  {
-    id: "ai-intelligence",
-    label: "AI Intelligence",
-    items: [
-      {
-        id: "aiso",
-        label: "AISO Hub",
-        href: "/app/aiso",
-        icon: BrainCircuit,
-      },
-      {
-        id: "aeo-hub",
-        label: "AEO Hub",
-        href: "/app/aeo-hub",
-        icon: MessageSquareQuote,
-      },
-      {
-        id: "geo-hub",
-        label: "GEO Hub",
-        href: "/app/geo-hub",
-        icon: Globe,
-      },
-    ],
-  },
-  {
-    id: "google-ai-overview",
-    label: "Google AI Overview",
-    items: [
-      {
-        id: "google-ai-overview-overview",
-        label: "Overview",
-        href: "/app/google-ai-overview",
-        icon: Sparkles,
-      },
-      {
-        id: "google-ai-overview-questions",
-        label: "Questions",
-        href: "/app/google-ai-overview/questions",
-        icon: CircleHelp,
-      },
-      {
-        id: "google-ai-overview-results",
-        label: "Answers & citations",
-        href: "/app/google-ai-overview/results",
-        icon: MessageSquareQuote,
-      },
-      {
-        id: "google-ai-overview-history",
-        label: "History",
-        href: "/app/google-ai-overview/history",
-        icon: History,
       },
     ],
   },

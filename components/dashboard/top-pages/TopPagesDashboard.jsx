@@ -47,11 +47,9 @@ function ProjectTopPages({ projectId, project }) {
   const { state, update, page } = tp
   const domain = tp.target || projectDomain
   const { toasts, notify, dismiss } = useToastQueue()
-  const [refreshClicked, setRefreshClicked] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const tableRef = useRef(null)
 
-  const refreshNote = refreshClicked && !tp.isFetching && tp.refreshThrottled ? "This data was refreshed less than a minute ago, so it was not requested again." : null
   const noDomain = page.status === "error" && page.error?.code === "INVALID_TARGET"
   const viewKey = JSON.stringify([state.tab, tp.request, state.merge, state.flags])
   const referringDomainsTotal = tp.summary.data?.totals.referringDomains ?? null
@@ -77,10 +75,7 @@ function ProjectTopPages({ projectId, project }) {
         domain={domain}
         updatedAt={tp.updatedAt}
         pageCount={tp.counts.data?.pages ?? null}
-        onRefresh={() => { setRefreshClicked(true); tp.refresh() }}
         busy={tp.isFetching}
-        refreshing={refreshClicked && tp.isFetching}
-        refreshNote={refreshNote}
         rowCount={page.rows.length}
         total={page.total}
         exportPageDisabled={page.status !== "success" || !page.rows.length}
@@ -96,9 +91,9 @@ function ProjectTopPages({ projectId, project }) {
           <SummaryStrip counts={tp.counts} summary={tp.summary} onOpenTab={openTab} />
 
           <div ref={tableRef} className="scroll-mt-4 space-y-4">
-            <TabsBar tab={state.tab} counts={tp.tabCounts} onTab={(tab) => update({ tab })} merge={state.merge} onMerge={(merge) => update({ merge, page: state.page })} />
             <FilterBar state={state} update={update} built={tp.built} activeCount={tp.chips.length} onClearAll={tp.clearFilters} />
             <ActiveFilters chips={tp.chips} onRemove={(chip) => update(chip.clear)} onClearAll={tp.clearFilters} />
+            <TabsBar tab={state.tab} counts={tp.tabCounts} onTab={(tab) => update({ tab })} merge={state.merge} onMerge={(merge) => update({ merge, page: state.page })} />
 
             {tp.traffic.failed ? (
               <p role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200" data-testid="tp-traffic-warning">

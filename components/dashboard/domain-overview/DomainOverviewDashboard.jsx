@@ -52,8 +52,7 @@ export default function DomainOverviewDashboard() {
 }
 
 function ProjectDomainOverview({ projectId, project }) {
-  const { sections, refreshAll, isFetching, competitorSettings } = useDomainOverview(projectId)
-  const [refreshClicked, setRefreshClicked] = useState(false)
+  const { sections, isFetching, competitorSettings } = useDomainOverview(projectId)
   const vm = mapDomainOverview(sections)
 
   const entries = Object.entries(sections)
@@ -69,10 +68,6 @@ function ProjectDomainOverview({ projectId, project }) {
   const updatedAt = fetchedAt.length ? new Date(Math.max(...fetchedAt.map(([, t]) => Date.parse(t)))).toISOString() : null
   const updatedDetail = fetchedAt.map(([name, t]) => `${SECTION_LABELS[name]}: ${formatDateTime(t)}`).join("\n")
 
-  const allThrottled = loaded.length > 0 && loaded.every(([, s]) => s.data.refreshThrottled)
-  const refreshNote = refreshClicked && !isFetching && allThrottled
-    ? "This data was refreshed less than a minute ago, so it was not requested again."
-    : null
 
   // Every section rejects a project whose URL has no public domain in the same way: say it once.
   const noDomain = entries.every(([, s]) => s.status === "error" && s.error?.code === "INVALID_TARGET")
@@ -95,9 +90,6 @@ function ProjectDomainOverview({ projectId, project }) {
         updatedAt={updatedAt}
         updatedDetail={updatedDetail}
         busy={isFetching}
-        refreshing={refreshClicked && isFetching}
-        refreshNote={refreshNote}
-        onRefresh={() => { setRefreshClicked(true); refreshAll() }}
         onExport={exportCsv}
         canExport={loaded.length > 0}
       />

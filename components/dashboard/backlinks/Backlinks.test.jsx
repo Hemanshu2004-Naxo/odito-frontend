@@ -119,7 +119,7 @@ describe("Backlinks: first load", () => {
     await screen.findAllByTestId("bl-row")
     expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toBe("Dashboard/SEO/Off-page")
     expect(screen.getByTestId("bl-updated").textContent).toMatch(/^Updated .*2026/)
-    expect(screen.getByTestId("bl-refresh")).toBeTruthy()
+    expect(screen.queryByTestId("bl-refresh")).toBeNull() // data is collected and refreshed automatically: no manual button
     expect(screen.getByTestId("bl-export")).toBeTruthy()
   })
 
@@ -621,23 +621,6 @@ describe("Backlinks: cancelling and refreshing", () => {
     expect(showing()).toMatch(/of 8,184/) // the New tab's total, not the lost one's 3,172
   })
 
-  test("Refresh asks the server to skip its cache, and a declined refresh says so", async () => {
-    renderPage()
-    await screen.findAllByTestId("bl-row")
-    fireEvent.click(screen.getByTestId("bl-refresh"))
-    await waitFor(() => expect(listCalls()).toHaveLength(2))
-    expect(lastList().refresh).toBe(true)
-    expect(listCalls()[0].refresh).toBe(false)
-  })
-
-  test("a refresh the server declined (data under a minute old) says so", async () => {
-    const base = svc.getSection.getMockImplementation()
-    svc.getSection.mockImplementation(async (...a) => { const r = await base(...a); if (a[1] === "backlinks-list" && a[2].refresh) r.data.refreshThrottled = true; return r })
-    renderPage()
-    await screen.findAllByTestId("bl-row")
-    fireEvent.click(screen.getByTestId("bl-refresh"))
-    expect(await screen.findByText(/refreshed less than a minute ago/)).toBeTruthy()
-  })
 })
 
 describe("Backlinks: states", () => {

@@ -200,35 +200,12 @@ describe("Traffic History: the date range never costs more than it must", () => 
   })
 })
 
-describe("Traffic History: refresh", () => {
-  test("Refresh skips the cache for the window on screen, once", async () => {
+describe("Traffic History: automatic data (no manual refresh)", () => {
+  test("no Refresh button, and the page never asks the server to skip its cache", async () => {
     renderPage()
     await screen.findByTestId("th-summary")
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
-    await waitFor(() => expect(calls()).toHaveLength(2))
-    expect(calls()[1]).toEqual({ pid: "p1", section: "history", refresh: true, months: 12 })
-    await screen.findByRole("button", { name: "Refresh" })
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
-    await waitFor(() => expect(calls()).toHaveLength(3))
-    expect(calls()[2].refresh).toBe(true)
-  })
-
-  test("after loading 24 months, Refresh refreshes the 24-month window", async () => {
-    renderPage()
-    await screen.findByTestId("th-summary")
-    fireEvent.click(range(24))
-    await waitFor(() => expect(rows()).toHaveLength(25))
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
-    await waitFor(() => expect(calls()).toHaveLength(3))
-    expect(calls()[2]).toEqual({ pid: "p1", section: "history", refresh: true, months: 24 })
-  })
-
-  test("a refresh the server declined to repeat says so", async () => {
-    renderPage()
-    await screen.findByTestId("th-summary")
-    serve(async () => ok(envelope(REAL_ITEMS, 12, { refreshThrottled: true })))
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
-    expect(await screen.findByText(/refreshed less than a minute ago/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /^refresh/i })).toBeNull()
+    expect(calls().every((c) => c.refresh === false)).toBe(true)
   })
 })
 

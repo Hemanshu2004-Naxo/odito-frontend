@@ -32,10 +32,8 @@ export default function BacklinkOverviewDashboard() {
 function ProjectBacklinks({ projectId, project }) {
   const bl = useBacklinkSummary(projectId)
   const { state, update, summary } = bl
-  const [refreshClicked, setRefreshClicked] = useState(false)
   const domain = bl.target ?? domainFromUrl(project?.main_url)
   const view = { status: bl.status, error: bl.error, refetch: bl.refetch }
-  const refreshNote = refreshClicked && !bl.isFetching && bl.refreshThrottled ? "This data was refreshed less than a minute ago, so it was not requested again." : null
   const noDomain = bl.status === "error" && bl.error?.code === "INVALID_TARGET"
   const empty = bl.status === "success" && summary?.hasBacklinks === false
   const extras = useBacklinkExtras(projectId, { domain, totalReferringDomains: summary?.totals.referringDomains ?? null })
@@ -49,10 +47,7 @@ function ProjectBacklinks({ projectId, project }) {
         since={summary?.age.short ?? null}
         state={state}
         update={update}
-        onRefresh={() => { setRefreshClicked(true); bl.refresh() }}
         busy={bl.isFetching}
-        refreshing={refreshClicked && bl.isFetching}
-        refreshNote={refreshNote}
       />
 
       {bl.status === "error" && !noDomain ? (

@@ -16,21 +16,27 @@ import { SidebarSection } from './SidebarSection'
 
 const section = (id) => sidebarSections.find((s) => s.id === id)
 
-describe('SidebarSection: the Domain Overview group', () => {
-  it('renders the link with no visible heading, in a landmark with its own accessible name', () => {
+describe('SidebarSection: the Rankings & traffic group', () => {
+  it('renders the link under its group heading, in a landmark named after it', () => {
     render(<SidebarSection section={section('domain-overview')} />)
-    expect(screen.getByRole('navigation', { name: 'Domain overview' })).toBeInTheDocument()
-    const link = screen.getByRole('link', { name: /Domain Overview/ })
+    expect(screen.getByRole('navigation', { name: 'Rankings & traffic' })).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /Domain overview/ })
     expect(link).toHaveAttribute('href', '/app/domain-overview')
     expect(link).toHaveAttribute('aria-current', 'page') // it is the active page on its own route
-    expect(document.querySelector('span.uppercase')).toBeNull() // no section label
+    expect(screen.getByText('Rankings & traffic')).toBeInTheDocument()
   })
 
   it('is not marked active on another route', () => {
     mockPathname = '/app/dashboard'
     render(<SidebarSection section={section('domain-overview')} />)
-    expect(screen.getByRole('link', { name: /Domain Overview/ })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: /Domain overview/ })).not.toHaveAttribute('aria-current')
     mockPathname = '/app/domain-overview'
+  })
+
+  it('shows the SEO parent heading on the first group', () => {
+    render(<SidebarSection section={section('site-audit')} />)
+    expect(screen.getByText('SEO')).toBeInTheDocument()
+    expect(screen.getByText('Site audit')).toBeInTheDocument()
   })
 
   it('groups that do have a label still show it and name their landmark after it', () => {

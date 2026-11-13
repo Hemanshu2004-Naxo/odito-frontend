@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useProject } from '@/contexts/ProjectContext'
 import CheckList from "@/components/dashboard/technical/CheckList"
-import StatusBreakdown from "@/components/dashboard/technical/StatusBreakdown"
 import TechCheckDetailView from "@/components/dashboard/technical/TechCheckDetailView"
 import PageDetailView from "@/app/onpage/components/PageDetailView"
 import { TechnicalChecksSummarySkeleton, TechnicalChecksTableSkeleton } from "@/components/skeletons/technicalchecks"
@@ -95,27 +94,6 @@ export default function TechnicalPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            {selectedCheck ? (
-              <div>
-              </div>
-            ) : (
-              <>
-                <h1 className="text-2xl font-bold tracking-tight" style={{ color:"var(--t)" }}>
-                  Technical Checks
-                </h1>
-                <p style={{ color:"var(--t2)", fontSize:13 }}>
-                   technical SEO analysis for {activeProject.project_name}
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
       {selectedUrl ? (
         <PageDetailView 
@@ -132,17 +110,11 @@ export default function TechnicalPage() {
           onOpenUrl={handleUrlSelect}
         />
       ) : (
-        <div className="split-aside-320">
-          <CheckList
-            onSelectCheck={setSelectedCheck}
-            technicalData={technicalData}
-            error={technicalError}
-          />
-          <StatusBreakdown
-            technicalData={technicalData}
-            error={technicalError}
-          />
-        </div>
+        <CheckList
+          onSelectCheck={setSelectedCheck}
+          technicalData={technicalData}
+          error={technicalError}
+        />
       )}
     </div>
   )

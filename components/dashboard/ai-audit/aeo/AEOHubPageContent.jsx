@@ -10,12 +10,8 @@ import AEOIssueDistribution    from "./AEOIssueDistribution"
 import FAQIntelligenceCenter   from "./FAQIntelligenceCenter"
 import AEOOptimizationPipeline from "./AEOOptimizationPipeline"
 
-// Static labels and descriptions for the 5 readiness signal cards
+// Static labels and descriptions for the 4 readiness signal cards
 const SIGNAL_META = {
-  direct_answer:    {
-    label:       "Direct Answer",
-    description: "Content leads with a direct response to user queries within 60 words.",
-  },
   question_h2:      {
     label:       "Question H2",
     description: "Interrogative H2 headings guide AI extraction. Target ≥ 30% question ratio.",

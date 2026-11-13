@@ -15,7 +15,7 @@ vi.mock('framer-motion', () => ({
 import { SidebarGroupItem } from './SidebarGroupItem'
 
 const item = sidebarSections
-  .find((s) => s.id === 'google-visibility')
+  .find((s) => s.id === 'google-data')
   .items.find((i) => i.id === 'google-visibility-business-profile')
 
 const toggle = () => screen.getByRole('button', { name: /business profile menu/i })
@@ -65,33 +65,22 @@ describe('SidebarGroupItem (Business Profile)', () => {
   })
 })
 
-describe('SidebarGroupItem (Off-Page: the five backlink pages)', () => {
-  const offPage = sidebarSections.find((s) => s.id === 'domain-overview').items.find((i) => i.id === 'off-page')
-  const offToggle = () => screen.getByRole('button', { name: /off-page menu/i })
+describe('SidebarGroupItem (Keyword ranking > All keywords)', () => {
+  const group = sidebarSections.find((s) => s.id === 'domain-overview').items.find((i) => i.id === 'keyword-ranking')
+  const kToggle = () => screen.getByRole('button', { name: /keyword ranking menu/i })
 
-  it.each([
-    ['/app/backlinks/overview', 'Overview'],
-    ['/app/backlinks/list', 'Backlinks'],
-    ['/app/backlinks/anchors', 'Anchors'],
-    ['/app/referring-domains', 'Referring Domains'],
-    ['/app/backlinks/top-pages', 'Top linked pages'],
-  ])('opens by itself on %s, and that page is the current one', (path, label) => {
-    mockPathname = path
-    render(<SidebarGroupItem item={offPage} />)
-    expect(offToggle()).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getAllByRole('link', { name: label }).some((l) => l.getAttribute('aria-current') === 'page')).toBe(true)
+  it('opens by itself on the keywords page, and All keywords is the current page', () => {
+    mockPathname = '/app/organic-keywords'
+    render(<SidebarGroupItem item={group} />)
+    expect(kToggle()).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'All keywords' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('stays closed on an unrelated route (including the other dashboard pages) and the chevron opens it without navigating', () => {
-    for (const path of ['/app/domain-overview', '/app/organic-keywords', '/app/competitors', '/app/dashboard']) {
-      mockPathname = path
-      const { unmount } = render(<SidebarGroupItem item={offPage} />)
-      expect(offToggle()).toHaveAttribute('aria-expanded', 'false')
-      unmount()
-    }
-    mockPathname = '/app/domain-overview'
-    render(<SidebarGroupItem item={offPage} />)
-    fireEvent.click(offToggle())
-    expect(offToggle()).toHaveAttribute('aria-expanded', 'true')
+  it('stays closed on an unrelated route and the chevron opens it', () => {
+    mockPathname = '/app/competitors'
+    render(<SidebarGroupItem item={group} />)
+    expect(kToggle()).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(kToggle())
+    expect(kToggle()).toHaveAttribute('aria-expanded', 'true')
   })
 })

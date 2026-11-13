@@ -106,7 +106,8 @@ describe("Anchors: first load", () => {
     expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toBe("Dashboard/SEO/Off-page")
     expect(screen.getByTestId("an-domain").textContent).toBe("asgeyehospital.com")
     expect(screen.getByTestId("an-about").textContent).toBe("The clickable words other sites use to link to you · 1,004 anchors")
-    for (const id of ["an-settings", "an-refresh", "an-export"]) expect(screen.getByTestId(id)).toBeTruthy()
+    for (const id of ["an-settings", "an-export"]) expect(screen.getByTestId(id)).toBeTruthy()
+    expect(screen.queryByTestId("an-refresh")).toBeNull() // data is collected and refreshed automatically: no manual button
   })
 
   test("asks for a project when none is selected, and requests nothing", () => {
@@ -376,23 +377,6 @@ describe("Anchors: export, refresh and states", () => {
     expect(content.split("\r\n").some((l) => /^LASIK surgery,Exact match,/.test(l))).toBe(true)
     expect(calls()).toHaveLength(before)
     expect(await screen.findByText("Exported 1,000 anchors.")).toBeTruthy()
-  })
-
-  test("Refresh asks the server to skip its cache for the profile, once", async () => {
-    renderPage()
-    await loaded()
-    fireEvent.click(screen.getByTestId("an-refresh"))
-    await waitFor(() => expect(bySection("anchor-profile")).toHaveLength(2))
-    expect(bySection("anchor-profile")[1].refresh).toBe(true)
-    expect(bySection("anchors")).toHaveLength(0)
-  })
-
-  test("a refresh the server declined (data under a minute old) says so", async () => {
-    serve({ "anchor-profile": (opts) => ok(envelope("anchor-profile", REAL_PROFILE, { refreshThrottled: Boolean(opts?.refresh) })) })
-    renderPage()
-    await loaded()
-    fireEvent.click(screen.getByTestId("an-refresh"))
-    expect(await screen.findByText(/refreshed less than a minute ago/)).toBeTruthy()
   })
 
   test("a failed profile is an inline error with Retry in each card; Retry loads the page", async () => {

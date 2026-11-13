@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import seoScanService from "@/services/seoScanService"
 import socketService, { ConnectionState } from "@/lib/socketService"
-import { queryKeys } from "@/lib/query/keys"
 import { HISTORY_ROOTS } from "@/hooks/useDatasetHistory"
+import { invalidateDataset } from "@/lib/seo/datasetQueries"
 
 /**
  * The project's SEO scans: the latest one and the action that starts one.
@@ -15,8 +15,10 @@ import { HISTORY_ROOTS } from "@/hooks/useDatasetHistory"
  * (seo_scan:* on the project room); while the socket is down, or as a slow safety net while it is up, the list is polled. A reconnect
  * refetches immediately, so a missed event or a reloaded page cannot leave the progress wrong.
  *
- * When a scan finishes, only this project's STORED-DATA queries (the pages, the history panels, the freshness lines) are invalidated.
- * Nothing here can reach the provider except starting a scan, which is an explicit user action.
+ * Collections start by themselves (useAutoCollect asks the server when a page opens); this hook only OBSERVES them. As each dataset of a scan
+ * completes, only the queries that read THAT dataset are refreshed (lib/seo/datasetQueries.js) - never the whole page - and a section that was
+ * showing "being collected" is read again. When the scan ends, the history / freshness panels and the page's ensure state are refreshed.
+ * Nothing here can reach the provider.
  */
 
 export const ACTIVE = ["pending", "queued", "running"]
@@ -81,10 +83,16 @@ function useScanSocket(projectId, onSignal) {
   return connected
 }
 
+/** Reads again every stored-data query of the project that is showing "not collected yet" (they are the ones a finished dataset may fill). */
+export function refreshNotCollected(qc, projectId) {
+  qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "domain-overview" && q.queryKey[1] === projectId && q.state.error?.code === "NOT_SCANNED" })
+}
+
 export function useSeoScan(projectId) {
   const qc = useQueryClient()
   const key = ["seo-scan", projectId]
   const wasActive = useRef(false)
+  const seen = useRef({ scanId: null, done: new Set() })
   const [socketUp, setSocketUp] = useState(false)
 
   const q = useQuery({
@@ -102,11 +110,25 @@ export function useSeoScan(projectId) {
   useEffect(() => { setSocketUp(connected) }, [connected])
 
   useEffect(() => {
+    if (!latest) return
+    // Dataset by dataset: what completed since the last look refreshes exactly the queries that read it. The first look at a scan only
+    // records what was already done (the page loaded that itself); a purchase-free (cached) dataset changed nothing.
+    const first = seen.current.scanId !== latest.id
+    const done = first ? new Set() : seen.current.done
+    const completed = (latest.datasets ?? []).filter((d) => d.status === "completed")
+    const added = completed.filter((d) => !done.has(d.id))
+    for (const d of completed) done.add(d.id)
+    seen.current = { scanId: latest.id, done }
+    if (!first) for (const d of added) if (d.cached !== true) invalidateDataset(qc, projectId, d.id)
+
     const active = isActive(latest)
-    if (wasActive.current && !active && latest) {
-      qc.invalidateQueries({ queryKey: queryKeys.domainOverview.all(projectId) })
+    const ended = wasActive.current && !active
+    if (ended) {
       for (const root of HISTORY_ROOTS) qc.invalidateQueries({ queryKey: [root, projectId] })
+      // The page's collection state (it may now queue what the finished scan did not cover, or show the failure).
+      qc.invalidateQueries({ queryKey: ["seo-ensure", projectId] })
     }
+    if (first || added.length || ended) refreshNotCollected(qc, projectId)
     wasActive.current = active
   }, [latest, projectId, qc])
 

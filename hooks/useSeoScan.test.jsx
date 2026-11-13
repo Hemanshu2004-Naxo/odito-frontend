@@ -121,21 +121,81 @@ describe("socket subscription", () => {
 })
 
 describe("scan completion", () => {
-  it("invalidates only THIS project's stored-data queries (pages, history, freshness) and nothing else", async () => {
-    api.list.mockReturnValueOnce(list(scan()))
-    const { client, result } = setup()
-    for (const key of [["domain-overview", "p1", "history"], ["dataset-changes", "p1", "keywords"], ["dataset-freshness", "p1", "backlinks"], ["snapshot-comparison", "p1"], ["keyword-history", "p1", "x"],
-      ["domain-overview", "p2", "history"], ["dataset-changes", "p2", "keywords"], ["social", "p1", "posts"]]) {
+  const seedKeys = (client) => {
+    for (const key of [["domain-overview", "p1", "history", "v2", 12], ["domain-overview", "p1", "competitors", "v2", "s", {}], ["domain-overview", "p1", "backlinks-list", {}],
+      ["dataset-changes", "p1", "keywords"], ["dataset-freshness", "p1", "backlinks"], ["snapshot-comparison", "p1"], ["keyword-history", "p1", "x"], ["seo-ensure", "p1", "traffic"],
+      ["domain-overview", "p2", "history", "v2", 12], ["dataset-changes", "p2", "keywords"], ["seo-ensure", "p2", "traffic"], ["social", "p1", "posts"]]) {
       client.setQueryData(key, { ok: true })
     }
+  }
+  const invalidated = (client, key) => client.getQueryState(key)?.isInvalidated
+
+  it("each completed dataset refreshes ONLY the queries that read it - not the whole page, not another project", async () => {
+    api.list.mockReturnValueOnce(list(scan({ datasets: [{ id: "rank-overview", status: "completed", cached: false }, { id: "history", status: "pending" }, { id: "competitors", status: "pending" }] })))
+    const { client, result } = setup()
+    seedKeys(client)
+    await waitFor(() => expect(result.current.running).toBe(true))
+    // The first look only records what was already done: nothing is refetched for it.
+    expect(invalidated(client, ["domain-overview", "p1", "history", "v2", 12])).toBe(false)
+
+    api.list.mockReturnValue(list(scan({ datasets: [{ id: "rank-overview", status: "completed", cached: false }, { id: "history", status: "completed", cached: false }, { id: "competitors", status: "pending" }] })))
+    act(() => { socket.emit("seo_scan:dataset_completed", { projectId: "p1", datasetId: "history" }) })
+    await waitFor(() => expect(invalidated(client, ["domain-overview", "p1", "history", "v2", 12])).toBe(true))
+    expect(invalidated(client, ["domain-overview", "p1", "competitors", "v2", "s", {}])).toBe(false)
+    expect(invalidated(client, ["domain-overview", "p1", "backlinks-list", {}])).toBe(false)
+    expect(invalidated(client, ["domain-overview", "p2", "history", "v2", 12])).toBe(false)
+    expect(invalidated(client, ["social", "p1", "posts"])).toBe(false)
+    expect(invalidated(client, ["dataset-changes", "p1", "keywords"])).toBe(false) // history panels wait for the end of the scan
+  })
+
+  it("a dataset answered from stored data (cached: no purchase) changes nothing on screen, so it refreshes nothing", async () => {
+    api.list.mockReturnValueOnce(list(scan({ datasets: [{ id: "history", status: "pending" }] })))
+    const { client, result } = setup()
+    seedKeys(client)
+    await waitFor(() => expect(result.current.running).toBe(true))
+    api.list.mockReturnValue(list(scan({ datasets: [{ id: "history", status: "completed", cached: true }] })))
+    act(() => { socket.emit("seo_scan:dataset_completed", { projectId: "p1", datasetId: "history" }) })
+    await waitFor(() => expect(result.current.latest.datasets[0].status).toBe("completed"))
+    expect(invalidated(client, ["domain-overview", "p1", "history", "v2", 12])).toBe(false)
+  })
+
+  it("the polling fallback finds completed datasets too (no socket needed)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    api.list.mockReturnValueOnce(list(scan({ datasets: [{ id: "competitors", status: "pending" }] })))
+    const { client, result } = setup()
+    seedKeys(client)
+    await waitFor(() => expect(result.current.running).toBe(true))
+    api.list.mockReturnValue(list(scan({ datasets: [{ id: "competitors", status: "completed", cached: false }] })))
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_MS + 100) })
+    await waitFor(() => expect(invalidated(client, ["domain-overview", "p1", "competitors", "v2", "s", {}])).toBe(true))
+    expect(invalidated(client, ["domain-overview", "p1", "history", "v2", 12])).toBe(false)
+  })
+
+  it("a section that was showing 'not collected yet' is read again as soon as a dataset completes", async () => {
+    api.list.mockReturnValueOnce(list(scan({ datasets: [{ id: "history", status: "pending" }, { id: "competitors", status: "pending" }] })))
+    const { client, result } = setup()
+    const missing = ["domain-overview", "p1", "backlinks-list", { status: "live" }]
+    client.getQueryCache().build(client, { queryKey: missing, queryFn: () => Promise.reject(Object.assign(new Error("n"), { code: "NOT_SCANNED", status: 404 })) })
+    await client.fetchQuery({ queryKey: missing, queryFn: () => Promise.reject(Object.assign(new Error("n"), { code: "NOT_SCANNED", status: 404 })), retry: false }).catch(() => {})
+    await waitFor(() => expect(result.current.running).toBe(true))
+    api.list.mockReturnValue(list(scan({ datasets: [{ id: "history", status: "completed", cached: false }, { id: "competitors", status: "pending" }] })))
+    act(() => { socket.emit("seo_scan:dataset_completed", { projectId: "p1" }) })
+    await waitFor(() => expect(invalidated(client, missing)).toBe(true))
+  })
+
+  it("when the scan ends: history / freshness panels and this page's collection state are read again; other projects are not touched", async () => {
+    api.list.mockReturnValueOnce(list(scan()))
+    const { client, result } = setup()
+    seedKeys(client)
     await waitFor(() => expect(result.current.running).toBe(true))
     api.list.mockReturnValue(list(scan({ status: "partially_completed", finishedAt: "2026-11-05T10:00:00Z" })))
     act(() => { socket.emit("seo_scan:partial", { projectId: "p1" }) })
     await waitFor(() => expect(result.current.running).toBe(false))
-    const invalidated = (key) => client.getQueryState(key)?.isInvalidated
-    await waitFor(() => expect(invalidated(["domain-overview", "p1", "history"])).toBe(true))
-    for (const key of [["dataset-changes", "p1", "keywords"], ["dataset-freshness", "p1", "backlinks"], ["snapshot-comparison", "p1"], ["keyword-history", "p1", "x"]]) expect(invalidated(key)).toBe(true)
-    for (const key of [["domain-overview", "p2", "history"], ["dataset-changes", "p2", "keywords"], ["social", "p1", "posts"]]) expect(invalidated(key)).toBe(false)
+    await waitFor(() => expect(invalidated(client, ["seo-ensure", "p1", "traffic"])).toBe(true))
+    for (const key of [["dataset-changes", "p1", "keywords"], ["dataset-freshness", "p1", "backlinks"], ["snapshot-comparison", "p1"], ["keyword-history", "p1", "x"]]) expect(invalidated(client, key)).toBe(true)
+    for (const key of [["domain-overview", "p2", "history", "v2", 12], ["dataset-changes", "p2", "keywords"], ["seo-ensure", "p2", "traffic"], ["social", "p1", "posts"]]) expect(invalidated(client, key)).toBe(false)
+    // The page's own data was refreshed dataset by dataset, not wholesale at the end.
+    expect(invalidated(client, ["domain-overview", "p1", "backlinks-list", {}])).toBe(false)
   })
 
   it("starting a scan is the only action, sends exactly what was asked, and re-reads the list", async () => {

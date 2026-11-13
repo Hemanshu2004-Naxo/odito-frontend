@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   summary: null, approved: null, profile: null, run: null, live: null, runs: null, evidence: null, evidenceItem: null, history: null, selection: null,
   cancel: { mutate: vi.fn(), isPending: false, error: null },
   start: { mutate: vi.fn(), isPending: false, error: null, reset: vi.fn() },
+  retry: { mutate: vi.fn(), isPending: false, error: null },
 }))
 vi.mock("@/contexts/ProjectContext", () => ({ useProject: () => ({ activeProject: h.project }) }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(""), useParams: () => ({}) }))
@@ -14,7 +15,7 @@ vi.mock("@/hooks/useAiVisibilityQuestions", () => ({ useApprovedQuestionSet: () 
 vi.mock("@/hooks/useGoogleAioVisibility", () => ({
   useGoogleAioSummary: () => h.summary, useGoogleAioRun: () => h.run, useCancelGoogleAioRun: () => h.cancel, useGoogleAioLiveProgress: () => h.live,
   useStartGoogleAioRun: () => h.start, useGoogleAioRuns: () => h.runs, useRunEvidence: () => h.evidence, useEvidenceItem: () => h.evidenceItem,
-  useQuestionHistory: () => h.history, useQuestionSelection: () => h.selection,
+  useRetryFailedGoogleAioQuestions: () => h.retry, useQuestionHistory: () => h.history, useQuestionSelection: () => h.selection,
 }))
 vi.mock("../shared/profile/ProfileDialog", () => ({ default: () => null }))
 
@@ -115,6 +116,27 @@ describe("overview page", () => {
     expect(screen.getByText("AI Overview shown")).toBeInTheDocument()
     expect(screen.getByText("No AI Overview")).toBeInTheDocument()
     expect(screen.getByText("Request failed")).toBeInTheDocument()
+  })
+
+  test("a failed question offers 'Retry failed (1)', which retries only that run's failed questions", () => {
+    h.retry.mutate.mockClear()
+    h.summary = { isLoading: false, data: { data: { latest: null, active: null, overview: overview() } } }
+    render(<GoogleAioDashboard />)
+    const btn = screen.getByRole("button", { name: "Retry failed (1)" })
+    expect(btn).toBeEnabled()
+    fireEvent.click(btn)
+    expect(h.retry.mutate).toHaveBeenCalledWith(expect.any(String))
+  })
+
+  test("no retry button while a run is in progress or when nothing failed", () => {
+    h.summary = { isLoading: false, data: { data: { latest: null, active: { id: "r2", status: "running", progress: { completed: 0, total: 5 } }, overview: overview() } } }
+    render(<GoogleAioDashboard />)
+    expect(screen.getByRole("button", { name: "Retry failed (1)" })).toBeDisabled()
+    const saved = h.evidence
+    h.evidence = { isLoading: false, data: { data: saved.data.data.map((r) => ({ ...r, observation: "ai_overview" })) } }
+    render(<GoogleAioDashboard />)
+    expect(screen.queryAllByRole("button", { name: /Retry failed/ })).toHaveLength(1)
+    h.evidence = saved
   })
 })
 

@@ -109,7 +109,7 @@ describe("Organic Keywords: first load", () => {
     await screen.findAllByTestId("ok-row")
     expect(screen.getByTestId("ok-market").textContent).toBe("India · English")
     expect(screen.getByTestId("ok-updated").textContent).toMatch(/^Last updated .*2026/)
-    expect(screen.getByTestId("ok-refresh")).toBeTruthy()
+    expect(screen.queryByTestId("ok-refresh")).toBeNull() // data is collected and refreshed automatically: no manual button
     expect(screen.getByTestId("ok-export")).toBeTruthy()
   })
 
@@ -635,24 +635,6 @@ describe("Organic Keywords: empty, error and refresh states", () => {
     expect((await screen.findByRole("alert")).textContent).toMatch(/does not have a public domain name/)
   })
 
-  test("Refresh asks the server to skip its cache for both the page and the totals", async () => {
-    renderPage()
-    await screen.findAllByTestId("ok-row")
-    const before = calls().length
-    fireEvent.click(screen.getByTestId("ok-refresh"))
-    await waitFor(() => expect(calls().length).toBe(before + 2))
-    const fresh = calls().slice(before)
-    expect(fresh.every((c) => c.refresh)).toBe(true)
-    expect(fresh.filter((c) => c.query)).toHaveLength(1)
-  })
-
-  test("when the server declines to re-buy data fetched a minute ago the page says so", async () => {
-    serve(async (_p, _s, opts) => ok({ ...pageEnvelope(opts?.query ? ALL.slice(0, 25) : [], { total: opts?.query ? TOTAL : 4139, metrics: opts?.query ? null : REAL_METRICS }), refreshThrottled: Boolean(opts?.refresh) }))
-    renderPage()
-    await screen.findAllByTestId("ok-row")
-    fireEvent.click(screen.getByTestId("ok-refresh"))
-    expect(await screen.findByText(/refreshed less than a minute ago/)).toBeTruthy()
-  })
 })
 
 describe("Organic Keywords: expandable row", () => {

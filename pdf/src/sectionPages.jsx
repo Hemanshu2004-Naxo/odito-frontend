@@ -204,7 +204,7 @@ export function aeoPages(report) {
   const CARD = [{ key: 'c', label: 'Category', width: 0.34 }, { key: 's', label: 'Score', width: 0.16 }, { key: 'st', label: 'Status', width: 0.2 }, { key: 'f', label: 'Failed checks', width: 0.3 }];
   const SIG = [{ key: 'sig', label: 'Signal (rule)', width: 0.34 }, { key: 'st', label: 'Result', width: 0.16 }, { key: 'pf', label: 'Pages failing', width: 0.2 }, { key: 'ap', label: 'Applicable pages', width: 0.3 }];
   const KV = [{ key: 'k', label: 'Measure', width: 0.6 }, { key: 'v', label: 'Value', width: 0.4 }];
-  const SIGNAL_NAMES = { direct_answer: 'Direct answer in opening', question_h2: 'Question-style headings', faq_schema: 'FAQ schema', howto_schema: 'HowTo schema', speakable_schema: 'Speakable schema' };
+  const SIGNAL_NAMES = { question_h2: 'Question-style headings', faq_schema: 'FAQ schema', howto_schema: 'HowTo schema', speakable_schema: 'Speakable schema' };
   const st = d.structure || {};
   const blocks = [
     heading('Score by category'),

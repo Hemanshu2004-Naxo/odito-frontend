@@ -41,7 +41,6 @@ export default function TrafficHistoryDashboard() {
 function ProjectTrafficHistory({ projectId, project }) {
   const { state, selectedMonths, selectRange, refresh, isLoadingMore } = useTrafficHistory(projectId)
   const { toasts, notify, dismiss } = useToastQueue()
-  const [refreshClicked, setRefreshClicked] = useState(false)
   const [metric, setMetric] = useState("traffic")
   const [pickedMonth, setPickedMonth] = useState(null)
   const vm = mapTrafficHistory(state.data, { months: selectedMonths })
@@ -51,9 +50,6 @@ function ProjectTrafficHistory({ projectId, project }) {
   const domain = state.data?.target ?? domainFromUrl(project?.main_url)
   const market = state.data?.market ?? null
   const updatedAt = state.data?.fetchedAt ?? null
-  const refreshNote = refreshClicked && !state.isFetching && state.data?.refreshThrottled
-    ? "This data was refreshed less than a minute ago, so it was not requested again."
-    : null
 
   const noDomain = state.status === "error" && state.error?.code === "INVALID_TARGET"
   const notEnough = state.status === "success" && !vm.hasEnoughHistory
@@ -66,11 +62,8 @@ function ProjectTrafficHistory({ projectId, project }) {
         updatedAt={updatedAt}
         selected={selectedMonths}
         onSelect={selectRange}
-        onRefresh={() => { setRefreshClicked(true); refresh() }}
         busy={state.isFetching}
-        refreshing={refreshClicked && state.isFetching && !isLoadingMore}
         loadingMore={isLoadingMore}
-        refreshNote={refreshNote}
         shownFrom={vm.range[0]?.label ?? null}
         shownTo={vm.range[vm.range.length - 1]?.label ?? null}
       />

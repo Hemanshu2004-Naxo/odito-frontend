@@ -1,12 +1,17 @@
 "use client"
 
-import { Suspense, useState } from "react"
+import { Suspense, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useProject } from "@/contexts/ProjectContext"
-import IssueTable from "@/components/dashboard/issues/IssueTable"
-import IssueDetailView from "@/components/dashboard/issues/IssueDetailView"
+import IssueDetailView, { WORDPRESS_FIXABLE_ISSUE_TYPES } from "@/components/dashboard/issues/IssueDetailView"
+import OnPageIssuesView from "@/components/dashboard/issues/OnPageIssuesView"
+import { IMAGE_ALT_ISSUE_ID } from "@/components/dashboard/issues/imageAltFix"
+import { ORGANIZATION_ISSUE_IDS } from "@/components/recommendations/organizationIntent"
 import PageDetailView from "@/app/onpage/components/PageDetailView"
 import { useOnPageIssues, usePageIssues } from '@/hooks/useDashboardQueries'
+
+// Issue types Odito can write the fix for (shown as "Auto-fix"): the same lists the fix panels use.
+const AUTO_FIX_IDS = new Set([...Object.keys(WORDPRESS_FIXABLE_ISSUE_TYPES), IMAGE_ALT_ISSUE_ID, ...ORGANIZATION_ISSUE_IDS])
 
 function OnPageContent() {
   const { activeProject } = useProject()
@@ -17,7 +22,7 @@ function OnPageContent() {
   const { data: onPageResponse, isLoading: loading, error } = useOnPageIssues(activeProject?._id)
   const { data: pageIssuesData, isLoading: pageDetailsLoading, error: pageDetailsError } = usePageIssues(activeProject?._id, selectedUrl)
 
-  const issues = onPageResponse?.data?.issues || []
+  const issues = useMemo(() => onPageResponse?.data?.issues || [], [onPageResponse])
   const summary = onPageResponse?.data?.summary || null
 
   if (loading) {
@@ -101,40 +106,16 @@ function OnPageContent() {
           initialMode={modeParam || 'ai'}
         />
       ) : (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold">On-Page SEO Issues</h1>
-              <p className="text-muted-foreground">
-                {summary
-                  ? `${summary.total_issue_types ?? 0} issue types · ${summary.total_issues_found ?? 0} SEO issues · ${summary.total_pages_analyzed ?? 0} pages analyzed`
-                  : "View and manage on-page SEO issues"}
-              </p>
-              {/* This total intentionally excludes Accessibility issues, which
-                  have their own dedicated audit surface — so it will legitimately
-                  differ from Overview's "Total Issues" (all categories). Both
-                  numbers are computed by the same canonical aggregation; only the
-                  category scope differs. */}
-              <p className="text-xs text-muted-foreground/70">
-                Excludes Accessibility issues — see the Accessibility tab for those
-              </p>
-            </div>
-            {issues.length > 0 && (
-              <span className="text-xs font-bold px-2 py-1 rounded bg-primary/10 text-primary whitespace-nowrap shrink-0">
-                {issues.length} FOUND
-              </span>
-            )}
-          </div>
-          <div className="bg-card rounded-lg border p-3 sm:p-6">
-            {error ? (
-              <div className="text-center py-12 text-red-500">Failed to load issues: {error}</div>
-            ) : issues.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">No on-page issues found. Your site looks great!</div>
-            ) : (
-              <IssueTable issues={issues} selected={selected} onSelect={handleIssueSelect} />
-            )}
-          </div>
-        </>
+        <OnPageIssuesView
+          issues={issues}
+          summary={summary}
+          projectId={activeProject?._id}
+          autoFixIds={AUTO_FIX_IDS}
+          error={error}
+          onOpenIssue={(code, url) =>
+            router.push(`/app/onpage?issue=${encodeURIComponent(code)}${url ? `&url=${encodeURIComponent(url)}` : ""}`)
+          }
+        />
       )}
     </div>
   )

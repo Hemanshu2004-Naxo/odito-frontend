@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ChevronDown, Download, Loader2, RefreshCw } from "lucide-react"
+import { ChevronDown, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatDateTime } from "../referring-domains/format"
@@ -35,10 +35,6 @@ export default function TopPagesHeader({ domain, updatedAt, pageCount, onRefresh
       <div className="flex shrink-0 flex-col items-start gap-1.5 @min-[900px]/main:items-end">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-muted-foreground" data-testid="tp-about">Your pages that other sites link to{typeof pageCount === "number" ? ` · ${formatExact(pageCount)} pages` : ""}</span>
-          <Button type="button" variant="outline" onClick={onRefresh} disabled={busy} aria-busy={busy} data-testid="tp-refresh">
-            {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" className="font-semibold" data-testid="tp-export">
@@ -63,7 +59,6 @@ export default function TopPagesHeader({ domain, updatedAt, pageCount, onRefresh
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground @min-[900px]/main:text-right" role="status">{refreshNote}</p> : null}
       </div>
     </div>
   )

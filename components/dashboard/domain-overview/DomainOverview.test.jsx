@@ -464,39 +464,14 @@ describe("Domain Overview: empty states", () => {
   })
 })
 
-describe("Domain Overview: refresh", () => {
-  test("Refresh asks every section to skip the server cache, once each, and shows its busy state", async () => {
+describe("Domain Overview: automatic data (no manual refresh)", () => {
+  test("the header has no Refresh button, and the page never asks the server to skip its cache (collection and refresh are automatic)", async () => {
     renderPage()
     await screen.findByText("100.4K")
-    const before = calls().length
-    let release
-    svc.getSection.mockImplementation((_pid, section) => new Promise((resolve) => { release = release || []; release.push(() => resolve({ success: true, data: fixtures()[section] })) }))
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
-    await screen.findByRole("button", { name: "Refreshing…" })
-    expect(screen.getByRole("button", { name: "Refreshing…" }).disabled).toBe(true)
-    expect(screen.getByText("100.4K")).toBeTruthy() // the old data stays while it refreshes
-    const refreshCalls = calls().slice(before)
-    expect(refreshCalls.map((c) => c.section).sort()).toEqual([...SECTIONS].sort())
-    expect(refreshCalls.every((c) => c.refresh === true)).toBe(true)
-    await act(async () => { release.forEach((r) => r()) })
-    await screen.findByRole("button", { name: "Refresh" })
-  })
-
-  test("a refresh the server declined to repeat says so", async () => {
-    renderPage()
-    await screen.findByText("100.4K")
-    answer(Object.fromEntries(SECTIONS.map((s) => [s, { ...fixtures()[s], refreshThrottled: true, cached: true }])))
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
-    expect(await screen.findByText(/refreshed less than a minute ago/)).toBeTruthy()
-  })
-
-  test("after a refresh the header shows the new fetch time", async () => {
-    renderPage()
-    await screen.findByText("100.4K")
-    answer(Object.fromEntries(SECTIONS.map((s) => [s, { ...fixtures()[s], fetchedAt: "2026-10-27T09:15:00.000Z" }])))
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
-    await waitFor(() => expect(screen.getByTestId("do-updated").getAttribute("title")).toMatch(/Traffic & keywords/))
-    await waitFor(() => expect(screen.getByTestId("do-updated").textContent).not.toBe("Last updated Oct 27, 2026, 11:12 AM"))
+    expect(screen.queryByRole("button", { name: /^refresh/i })).toBeNull()
+    expect(screen.queryByRole("button", { name: /update data/i })).toBeNull()
+    expect(screen.getByTestId("do-updated")).toBeTruthy() // the informational "Updated …" time stays
+    expect(calls().every((c) => c.refresh === false)).toBe(true)
   })
 })
 

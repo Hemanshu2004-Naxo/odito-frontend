@@ -2,103 +2,79 @@ import { describe, it, expect } from 'vitest'
 import { sidebarSections } from './sidebar-config'
 
 const section = (id) => sidebarSections.find((s) => s.id === id)
+const flat = (s) => s.items.map((i) => [i.label, i.href])
 
-describe('sidebar config: Domain Overview', () => {
-  it('is the very first item in the sidebar, above every group, and points at its page', () => {
-    const first = sidebarSections[0]
-    expect(first.id).toBe('domain-overview')
-    expect(first.items[0]).toMatchObject({ id: 'domain-overview', label: 'Domain Overview', href: '/app/domain-overview' })
-    expect(first.items[0].icon).toBeTruthy()
-    const ids = sidebarSections.map((s) => s.id)
-    expect(ids.indexOf('domain-overview')).toBeLessThan(ids.indexOf('audit'))
-    expect(ids).not.toContain('off-page') // the backlink pages live in the top group now
-  })
-
-  it('lists Traffic History under Domain Overview, Organic Keywords under Traffic History, Competitors under Organic Keywords, and the Off-Page group under Competitors', () => {
-    const items = section('domain-overview').items
-    expect(items.slice(0, 5).map((i) => [i.id, i.label, i.href])).toEqual([
-      ['domain-overview', 'Domain Overview', '/app/domain-overview'],
-      ['traffic-history', 'Traffic', '/app/traffic-history'],
-      ['organic-keywords', 'Organic Keywords', '/app/organic-keywords'],
-      ['competitors', 'Competitors', '/app/competitors'],
-      ['off-page', 'Off-Page', '/app/backlinks/overview'],
+describe('sidebar config: the SEO flow', () => {
+  it('has the groups in order, with an "SEO" parent heading on the first', () => {
+    expect(sidebarSections.slice(0, 5).map((s) => s.label)).toEqual([
+      'Site audit', 'Rankings & traffic', 'Off-page', 'AI search', 'Google data',
     ])
-    expect(items[1].icon).toBeTruthy()
-    expect(items[2].icon).toBeTruthy()
-    expect(items[3].icon).toBeTruthy()
-    expect(items[4].icon).toBeTruthy()
-    expect(sidebarSections.flatMap((s) => s.items.map((i) => i.href)).filter((h) => h === '/app/competitors')).toHaveLength(1)
-    const hrefs = sidebarSections.flatMap((s) => s.items.map((i) => i.href))
-    expect(hrefs.filter((h) => h === '/app/traffic-history')).toHaveLength(1)
-    expect(hrefs.filter((h) => h === '/app/organic-keywords')).toHaveLength(1)
+    expect(sidebarSections[0].parentLabel).toBe('SEO')
   })
 
-  it('has no heading of its own (it is a home link) but keeps an accessible name for its navigation landmark', () => {
-    expect(section('domain-overview').label).toBeNull()
-    expect(section('domain-overview').ariaLabel).toBe('Domain overview')
-  })
-
-  it('does not disturb the audit group', () => {
-    expect(section('audit').items.map((i) => i.id)).toEqual([
-      'pre-audit', 'overview', 'onpage', 'accessibility', 'technical-checks', 'pagespeed', 'keywords',
+  it('Site audit: Overview, On-Page, Technical, Accessibility, Performance, Keywords', () => {
+    expect(flat(section('site-audit'))).toEqual([
+      ['Overview', '/app/dashboard'],
+      ['On-Page', '/app/onpage'],
+      ['Technical', '/app/technicalchecks'],
+      ['Accessibility', '/app/accessibility'],
+      ['Performance', '/app/pagespeed'],
+      ['Keywords', '/app/keywords'],
     ])
-    expect(section('audit').items.find((i) => i.id === 'overview').href).toBe('/app/dashboard')
   })
-})
 
-describe('sidebar config: the Off-Page group (the five backlink pages)', () => {
-  it('is ONE collapsible group in the top section, after Competitors, with no group of its own section', () => {
-    expect(sidebarSections.some((s) => s.id === 'off-page')).toBe(false)
+  it('Rankings & traffic: Domain overview, Traffic, Keyword ranking > All keywords, Competitors', () => {
     const items = section('domain-overview').items
-    const group = items.find((i) => i.id === 'off-page')
-    expect(group).toMatchObject({ label: 'Off-Page', href: '/app/backlinks/overview' })
-    expect(group.icon).toBeTruthy()
-    expect(items.at(-1).id).toBe('off-page')
+    expect(items.map((i) => i.label)).toEqual(['Domain overview', 'Traffic', 'Keyword ranking', 'Competitors'])
+    expect(items[0].href).toBe('/app/domain-overview')
+    expect(items[2].children.map((c) => [c.label, c.href])).toEqual([['All keywords', '/app/organic-keywords']])
   })
 
-  it('lists Overview, Backlinks, Anchors, Referring Domains and Top linked pages in that order, on their unchanged routes', () => {
-    const group = section('domain-overview').items.find((i) => i.id === 'off-page')
-    expect(group.children.map((c) => [c.label, c.href])).toEqual([
-      ['Overview', '/app/backlinks/overview'],
+  it('Off-page: five backlink pages on their unchanged routes', () => {
+    expect(flat(section('off-page'))).toEqual([
+      ['Backlink overview', '/app/backlinks/overview'],
       ['Backlinks', '/app/backlinks/list'],
       ['Anchors', '/app/backlinks/anchors'],
-      ['Referring Domains', '/app/referring-domains'],
+      ['Linking sites', '/app/referring-domains'],
       ['Top linked pages', '/app/backlinks/top-pages'],
     ])
   })
 
-  it('no longer lists the five pages as separate items, anywhere', () => {
-    const items = section('domain-overview').items
-    for (const id of ['backlink-overview', 'anchors', 'referring-domains', 'top-pages']) expect(items.some((i) => i.id === id)).toBe(false)
-    const topLevel = sidebarSections.flatMap((s) => s.items.map((i) => i.href))
-    expect(topLevel.filter((h) => h === '/app/referring-domains')).toHaveLength(0)
+  it('AI search: AI Visibility (dropdown of the Google AI Overview pages), AEO, AISO, GEO', () => {
+    const items = section('ai-search').items
+    expect(items.map((i) => [i.label, i.href])).toEqual([
+      ['AI Visibility', '/app/google-ai-overview'],
+      ['AEO', '/app/aeo-hub'],
+      ['AISO', '/app/aiso'],
+      ['GEO', '/app/geo-hub'],
+    ])
+    expect(items[0].children.map((c) => [c.label, c.href])).toEqual([
+      ['Overview', '/app/google-ai-overview'],
+      ['Questions', '/app/google-ai-overview/questions'],
+      ['Answers & citations', '/app/google-ai-overview/results'],
+      ['History', '/app/google-ai-overview/history'],
+    ])
   })
 
-  it('does not list Referring Domains under Audit, and lists every backlink route exactly once in the group', () => {
-    expect(section('audit').items.some((i) => i.id === 'referring-domains')).toBe(false)
-    const childHrefs = sidebarSections.flatMap((s) => s.items.flatMap((i) => (i.children ?? []).map((c) => c.href)))
-    for (const href of ['/app/backlinks/overview', '/app/backlinks/list', '/app/backlinks/anchors', '/app/referring-domains', '/app/backlinks/top-pages']) {
-      expect(childHrefs.filter((h) => h === href), href).toHaveLength(1)
-    }
+  it('Google data: Search Console, Analytics, Business Profile (with its sub-pages)', () => {
+    const items = section('google-data').items
+    expect(items.map((i) => i.label)).toEqual(['Search Console', 'Analytics', 'Business Profile'])
+    expect(items[2].children.map((c) => c.label)).toEqual(['Overview', 'Reviews', 'Posts'])
   })
 
-  it('keeps every section id and item id unique (they are used as React keys)', () => {
-    const sectionIds = sidebarSections.map((s) => s.id)
-    expect(new Set(sectionIds).size).toBe(sectionIds.length)
-    const itemIds = sidebarSections.flatMap((s) => s.items.flatMap((i) => [i.id, ...(i.children ?? []).map((c) => c.id)]))
-    expect(new Set(itemIds).size).toBe(itemIds.length)
+  it('every item has an icon, and ids and hrefs are unique', () => {
+    const items = sidebarSections.flatMap((s) => s.items)
+    for (const i of items) expect(i.icon, i.id).toBeTruthy()
+    const sids = sidebarSections.map((s) => s.id)
+    expect(new Set(sids).size).toBe(sids.length)
+    const ids = sidebarSections.flatMap((s) => s.items.flatMap((i) => [i.id, ...(i.children ?? []).map((c) => c.id)]))
+    expect(new Set(ids).size).toBe(ids.length)
   })
 })
 
 describe('hidden sections', () => {
-  it('Leads and Social Media are marked hidden (not removed: their pages and routes still exist)', () => {
+  it('Leads and Social Media are marked hidden', () => {
     expect(section('leads')?.hidden).toBe(true)
     expect(section('social-media')?.hidden).toBe(true)
-  })
-  it('every other section is still shown', () => {
-    const shown = sidebarSections.filter((s) => !s.hidden).map((s) => s.id)
-    expect(shown).not.toContain('leads')
-    expect(shown).not.toContain('social-media')
-    expect(shown).toEqual(expect.arrayContaining(['domain-overview', 'google-visibility']))
   })
 })

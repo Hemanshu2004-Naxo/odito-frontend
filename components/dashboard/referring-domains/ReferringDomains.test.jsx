@@ -166,7 +166,8 @@ describe("Referring Domains: first load", () => {
     renderPage()
     await loaded()
     expect(screen.getByTestId("rd-updated").textContent).toMatch(/^Updated .*2026/)
-    for (const id of ["rd-refresh", "rd-export", "rd-export-disavow"]) expect(screen.getByTestId(id)).toBeTruthy()
+    for (const id of ["rd-export", "rd-export-disavow"]) expect(screen.getByTestId(id)).toBeTruthy()
+    expect(screen.queryByTestId("rd-refresh")).toBeNull() // data is collected and refreshed automatically: no manual button
     await waitFor(() => expect(screen.getByTestId("rd-export-disavow").disabled).toBe(true))
   })
 
@@ -979,23 +980,6 @@ describe("Referring Domains: cancelling and refreshing", () => {
     expect(showing()).toMatch(/of 141 referring domains/)
   })
 
-  test("Refresh asks the server to skip its cache for the table", async () => {
-    renderPage()
-    await loaded()
-    fireEvent.click(screen.getByTestId("rd-refresh"))
-    await waitFor(() => expect(pageCalls()).toHaveLength(2))
-    expect(lastPage().refresh).toBe(true)
-    expect(pageCalls()[0].refresh).toBe(false)
-  })
-
-  test("a refresh the server declined (data under a minute old) says so", async () => {
-    const base = svc.getSection.getMockImplementation()
-    svc.getSection.mockImplementation(async (...a) => { const r = await base(...a); if (a[1] === "referring-domains" && a[2].refresh) r.data.refreshThrottled = true; return r })
-    renderPage()
-    await loaded()
-    fireEvent.click(screen.getByTestId("rd-refresh"))
-    expect(await screen.findByText(/refreshed less than a minute ago/)).toBeTruthy()
-  })
 })
 
 describe("Referring Domains: states", () => {

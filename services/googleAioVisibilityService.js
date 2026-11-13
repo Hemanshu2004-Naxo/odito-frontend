@@ -15,6 +15,8 @@ export const googleAioVisibilityService = {
   /** Only the device (and optionally exactly five question ids) are sent; location, language and limits are the server's. */
   startRun: (projectId, { device = 'desktop', questionIds } = {}) => apiService.post(`${base(projectId)}/runs`, questionIds ? { device, questionIds } : { device }),
   cancelRun: (projectId, runId) => apiService.post(`${base(projectId)}/runs/${runId}/cancel`, {}),
+  /** Re-sends ONLY the failed questions of a finished run (same run); answered questions are not searched again. */
+  retryFailed: (projectId, runId) => apiService.post(`${base(projectId)}/runs/${runId}/retry-failed`, {}),
   listEvidence: (projectId, runId) => apiService.get(`${base(projectId)}/runs/${runId}/evidence`),
   getEvidence: (projectId, runId, questionId) => apiService.get(`${base(projectId)}/runs/${runId}/evidence/${encodeURIComponent(questionId)}`),
   getQuestionHistory: (projectId, questionId, { limit = 20 } = {}) => apiService.get(`${base(projectId)}/questions/${encodeURIComponent(questionId)}/history?limit=${limit}`),

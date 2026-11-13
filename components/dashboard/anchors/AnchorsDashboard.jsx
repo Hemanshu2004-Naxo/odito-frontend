@@ -50,7 +50,6 @@ function ProjectAnchors({ projectId, project }) {
   const { profile, settings } = an
   const domain = an.target ?? projectDomain
   const { toasts, notify, dismiss } = useToastQueue()
-  const [refreshClicked, setRefreshClicked] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(() => readDismissed(projectId))
   const [query, setQuery] = useState("")
@@ -68,7 +67,6 @@ function ProjectAnchors({ projectId, project }) {
   }
   useEffect(() => { setBannerDismissed(readDismissed(projectId)) }, [projectId])
 
-  const refreshNote = refreshClicked && !an.isFetching && an.refreshThrottled ? "This data was refreshed less than a minute ago, so it was not requested again." : null
 
   const mixRows = useMemo(
     () => buildMixRows(profile.summary, { domain, brandTerms: settings.settings.brandTerms ?? [], targetKeywords: settings.settings.targetKeywords ?? [] }),
@@ -104,10 +102,7 @@ function ProjectAnchors({ projectId, project }) {
         domain={domain}
         updatedAt={an.updatedAt}
         total={profile.status === "success" ? (profile.total ?? profile.rows.length) : null}
-        onRefresh={() => { setRefreshClicked(true); an.refresh() }}
         busy={an.isFetching}
-        refreshing={refreshClicked && an.isFetching}
-        refreshNote={refreshNote}
         exportDisabled={profile.status !== "success" || !profile.rows.length}
         onExport={exportAll}
         onSettings={() => setSettingsOpen(true)}

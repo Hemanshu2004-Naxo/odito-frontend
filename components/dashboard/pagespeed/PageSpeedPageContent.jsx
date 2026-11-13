@@ -1,40 +1,19 @@
 "use client"
-import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useProject } from "@/contexts/ProjectContext"
 import { useQueryClient } from "@tanstack/react-query"
 import { usePageSpeedData, usePageSpeedStatus, usePageSpeedRescan } from '@/hooks/useDashboardQueries'
 import { PageSpeedSkeleton } from "@/components/skeletons/pagespeed"
 import DeviceTabs from "@/components/dashboard/pagespeed/DeviceTabs"
 import PerformanceRing from "@/components/dashboard/pagespeed/PerformanceRing"
-import CoreMetrics from "@/components/dashboard/pagespeed/CoreMetrics"
-import { sanitizeHTML } from "@/lib/security/sanitize"
-
-// Google's Core Web Vitals thresholds
-const CWV_THRESHOLDS = {
-  lcp: { good: 2.5, poor: 4.0 },
-  cls: { good: 0.1, poor: 0.25 },
-  fcp: { good: 1.8, poor: 3.0 },
-  tbt: { good: 200, poor: 600 },
-  speed_index: { good: 3.4, poor: 5.8 },
-  ttfb: { good: 800, poor: 1800 },
-  tti: { good: 3.8, poor: 7.3 }
-}
-
-// Get metric status based on Google thresholds
-const getMetricStatus = (metric, value, unit) => {
-  if (!value || value === null || value === undefined) return 'missing'
-  
-  const threshold = CWV_THRESHOLDS[metric]
-  if (!threshold) return 'unknown'
-  
-  const numericValue = parseFloat(value)
-  if (metric === 'cls') {
-    return numericValue <= threshold.good ? 'good' : numericValue >= threshold.poor ? 'poor' : 'needs_improvement'
-  } else {
-    return numericValue <= threshold.good ? 'good' : numericValue >= threshold.poor ? 'poor' : 'needs_improvement'
-  }
-}
+import CoreMetricsExplained from "@/components/dashboard/pagespeed/CoreMetricsExplained"
+import ScoreBreakdown from "@/components/dashboard/pagespeed/ScoreBreakdown"
+import ScoreSummary from "@/components/dashboard/pagespeed/ScoreSummary"
+import FieldDataCard from "@/components/dashboard/pagespeed/FieldDataCard"
+import PageWeightCard from "@/components/dashboard/pagespeed/PageWeightCard"
+import FixPlan from "@/components/dashboard/pagespeed/FixPlan"
+import { buildScoreBreakdown, buildFieldSummary, describeLab } from "@/lib/pagespeed/metrics"
+import { buildActionPlan, buildPageWeight } from "@/lib/pagespeed/actionPlan"
 
 // Get performance score color
 const getScoreColor = (score) => {
@@ -43,87 +22,6 @@ const getScoreColor = (score) => {
   return { color: '#ff4560', color2: '#ff1744', status: 'poor' }
 }
 
-// Generate traffic impact message based on LCP
-const getTrafficImpactMessage = (lcpValue, device) => {
-  if (!lcpValue || lcpValue === null) return 'No LCP data available'
-  
-  const lcpNumeric = parseFloat(lcpValue)
-  if (lcpNumeric <= 2.5) {
-    return device === 'mobile' 
-      ? '✅ Your mobile LCP is within Google\'s good threshold. No significant traffic impact expected.'
-      : '✅ Your desktop LCP is within Google\'s good threshold. No significant traffic impact expected.'
-  }
-  
-  // Calculate estimated traffic loss based on how much LCP exceeds threshold
-  const excessTime = lcpNumeric - 2.5
-  let trafficLoss = '5–8%'
-  
-  if (excessTime >= 2.5) trafficLoss = '~12–18%'
-  else if (excessTime >= 1.5) trafficLoss = '~8–12%'
-  
-  return `Your ${device} LCP of ${lcpValue}s exceeds Google's 2.5s threshold. Estimated traffic loss: <strong style={{ color: "var(--red)" }}>${trafficLoss} of ${device} sessions</strong>.`
-}
-
-// Fix data for PageSpeed opportunities and diagnostics
-const FIX_DATA = {
-  "render-blocking": {
-    why: "These files force the browser to pause HTML parsing until fully loaded, delaying the first visible paint. Every millisecond here directly hurts your FCP and LCP scores.",
-    steps: [
-      { t: "Add defer or async to non-critical scripts", c: '<script src="/js/vendor.js" defer></script>' },
-      { t: "Preload CSS and swap it in asynchronously", c: "<link rel='preload' href='/css/styles.css' as='style'\n     onload=\"this.rel='stylesheet'\">" },
-      { t: "Use font-display: swap for web fonts", c: "@font-face {\n  font-family: 'MyFont';\n  font-display: swap;\n  src: url('/fonts/main.woff2');\n}" },
-      { t: "Move non-critical scripts to the bottom of <body>" }
-    ]
-  },
-  "unused-js": {
-    why: "Unused JavaScript is still downloaded, parsed, and compiled by the browser even if never executed — wasting bandwidth and blocking the main thread.",
-    steps: [
-      { t: "Analyse your bundle to see what's unused", c: "npx webpack-bundle-analyzer stats.json" },
-      { t: "Enable tree-shaking in your bundler", c: "// webpack.config.js\nmodule.exports = { mode: 'production' }" },
-      { t: "Use dynamic import() so code only loads when needed", c: "const { Chart } = await import('./chart.js')" },
-      { t: "Replace heavy libraries with lighter alternatives (e.g. dayjs instead of moment.js)" }
-    ]
-  },
-  "optimise-images": {
-    why: "Images are served at a much larger resolution than they appear on screen — costing every visitor 840 KB of unnecessary data on each page load.",
-    steps: [
-      { t: "Use srcset to serve different sizes per device", c: "<img src='hero-800.jpg'\n  srcset='hero-400.jpg 400w, hero-800.jpg 800w'\n  sizes='(max-width: 600px) 400px, 800px'>" },
-      { t: "Convert to WebP or AVIF for 30–50% smaller files", c: "npx sharp-cli -i hero.png -o hero.webp" },
-      { t: "Lazy-load all below-the-fold images", c: "<img src='about.jpg' loading='lazy' alt='...'>" }
-    ]
-  },
-  "text-compression": {
-    why: "Your server sends CSS and JS without Gzip or Brotli compression. Enabling it reduces transfer sizes by 60–80% with zero quality loss.",
-    steps: [
-      { t: "Enable Brotli and Gzip in Nginx", c: "gzip on;\ngzip_types text/css application/javascript;\nbrotli on;" },
-      { t: "For Express.js use the compression middleware", c: "const compression = require('compression');\napp.use(compression());" },
-      { t: "Verify compression is active", c: "curl -H 'Accept-Encoding: gzip, br' -I https://yoursite.com/styles.css" }
-    ]
-  },
-  "cache-policy": {
-    why: "12 static assets have no Cache-Control header so repeat visitors re-download every file on every visit even when nothing changed.",
-    steps: [
-      { t: "Set long-lived cache headers for hashed static assets", c: "location ~* \\.(js|css|png|woff2)$ {\n  add_header Cache-Control 'public, max-age=31536000, immutable';\n}" },
-      { t: "Use content hashing in your build for automatic cache-busting", c: "output: { filename: '[name].[contenthash].js' }" },
-      { t: "Keep HTML at no-cache", c: "add_header Cache-Control 'no-cache';" }
-    ]
-  },
-  "lcp-element": {
-    why: "A CSS background-image is invisible to the browser's preload scanner and can't start loading until CSS is fully parsed — directly delaying LCP.",
-    steps: [
-      { t: "Move hero from CSS background to an HTML img with fetchpriority", c: "<img src='hero.jpg' fetchpriority='high' width='1200' height='600' alt='Hero'>" },
-      { t: "Or add a preload link in head if you must keep CSS", c: "<link rel='preload' href='/img/hero.jpg' as='image' fetchpriority='high'>" }
-    ]
-  },
-  "long-tasks": {
-    why: "Tasks over 50ms freeze the browser's main thread and prevent it from responding to user input — the primary driver of high TBT and poor INP.",
-    steps: [
-      { t: "Break long tasks using scheduler.yield()", c: "async function processItems(items) {\n  for (const item of items) {\n    processItem(item);\n    await scheduler.yield();\n  }\n}" },
-      { t: "Offload heavy computation to a Web Worker", c: "const worker = new Worker('heavy.js');\nworker.postMessage({ data });" },
-      { t: "Use Chrome DevTools Performance tab to find which scripts cause long tasks" }
-    ]
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Shared button style helpers
@@ -301,6 +199,39 @@ export default function PageSpeedPageContent() {
     }
   }, [activeProjectId, queryClient])
 
+  // ── Explainer data for the selected device (pure, from the stored scan) ──
+  const deviceData = pagespeedData?.[device] || null
+  const explained = useMemo(() => {
+    if (!deviceData) return null
+    return {
+      breakdown: buildScoreBreakdown(deviceData),
+      field: buildFieldSummary(deviceData),
+      plan: buildActionPlan(deviceData, { domain: pagespeedData?.domain }),
+      weight: buildPageWeight(deviceData),
+    }
+  }, [deviceData, pagespeedData?.domain])
+
+  // Which fix-plan items are expanded; reset when switching device.
+  const [openIds, setOpenIds] = useState(() => new Set())
+  useEffect(() => { setOpenIds(new Set()) }, [device])
+  const toggleItem = useCallback((id) => {
+    setOpenIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }, [])
+  const jumpToItem = useCallback((id) => {
+    setOpenIds(prev => new Set(prev).add(id))
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`psx-item-${id}`)
+      if (!el) return
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+      el.querySelector('button')?.focus({ preventScroll: true })
+    })
+  }, [])
+
   // ── Derive UI state ────────────────────────────────────────────────────────
   const loading       = dataLoading || projectLoading || statusLoading
   const isRunning     = statusData?.is_running === true || statusData?.scan_status === 'running'
@@ -345,65 +276,17 @@ export default function PageSpeedPageContent() {
 
   const score       = currentDeviceData ? Math.round(currentDeviceData.performance_score || 0) : 0
   const scoreColors = getScoreColor(score)
-
-  const formatMetricValue = (label, rawValue, displayValue) => {
-    if (displayValue && displayValue !== 'N/A') {
-      return displayValue.replace(/\.0+s$/, 's').replace(/(\.\d+?)0+s$/, '$1s')
-    }
-    if (rawValue === null || rawValue === undefined) return 'N/A'
-    switch (label) {
-      case 'LCP': case 'FCP': case 'Speed Index':
-        return `${Math.round(rawValue * 10) / 10}s`
-      case 'CLS':
-        return Math.round(rawValue * 1000) / 1000
-      case 'TBT':
-        return `${Math.round(rawValue)}ms`
-      default:
-        return displayValue || 'N/A'
-    }
-  }
-
-  const metrics = currentDeviceData ? [
-    { label: "LCP",         value: formatMetricValue("LCP",         currentDeviceData.lcp?.value,         currentDeviceData.lcp?.display_value),         status: getMetricStatus('lcp',         currentDeviceData.lcp?.value,         currentDeviceData.lcp?.unit),         rawValue: currentDeviceData.lcp?.value },
-    { label: "CLS",         value: formatMetricValue("CLS",         currentDeviceData.cls?.value,         currentDeviceData.cls?.display_value),         status: getMetricStatus('cls',         currentDeviceData.cls?.value,         currentDeviceData.cls?.unit),         rawValue: currentDeviceData.cls?.value },
-    { label: "FCP",         value: formatMetricValue("FCP",         currentDeviceData.fcp?.value,         currentDeviceData.fcp?.display_value),         status: getMetricStatus('fcp',         currentDeviceData.fcp?.value,         currentDeviceData.fcp?.unit),         rawValue: currentDeviceData.fcp?.value },
-    { label: "TBT",         value: formatMetricValue("TBT",         currentDeviceData.tbt?.value,         currentDeviceData.tbt?.display_value),         status: getMetricStatus('tbt',         currentDeviceData.tbt?.value,         currentDeviceData.tbt?.unit),         rawValue: currentDeviceData.tbt?.value },
-    { label: "Speed Index", value: formatMetricValue("Speed Index", currentDeviceData.speed_index?.value, currentDeviceData.speed_index?.display_value), status: getMetricStatus('speed_index', currentDeviceData.speed_index?.value, currentDeviceData.speed_index?.unit), rawValue: currentDeviceData.speed_index?.value },
-    { label: "TTFB",        value: formatMetricValue("TTFB",        currentDeviceData.ttfb?.value,        currentDeviceData.ttfb?.display_value),        status: getMetricStatus('ttfb',        currentDeviceData.ttfb?.value,        currentDeviceData.ttfb?.unit),        rawValue: currentDeviceData.ttfb?.value },
-  ] : []
-
-  const availableMetrics = metrics.filter(m => m.label === 'TTFB' || m.status !== 'missing')
-  const trafficImpactMessage = currentDeviceData ? getTrafficImpactMessage(currentDeviceData.lcp?.value, device) : ''
-
-  const getPassedAudits = () => {
-    if (!currentDeviceData) return []
-    const passed = []
-    currentDeviceData.diagnostics?.forEach(d => { if (d.score >= 0.9) passed.push(d.title) })
-    currentDeviceData.opportunities?.forEach(o => { if (o.score >= 0.9) passed.push(o.title) })
-    if (passed.length === 0) {
-      // Real, verified fallbacks only — each gated on an actual real score
-      // ≥90. Previously, if a page genuinely had zero passing audits AND
-      // every score was below 90, this unconditionally pushed three
-      // fabricated claims ("Valid HTML structure", "No critical errors
-      // found", "Basic optimizations applied") with no basis in the real
-      // PageSpeed data — rendered next to a ✔ as if genuinely verified.
-      // A page with real problems can legitimately have 0 passing audits;
-      // that's now just an empty list, handled honestly by the caller.
-      if (currentDeviceData.performance_score >= 90) passed.push("Performance optimized")
-      if (currentDeviceData.accessibility >= 90)     passed.push("Accessibility compliant")
-      if (currentDeviceData.best_practices >= 90)    passed.push("Best practices followed")
-      if (currentDeviceData.seo >= 90)               passed.push("SEO optimized")
-    }
-    return passed
-  }
+  const deviceLabel = device === 'mobile' ? 'mobile' : 'desktop'
+  const { breakdown, field, plan, weight } = explained || {}
 
   // Partial-success warning banner (one device failed but we still have data)
   const isPartial = statusData?.scan_status === 'partial_success'
+  const testedAt = pagespeedData?.tested_at ? new Date(pagespeedData.tested_at).toLocaleDateString() : null
 
   return (
     <div>
       {/* Header row with device tabs + rescan button */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div className="section-head" style={{ margin: 0 }}>
           <div className="section-title">PageSpeed Insights</div>
           <div className="section-tag">CORE WEB VITALS</div>
@@ -429,6 +312,16 @@ export default function PageSpeedPageContent() {
         </div>
       )}
 
+      {currentDeviceData && plan && !plan.full && (
+        <div className="psx-notice" role="status">
+          <span>
+            This result is from an older scan. Rescan to get Google’s full list of findings
+            (render-blocking files, images, caching, third-party scripts, the hero element) and real-visitor data.
+          </span>
+          <RescanButton onClick={handleRescan} disabled={isRescanning || isRunning} label={isRescanning ? 'Starting…' : 'Rescan now'} />
+        </div>
+      )}
+
       {!currentDeviceData ? (
         <div style={{ textAlign: 'center', padding: '64px 24px' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>{deviceStatusField === 'failed' ? '❌' : '📊'}</div>
@@ -448,38 +341,29 @@ export default function PageSpeedPageContent() {
                 <div style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 800, color: scoreColors.status === 'good' ? "var(--green)" : scoreColors.status === 'needs_improvement' ? "var(--orange)" : "var(--red)" }}>{score}</div>
               </div>
             </div>
-            <div className="score-sub">{device === "mobile" ? "📱 Mobile" : "🖥 Desktop"}</div>
+            <div className="score-sub">{device === "mobile" ? "📱 Mobile" : "🖥 Desktop"}{testedAt ? ` · tested ${testedAt}` : ''}</div>
           </div>
-          <div className="ai-card">
-            <div className="ai-card-label">✦ Traffic Impact</div>
-            <div className="ai-card-text" dangerouslySetInnerHTML={{ __html: sanitizeHTML(trafficImpactMessage) }} />
-          </div>
+          <ScoreSummary score={score} device={deviceLabel} breakdown={breakdown} field={field} plan={plan} />
         </div>
-        <div className="glass-card" style={{ padding: 20 }}>
-          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, marginBottom: 16, fontSize: 14 }}>Core Metrics</div>
-          {availableMetrics.map((metric, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < availableMetrics.length - 1 ? "1px solid var(--border)" : "none" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{metric.label}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 20, color: metric.status === 'good' ? "var(--green)" : metric.status === 'needs_improvement' ? "var(--orange)" : "var(--red)" }}>{metric.value}</div>
-                <div style={{ fontSize: 16 }}>
-                  {metric.status === 'good' ? "✅" : metric.status === 'needs_improvement' ? "⚠️" : "❌"}
-                </div>
-              </div>
-            </div>
-          ))}
-          {availableMetrics.length === 0 && (
-            <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '20px' }}>
-              No metrics data available for {device}
-            </div>
-          )}
-        </div>
+        <CoreMetricsExplained device={currentDeviceData} breakdown={breakdown} plan={plan} onJump={jumpToItem} />
       </div>
+
+      <div style={{ marginTop: 24 }}>
+        <ScoreBreakdown breakdown={breakdown} score={score} deviceLabel={deviceLabel} />
+        <FieldDataCard field={field} labText={describeLab(currentDeviceData, device)} />
+      </div>
+
+      <FixPlan plan={plan} openIds={openIds} onToggle={toggleItem} />
+
+      {weight && <div style={{ marginTop: 24 }}><PageWeightCard weight={weight} /></div>}
 
       {/* Lighthouse Scores */}
       <div className="section-head" style={{ marginTop: 32 }}>
         <div className="section-title">Lighthouse Scores</div>
       </div>
+      <p className="psx-sub" style={{ marginTop: -6 }}>
+        Accessibility, Best Practices and SEO are scored separately and do not change the performance score above.
+      </p>
       <div className="cat-grid">
         {[
           { key: 'performance',   icon: '⚡', label: 'Performance',   value: Math.round(currentDeviceData.performance  || currentDeviceData.performance_score || 0) },
@@ -502,70 +386,24 @@ export default function PageSpeedPageContent() {
         })}
       </div>
 
-      {/* Opportunities */}
-      {currentDeviceData.opportunities?.length > 0 && (
-        <>
-          <div className="section-head" style={{ marginTop: 32 }}>
-            <div className="section-title">Opportunities</div>
-            <div className="section-tag">{currentDeviceData.opportunities.length} ITEMS</div>
-          </div>
-          {currentDeviceData.opportunities.map((opp, i) => {
-            const sc = opp.score < 0.5 ? 'fail' : opp.score < 0.9 ? 'warn' : 'pass'
-            return (
-              <div key={i} className={`opp-row ${sc}`}>
-                <div className={`opp-icon ${sc}`}>{opp.icon || '⚡'}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="opp-title">{opp.title}</div>
-                  <div className="opp-desc">{opp.description?.slice(0, 110)}</div>
-                </div>
-                {opp.saved && opp.saved !== "—" && <span className={`badge ${sc}`} style={{ whiteSpace: "nowrap", flexShrink: 0 }}>Save {opp.saved}</span>}
-              </div>
-            )
-          })}
-        </>
-      )}
-
-      {/* Diagnostics */}
-      {currentDeviceData.diagnostics?.length > 0 && (
-        <>
-          <div className="section-head" style={{ marginTop: 20 }}>
-            <div className="section-title">Diagnostics</div>
-            <div className="section-tag">{currentDeviceData.diagnostics.length} ITEMS</div>
-          </div>
-          {currentDeviceData.diagnostics.map((diag, i) => {
-            const sc = diag.score < 0.5 ? 'fail' : diag.score < 0.9 ? 'warn' : 'pass'
-            return (
-              <div key={i} className={`opp-row ${sc}`}>
-                <div className={`opp-icon ${sc}`}>{diag.icon || '⚙'}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="opp-title">{diag.title}</div>
-                  <div className="opp-desc">{diag.description?.slice(0, 110)}</div>
-                </div>
-                <span className={`badge ${sc}`}>{sc === 'fail' ? '● Fail' : sc === 'warn' ? '◆ Warn' : '✔ Pass'}</span>
-              </div>
-            )
-          })}
-        </>
-      )}
-
-      {/* Passed Audits */}
+      {/* Passed Audits — real Lighthouse checks that scored >= 90 */}
       <div className="section-head" style={{ marginTop: 20 }}>
         <div className="section-title">Passed Audits</div>
         <div className="section-tag" style={{ background: "rgba(0,245,160,.08)", color: "var(--green)", borderColor: "rgba(0,245,160,.16)" }}>
-          {getPassedAudits().length} PASSING
+          {plan?.passed.length || 0} PASSING
         </div>
       </div>
       <div className="pass-grid">
-        {getPassedAudits().length > 0 ? (
-          getPassedAudits().map((audit, i) => (
-            <div key={i} className="pass-item">
+        {plan?.passed.length > 0 ? (
+          plan.passed.map(audit => (
+            <div key={audit.id} className="pass-item">
               <span style={{ color: "var(--green)" }}>✔</span>
-              {audit}
+              {audit.title}
             </div>
           ))
         ) : (
           <div className="pass-item" style={{ color: "var(--t3)" }}>
-            No audits passed yet — see the opportunities and diagnostics above.
+            No performance checks passed yet — see the fix plan above.
           </div>
         )}
       </div>

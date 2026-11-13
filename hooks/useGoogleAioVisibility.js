@@ -126,6 +126,29 @@ export function useCancelGoogleAioRun(projectId) {
   })
 }
 
+/** Retry only the failed questions of a run. The ref guards a double click, like starting a run. */
+export function useRetryFailedGoogleAioQuestions(projectId) {
+  const qc = useQueryClient()
+  const inFlight = useRef(false)
+  const mutation = useMutation({
+    mutationFn: (runId) => googleAioVisibilityService.retryFailed(projectId, runId),
+    onSuccess: (_res, runId) => {
+      invalidateRunState(qc, projectId)
+      qc.invalidateQueries({ queryKey: keys.evidenceRun(projectId, runId) })
+    },
+    onSettled: () => { inFlight.current = false },
+  })
+  const { mutate, ...rest } = mutation
+  return {
+    ...rest,
+    mutate: (runId, options) => {
+      if (inFlight.current) return
+      inFlight.current = true
+      mutate(runId, options)
+    },
+  }
+}
+
 const PROGRESS_EVENTS = [
   'google_aio_visibility:started', 'google_aio_visibility:progress',
   'google_aio_visibility:question_started', 'google_aio_visibility:question_completed', 'google_aio_visibility:question_failed',

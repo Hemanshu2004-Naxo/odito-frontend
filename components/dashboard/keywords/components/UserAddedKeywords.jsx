@@ -110,6 +110,27 @@ function ChangeIndicator({ change }) {
 }
 
 /**
+ * What a check that ran but found no ranking says, from the channel's stored scan (desktop_scan / mobile.scan):
+ *   "Not in top N"                 every returned result was read
+ *   "Not in top N (partial)"       the provider returned only part of the SERP (N = the deepest rank it returned)
+ *   "Not in top N (X unreadable)"  X results had no readable website, so the site could be among them
+ * N is what the response actually contained, never an assumed 100. Not a scan error; null is never a rank of 0.
+ */
+export function notRankedNote(scan, fallbackDepth = null) {
+  const n = scan?.returned_results || fallbackDepth || null;
+  const top = n ? `Not in top ${n}` : 'Not ranked';
+  if (scan?.status === 'not_found_partial') return { text: `${top} (partial)`, title: `${top}: the data provider returned only part of the results, so the site may rank beyond them.` };
+  if (scan?.status === 'not_found_uncertain') {
+    const x = scan.unresolved_candidates ?? 0;
+    return { text: `${top} (${x || 'some'} unreadable)`, title: `${top}: ${x || 'some'} result${x === 1 ? ' has' : 's have'} no readable website, so the site could be among them.` };
+  }
+  return { text: top, title: n ? `Checked: not found in the top ${n} results returned.` : 'Checked: not found in the results returned.' };
+}
+
+/** Matched only by the project's brand name on a masked result (no verified domain): shown as approximate. */
+export const isLowConfidence = (rankingUrls) => Array.isArray(rankingUrls) && rankingUrls.some((u) => u?.match_confidence === 'low');
+
+/**
  * Mobile organic ranking cell. Four data states that must never be confused:
  *   not_collected — mobile was never checked (old keyword / feature off)
  *   scan_error    — the last mobile check failed (rank unknown)
@@ -177,11 +198,11 @@ function MobileRankCell({ mobile, isScanning }) {
   }
 
   if (state === 'not_ranked') {
-    const depth = mobile.tracked_depth;
+    const note = notRankedNote(mobile.scan, mobile.tracked_depth);
     return (
-      <div data-testid="mobile-not-ranked" title={depth ? `Checked on mobile: not found in the top ${depth} results` : 'Checked on mobile: not found in the results returned'} style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+      <div data-testid="mobile-not-ranked" title={note.title} style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
         <span style={{ fontSize: '12px', color: 'var(--text3)' }}>—</span>
-        {depth ? <span style={{ fontSize: '10px', color: 'var(--text3)', whiteSpace: 'nowrap' }}>Not in top {depth}</span> : null}
+        {note.text !== 'Not ranked' ? <span data-testid="mobile-not-ranked-note" style={{ fontSize: '10px', color: 'var(--text3)', whiteSpace: 'nowrap' }}>{note.text}</span> : null}
       </div>
     );
   }
@@ -195,6 +216,7 @@ function MobileRankCell({ mobile, isScanning }) {
   ].filter(Boolean).join(' · ');
   return (
     <div data-testid="mobile-ranked" title={history || 'No earlier mobile scan to compare with'} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      {isLowConfidence(mobile.ranking_urls) ? <span data-testid="mobile-low-confidence" title="Matched by brand name only (the result's website could not be read)" style={{ fontSize: '12px', color: 'var(--text3)' }}>≈</span> : null}
       <RankBadge rank={mobile.current_rank} />
       <ChangeIndicator change={change} />
     </div>
@@ -385,10 +407,18 @@ const KeywordRow = memo(function KeywordRow({ projectId, keyword, index, isLast,
               Scanning…
             </span>
           ) : (
-            <RankBadge
-              rank={currentRank}
-              nullTitle={scanFailed ? scanErrorMessage : 'Not in Top 100'}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                {currentRank != null && isLowConfidence(rankingUrls) ? <span data-testid="desktop-low-confidence" title="Matched by brand name only (the result's website could not be read)" style={{ fontSize: '12px', color: 'var(--text3)' }}>≈</span> : null}
+                <RankBadge
+                  rank={currentRank}
+                  nullTitle={scanFailed ? scanErrorMessage : notRankedNote(keyword.desktop_scan).title}
+                />
+              </span>
+              {currentRank == null && !scanFailed && notRankedNote(keyword.desktop_scan).text !== 'Not ranked' ? (
+                <span data-testid="desktop-not-ranked-note" style={{ fontSize: '10px', color: 'var(--text3)', whiteSpace: 'nowrap' }}>{notRankedNote(keyword.desktop_scan).text}</span>
+              ) : null}
+            </div>
           )}
         </div>
 
@@ -477,7 +507,9 @@ const KeywordRow = memo(function KeywordRow({ projectId, keyword, index, isLast,
               Scan Error
             </span>
           ) : (
-            <span style={{ fontSize: '11px', color: 'var(--text3)' }}>Not ranked</span>
+            <span data-testid="desktop-status-not-ranked" style={{ fontSize: '11px', color: 'var(--text3)' }} title={notRankedNote(keyword.desktop_scan).title}>
+              {keyword.desktop_scan?.status === 'not_found_partial' ? 'Not ranked (partial)' : keyword.desktop_scan?.status === 'not_found_uncertain' ? 'Not ranked (uncertain)' : 'Not ranked'}
+            </span>
           )}
         </div>
 

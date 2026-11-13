@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ChevronDown, Download, Loader2, RefreshCw } from "lucide-react"
+import { ChevronDown, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatDateTime } from "../referring-domains/format"
@@ -36,10 +36,6 @@ export default function BacklinksHeader({ domain, updatedAt, onRefresh, refreshi
           <span className="text-xs text-muted-foreground" data-testid="bl-updated">
             {updatedAt ? <>Updated {formatDateTime(updatedAt)}</> : <Skel className="inline-block h-3.5 w-36 align-middle" />}
           </span>
-          <Button type="button" variant="outline" onClick={onRefresh} disabled={busy} aria-busy={busy} data-testid="bl-refresh">
-            {refreshing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" disabled={exportDisabled} className="bg-emerald-400 font-semibold text-[#0d1a3a] hover:bg-emerald-300" data-testid="bl-export">
@@ -64,7 +60,6 @@ export default function BacklinksHeader({ domain, updatedAt, onRefresh, refreshi
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {refreshNote ? <p className="max-w-xs text-xs text-muted-foreground @min-[800px]/main:text-right" role="status">{refreshNote}</p> : null}
       </div>
     </div>
   )

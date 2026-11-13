@@ -16,6 +16,16 @@ export const seoScanService = {
    */
   start: (projectId, input) => apiService.request(`${base(projectId)}/seo-scans`, { method: 'POST', body: JSON.stringify(input) }),
 
+  /**
+   * A page was opened: the server reads what the page needs, and queues ONE coordinated collection of whatever is missing or stale (it never
+   * waits for the provider). Safe to call repeatedly: a running collection is shared, a fresh page queues nothing, a failed dataset waits.
+   * @returns {Promise<{ success: boolean, data: { state: 'fresh'|'stale'|'missing', activity: string, lastUpdatedAt: string|null, hasData: boolean, lastError: object|null, nextAttemptAt: string|null, enqueued: object|null, scan: object|null, datasets: object[] } }>}
+   */
+  ensure: (projectId, page, { signal } = {}) => apiService.request(`${base(projectId)}/seo-data/ensure`, { method: 'POST', body: JSON.stringify({ page }), signal }),
+
+  /** The optional manual refresh of one page's datasets (one per project per hour; refused while a collection is running). */
+  refresh: (projectId, page) => apiService.request(`${base(projectId)}/seo-data/refresh`, { method: 'POST', body: JSON.stringify({ page }) }),
+
   /** Stored snapshots of one dataset (MongoDB only). */
   snapshots: (projectId, { datasetType, part, from, to, limit } = {}, { signal } = {}) => {
     const q = new URLSearchParams({ datasetType })

@@ -2,20 +2,18 @@
 
 import { usePathname } from "next/navigation"
 import { useProject } from "@/contexts/ProjectContext"
-import { ProjectScanBar } from "./ProjectScanBar"
-import { scopeForPath } from "./scanScope"
+import { historyRouteFor } from "../history/routes"
+import { DataStatusLine } from "./DataStatusLine"
 
 /**
- * The page's data is what Odito STORED at its last scan: opening a page never buys anything. This bar says how old that is, shows a scan
- * while it runs (the state lives in the database, so a reload keeps it), and is the one place a scan is started or a failed one retried.
- * Renders nothing outside the SEO data pages.
+ * Mounted once in the app layout. On each of the nine SEO pages it keeps the page's data collected and fresh by itself (opening the page
+ * asks the server what is missing or stale; a worker collects it) and shows the status line. Renders nothing outside those pages.
  */
 export default function SeoScanBar() {
   const pathname = usePathname()
-  const scope = scopeForPath(pathname)
+  const page = historyRouteFor(pathname)?.page ?? null
   const { activeProject } = useProject()
   const projectId = activeProject?._id
-  if (!scope || !projectId) return null
-  return <ProjectScanBar key={projectId} projectId={projectId} scope={scope} />
+  if (!page || !projectId) return null
+  return <DataStatusLine key={`${projectId}:${page}`} projectId={projectId} page={page} />
 }
-

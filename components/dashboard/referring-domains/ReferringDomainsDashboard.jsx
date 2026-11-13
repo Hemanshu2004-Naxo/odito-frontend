@@ -57,7 +57,6 @@ function ProjectReferringDomains({ projectId, project }) {
   const { state, update, page, lists } = rd
   const domain = rd.target ?? domainFromUrl(project?.main_url)
   const { toasts, notify, dismiss } = useToastQueue()
-  const [refreshClicked, setRefreshClicked] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [disavowOpen, setDisavowOpen] = useState(false)
   const [selected, setSelected] = useState(() => new Set())
@@ -67,7 +66,6 @@ function ProjectReferringDomains({ projectId, project }) {
   // A selection belongs to the view it was made in.
   useEffect(() => { setSelected(new Set()) }, [viewKey])
 
-  const refreshNote = refreshClicked && !rd.isFetching && rd.refreshThrottled ? "This data was refreshed less than a minute ago, so it was not requested again." : null
   const disavowedTab = rd.isDisavowedTab
   const noDomain = page.status === "error" && page.error?.code === "INVALID_TARGET"
 
@@ -112,10 +110,7 @@ function ProjectReferringDomains({ projectId, project }) {
       <ReferringDomainsHeader
         domain={domain}
         updatedAt={rd.updatedAt}
-        onRefresh={() => { setRefreshClicked(true); rd.refresh() }}
         busy={rd.isFetching || disavowedTab}
-        refreshing={refreshClicked && rd.isFetching}
-        refreshNote={refreshNote}
         rowCount={page.rows.length}
         total={page.total}
         exportPageDisabled={page.status !== "success" || !page.rows.length}
@@ -138,9 +133,9 @@ function ProjectReferringDomains({ projectId, project }) {
           </div>
 
           <div ref={tableRef} className="scroll-mt-4 space-y-4">
-            <TabsBar tab={state.tab} counts={rd.tabCounts} onTab={(tab) => update({ tab })} />
             <FilterBar state={state} update={update} built={rd.built} activeCount={rd.chips.length} onClearAll={rd.clearFilters} />
             <ActiveFilters chips={rd.chips} onRemove={(chip) => update(chip.clear)} onClearAll={rd.clearFilters} />
+            <TabsBar tab={state.tab} counts={rd.tabCounts} onTab={(tab) => update({ tab })} />
 
             {bulkCount > 0 ? (
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm" role="region" aria-label="Bulk actions" data-testid="rd-bulk">

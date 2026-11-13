@@ -1,7 +1,10 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { ChevronRight, Search, Sparkles } from 'lucide-react'
 import { useProject } from '@/contexts/ProjectContext'
+import { SEV, Chip, StatCard } from '@/components/dashboard/issues/OnPageIssuesView'
 
 // Static lookup table for enriching checks with additional data
 const CHECKS_LOOKUP = {
@@ -145,32 +148,12 @@ const CHECKS_LOOKUP = {
   }
 }
 
-function StatusDot({ status }) {
-  const colors = {
-    critical: "#ff3860",
-    warning: "#ffb703", 
-    passed: "#00f5a0",
-    OK: "#00f5a0",
-    Critical: "#ff3860",
-    Warning: "#ffb703"
-  }
-  const c = colors[status] || "#4e5f7a"
-  return (
-    <div 
-      className="status-dot"
-      style={{ 
-        background: c, 
-        boxShadow: `0 0 6px ${c}60` 
-      }}
-    />
-  )
-}
-
 export default function CheckList({ onSelectCheck, technicalData, error }) {
   const { activeProject } = useProject()
   const [checks, setChecks] = useState([])
   const [summary, setSummary] = useState(null)
   const [filter, setFilter] = useState("all")
+  const [search, setSearch] = useState("")
 
   // Process technical data when received from parent
   useEffect(() => {
@@ -248,204 +231,127 @@ export default function CheckList({ onSelectCheck, technicalData, error }) {
     )
   }
 
+  const STATUS = {
+    critical: { label: "Critical", pill: SEV.high.pill, bar: SEV.high.bar },
+    warning: { label: "Warning", pill: SEV.medium.pill, bar: SEV.medium.bar },
+    passed: { label: "Passed", pill: "bg-[#1FB37A]/15 text-[#0B6E4D] dark:text-[#5FD9A6]", bar: "bg-[#1FB37A]" },
+  }
+  const ORDER = ["critical", "warning", "passed"]
+  const query = search.trim().toLowerCase()
+  const shown = filteredChecks
+    .filter((c) => !query || `${c.name} ${c.message || ""} ${c.description || ""}`.toLowerCase().includes(query))
+    .sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
+  const hasFilters = filter !== "all" || query !== ""
+  const clearAll = () => { setFilter("all"); setSearch("") }
+  const listTitle = filter === "all" ? `All checks · ${shown.length}` : `${STATUS[filter].label} · ${shown.length}`
+  const GRID = "minmax(0,1fr) 170px 100px 120px"
+
   return (
-    <div>
-      {/* Summary Bar */}
-      <div className="summary-bar">
-        <div className="sum-tile">
-          <div className="sum-tile-val" style={{ color: "var(--t)" }}>
-            {total}
-          </div>
-          <div className="sum-tile-lbl">Total Checks</div>
-          <div className="sum-tile-sub">across 8 categories</div>
+    <div className="flex flex-col gap-[18px] text-foreground">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex min-w-[220px] flex-1 flex-col gap-0.5">
+          <span className="text-[13px] text-muted-foreground">
+            <Link href="/app/domain-overview" className="hover:underline">Dashboard</Link> / SEO / <span className="font-bold text-foreground">Technical</span>
+          </span>
+          <h1 className="m-0 text-2xl font-extrabold tracking-tight">Technical checks</h1>
         </div>
-        <div className="sum-tile">
-          <div className="sum-tile-val" style={{ color: "var(--red)" }}>
-            {critical}
-          </div>
-          <div className="sum-tile-lbl">Critical</div>
-          <div className="sum-tile-sub">need immediate fix</div>
-        </div>
-        <div className="sum-tile">
-          <div className="sum-tile-val" style={{ color: "var(--amber)" }}>
-            {warnings}
-          </div>
-          <div className="sum-tile-lbl">Warnings</div>
-          <div className="sum-tile-sub">should be addressed</div>
-        </div>
-        <div className="sum-tile">
-          <div className="sum-tile-val" style={{ color: "var(--green)" }}>
-            {passed}
-          </div>
-          <div className="sum-tile-lbl">Passed</div>
-          <div className="sum-tile-sub">no action needed</div>
-        </div>
+        <span className="text-[13px] text-muted-foreground">Technical health {healthScore}%{activeProject?.project_name ? ` · ${activeProject.project_name}` : ""}</span>
+      </header>
+
+      <div role="group" aria-label="Filter by status" className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))" }}>
+        <StatCard label="Total checks" value={total} sub="across 8 categories" accent="bg-foreground" valueColor="text-foreground" active={filter === "all"} showBadge={filter === "all"} onClick={() => setFilter("all")} />
+        <StatCard label="Critical" value={critical} sub="need immediate fix" accent={SEV.high.accent} valueColor={SEV.high.value} active={filter === "critical"} showBadge={filter === "critical"} onClick={() => setFilter(filter === "critical" ? "all" : "critical")} />
+        <StatCard label="Warnings" value={warnings} sub="should be addressed" accent={SEV.medium.accent} valueColor={SEV.medium.value} active={filter === "warning"} showBadge={filter === "warning"} onClick={() => setFilter(filter === "warning" ? "all" : "warning")} />
+        <StatCard label="Passed" value={passed} sub="no action needed" accent="bg-[#1FB37A]" valueColor="text-[#0B6E4D] dark:text-[#5FD9A6]" active={filter === "passed"} showBadge={filter === "passed"} onClick={() => setFilter(filter === "passed" ? "all" : "passed")} />
       </div>
 
-      {/* Health Row */}
-      <div className="health-row">
-        <div className="health-card">
-          <div style={{ position: "relative", width: 80, height: 80 }}>
-            <svg width="80" height="80" style={{ transform: "rotate(-90deg)" }}>
-              <defs>
-                <linearGradient id="healthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#7730ed" />
-                  <stop offset="100%" stopColor="#00dfff" />
-                </linearGradient>
-              </defs>
-              <circle 
-                cx="40" cy="40" r="33" 
-                fill="none" 
-                stroke="rgba(255,255,255,0.05)" 
-                strokeWidth="5.5"
-              />
-              <circle 
-                cx="40" cy="40" r="33" 
-                fill="none" 
-                stroke="url(#healthGrad)" 
-                strokeWidth="5.5"
-                strokeDasharray={`${2 * Math.PI * 33}`}
-                strokeDashoffset={`${2 * Math.PI * 33 * (1 - healthScore / 100)}`}
-                strokeLinecap="round"
-                style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)" }}
-              />
-            </svg>
-            <div style={{ 
-              position: "absolute", 
-              inset: 0, 
-              display: "flex", 
-              flexDirection: "column", 
-              alignItems: "center", 
-              justifyContent: "center" 
-            }}>
-              <div style={{ 
-                fontFamily: "var(--font-metric)", 
-                fontVariantNumeric: 'tabular-nums',
-                fontSize: 16, 
-                fontWeight: 700, 
-                color: "var(--cyan)" 
-              }}>
-                {healthScore}%
-              </div>
-            </div>
-          </div>
-          <div>
-            <div style={{ 
-              fontFamily: "var(--font-metric)", 
-              fontWeight: 700, 
-              fontSize: 15, 
-              marginBottom: 3 
-            }}>
-              Technical Health
-            </div>
-            <div style={{ fontSize: 12, color: "var(--t3)" }}>
-              {passed} passed · {warnings} warnings · {critical} critical
-            </div>
-          </div>
+      <div className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-[#0A86A0]/30 bg-[#0A86A0]/10 px-4 py-3.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#0A86A0] text-white"><Sparkles className="h-[18px] w-[18px]" aria-hidden="true" /></span>
+        <span className="min-w-[240px] flex-1 text-[14px] leading-normal">
+          {critical > 0 ? (
+            <>
+              <strong>Start here:</strong> {critical} critical {critical === 1 ? "check needs" : "checks need"} action.
+              {topCriticalCheck && (
+                <> Begin with <strong>{topCriticalCheck.name}</strong>{topCriticalCheck.difficulty ? ` (${topCriticalCheck.difficulty})` : ""}
+                  {topCriticalCheck.impact_basis === "pages_affected_ratio" && <>, which affects <strong>{topCriticalCheck.impact || 0}%</strong> of crawled pages</>}.</>
+              )}
+            </>
+          ) : (
+            <>No critical checks right now — nice work.</>
+          )}
+        </span>
+        {critical > 0 && (
+          <button type="button" onClick={() => setFilter("critical")} className="h-10 rounded-xl bg-foreground px-3.5 text-[13px] font-bold text-background">Show critical</button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2.5 rounded-[18px] border border-border bg-card p-3.5">
+        <div role="group" aria-label="Status" className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-[12px] font-bold text-muted-foreground">Status</span>
+          {[["all", "All"], ["critical", "Critical"], ["warning", "Warnings"], ["passed", "Passed"]].map(([id, label]) => (
+            <Chip key={id} active={filter === id} onClick={() => setFilter(id)}>{label}</Chip>
+          ))}
         </div>
-        <div className="aria-card">
-          <div className="aria-label">✦ ARIA — Priority Analysis</div>
-          <div style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--t2)" }}>
-            {critical > 0 ? (
-              <>
-                <strong style={{ color: "var(--red)" }}>{critical} critical {critical === 1 ? 'issue' : 'issues'}</strong> require immediate action.
-                {topCriticalCheck && (
-                  <>
-                    {' '}Start with <strong style={{ color: "var(--t)" }}>{topCriticalCheck.name}</strong>
-                    {topCriticalCheck.difficulty && <> ({topCriticalCheck.difficulty})</>}
-                    {topCriticalCheck.impact_basis === 'pages_affected_ratio' && (
-                      <> — affecting <strong style={{ color: "var(--cyan)" }}>{topCriticalCheck.impact || 0}%</strong> of crawled pages</>
-                    )}.
-                  </>
-                )}
-              </>
-            ) : (
-              <>No critical checks right now — nice work.</>
+        <label className="flex h-11 min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 text-muted-foreground">
+          <Search className="h-4 w-4" aria-hidden="true" />
+          <span className="sr-only">Search checks</span>
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder='Search checks, e.g. "canonical"' className="min-w-0 flex-1 border-0 bg-transparent text-[14px] text-foreground outline-none" />
+        </label>
+        {hasFilters && <button type="button" onClick={clearAll} className="h-11 rounded-xl px-3 text-[13px] font-bold text-[#4256D6] dark:text-[#8FA0FF]">Clear filters</button>}
+      </div>
+
+      <section aria-label="Checks" className="overflow-hidden rounded-[20px] border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border px-[18px] py-3.5">
+          <span className="text-[14px] font-extrabold">{listTitle}</span>
+          <span className="text-[12px] text-muted-foreground">Critical first · click a check to see pages and fixes</span>
+        </div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[760px]">
+            <div className="grid gap-3 border-b border-border px-[18px] py-2.5 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground" style={{ gridTemplateColumns: GRID }}>
+              <span>Check</span><span>Pages affected</span><span>Difficulty</span><span />
+            </div>
+            {shown.map((check) => {
+              const st = STATUS[check.status] || STATUS.passed
+              const ok = check.status === "passed" || check.status === "OK"
+              const ratio = check.impact_basis === "pages_affected_ratio"
+              return (
+                <div key={check.name} className="grid cursor-pointer items-center gap-3 border-t border-border px-[18px] py-3 transition-colors hover:bg-muted/40" style={{ gridTemplateColumns: GRID }} onClick={() => onSelectCheck(check)}>
+                  <span className="flex min-w-0 items-center gap-3">
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span className={`w-16 shrink-0 rounded-full py-1 text-center text-[11px] font-extrabold ${st.pill}`}>{st.label}</span>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-[14px] font-bold">{check.name}</span>
+                      <span className="truncate text-[12px] text-muted-foreground">{check.message || check.description || "No description available"}</span>
+                    </span>
+                  </span>
+                  <span>
+                    {check.affected_pages > 0 ? (
+                      <span className="flex flex-col gap-1">
+                        <span className="text-[13px]"><strong>{check.affected_pages}</strong> <span className="text-muted-foreground">page{check.affected_pages > 1 ? "s" : ""}{ratio ? ` · ${check.impact || 0}%` : ""}</span></span>
+                        {ratio && <span className="block h-[5px] rounded-[3px] bg-muted"><span className={`block h-[5px] rounded-[3px] ${st.bar}`} style={{ width: `${Math.min(100, check.impact || 0)}%` }} /></span>}
+                      </span>
+                    ) : <span className="text-[13px] text-muted-foreground">{ok ? "—" : "Site-wide"}</span>}
+                  </span>
+                  <span className="text-[12px] font-semibold text-muted-foreground">{ok ? "—" : check.difficulty}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onSelectCheck(check) }}
+                    className={`h-9 rounded-[10px] text-[12px] font-bold ${ok ? "border border-border bg-card text-foreground hover:bg-muted" : "bg-[#4256D6] text-white hover:bg-[#3547BD]"}`}
+                  >
+                    {ok ? "View" : "Fix with AI"}
+                  </button>
+                </div>
+              )
+            })}
+            {shown.length === 0 && (
+              <div className="flex flex-col items-center gap-2 px-[18px] py-10 text-center">
+                <span className="text-[15px] font-extrabold">No checks match these filters</span>
+                <button type="button" onClick={clearAll} className="h-[38px] rounded-[10px] border border-border bg-card px-3.5 text-[13px] font-bold">Clear filters</button>
+              </div>
             )}
           </div>
         </div>
-      </div>
-      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div className="section-head" style={{ margin: 0 }}>
-          <div className="section-title">All Checks</div>
-          <div className="section-tag">{total} TOTAL</div>
-        </div>
-        <div className="tab-strip">
-          {[
-            { id: "all", label: `All (${total})` },
-            { id: "critical", label: `Critical (${critical})` },
-            { id: "warning", label: `Warnings (${warnings})` },
-            { id: "passed", label: `Passed (${passed})` }
-          ].map(tab => (
-            <div 
-              key={tab.id}
-              className={`tab-item${filter === tab.id ? " on" : ""}`}
-              onClick={() => setFilter(tab.id)}
-            >
-              {tab.label}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Check Cards Grid */}
-      <div className="check-grid">
-        {filteredChecks.map(check => {
-          const cardCls = check.status === "critical" || check.status === "Critical" ? "critical-card" : 
-                         check.status === "warning" || check.status === "Warning" ? "warning-card" : "passed-card"
-          const iconBg = check.status === "critical" || check.status === "Critical" ? "critical-bg" : 
-                        check.status === "warning" || check.status === "Warning" ? "warning-bg" : "passed-bg"
-          
-          return (
-            <div 
-              key={check.name}
-              className={`check-card ${cardCls}`}
-              onClick={() => onSelectCheck(check)}
-            >
-              <div className={`check-icon ${iconBg}`}>
-                {check.icon}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 2 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{check.name}</div>
-                  <StatusDot status={check.status} />
-                </div>
-                <div style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.4 }}>
-                  {check.message || check.description || "No description available"}
-                </div>
-                {check.status !== "passed" && (
-                  <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
-                    <span className={`pill-sev-${check.status === "critical" ? "r" : "a"}`} style={{ fontSize: 9 }}>
-                      {check.status === "critical" ? "● CRITICAL" : "◆ WARNING"}
-                    </span>
-                    {check.affected_pages > 0 && (
-                      <span className="pill-impact" style={{ fontSize: 9 }}>
-                        {check.affected_pages} page{check.affected_pages > 1 ? 's' : ''}
-                      </span>
-                    )}
-                    <span className={`pill-diff`} style={{ fontSize: 9 }}>
-                      {check.difficulty}
-                    </span>
-                  </div>
-                )}
-              </div>
-              {check.status === "passed" || check.status === "OK" ? (
-                <span className="ok-chip">✔ OK</span>
-              ) : (
-                <button 
-                  className="fix-ai-btn tap-target"
-                  onClick={e => {
-                    e.stopPropagation()
-                    onSelectCheck(check)
-                  }}
-                >
-                  ✦ Fix
-                </button>
-              )}
-            </div>
-          )
-        })}
-      </div>
+      </section>
     </div>
   )
 }
