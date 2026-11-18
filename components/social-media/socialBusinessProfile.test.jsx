@@ -14,6 +14,12 @@ vi.mock('@/contexts/ProjectContext', () => ({
 vi.mock('next/link', async () => (await import('@/test-utils/socialMediaAI')).nextLinkMock())
 
 import { BusinessProfileScreen } from './BusinessProfileScreen'
+import { BrandKitSettings } from './BrandKitSettings'
+import { useProject } from '@/contexts/ProjectContext'
+
+// The Brand Kit moved from Business Profile to Settings -> Brand kit; the combined view keeps the old page's surface.
+function BrandKitTab() { return <BrandKitSettings projectId={useProject().activeProjectId} /> }
+function ProfileAndBrandKit() { return <><BusinessProfileScreen /><BrandKitTab /></> }
 
 beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset())
@@ -21,8 +27,9 @@ beforeEach(() => {
 })
 
 const load = (opts) => api.getSocialBusinessProfile.mockResolvedValue(businessProfileData(opts))
-const renderSettings = () => renderWithClient(<BusinessProfileScreen />)
-const renderBrand = () => renderWithClient(<BusinessProfileScreen />)
+const renderSettings = () => renderWithClient(<ProfileAndBrandKit />)
+const renderProfile = () => renderWithClient(<BusinessProfileScreen />)
+const renderBrand = () => renderWithClient(<BrandKitTab />)
 const editor = (section) => screen.getByTestId(`editor-${section}`)
 
 describe('Business profile — real data', () => {
@@ -209,14 +216,14 @@ describe('Business profile — editing the Social AI fields', () => {
 describe('Business profile — states', () => {
   it('LOADING: skeletons, then content', async () => {
     api.getSocialBusinessProfile.mockReturnValue(new Promise(() => {}))
-    renderSettings()
+    renderProfile()
     expect(screen.getByTestId('profile-loading')).toBeInTheDocument()
     expect(screen.queryByTestId('resolved-facts')).not.toBeInTheDocument()
   })
 
   it('ERROR: shows the failure with a working retry — no sample data as a fallback', async () => {
     api.getSocialBusinessProfile.mockRejectedValueOnce(apiError('Failed to load the business profile', { status: 500 }))
-    renderSettings()
+    renderProfile()
     expect(await screen.findByTestId('profile-error')).toHaveTextContent('Failed to load the business profile')
     load({ google: true })
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
@@ -225,18 +232,18 @@ describe('Business profile — states', () => {
 
   it('NO PROJECT: asks for a project and requests nothing', () => {
     project = null
-    renderSettings()
+    renderProfile()
     expect(screen.getByTestId('profile-no-project')).toBeInTheDocument()
     expect(api.getSocialBusinessProfile).not.toHaveBeenCalled()
   })
 
   it('the query is project-scoped: another project refetches for ITS id', async () => {
     load({ google: true })
-    const { unmount } = renderSettings()
+    const { unmount } = renderProfile()
     await screen.findByTestId('fact-name-value')
     unmount()
     project = { _id: 'proj-2', project_name: 'Other' }
-    renderSettings()
+    renderProfile()
     await waitFor(() => expect(api.getSocialBusinessProfile).toHaveBeenCalledWith('proj-2'))
   })
 })

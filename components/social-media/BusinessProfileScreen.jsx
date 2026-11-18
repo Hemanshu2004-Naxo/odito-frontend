@@ -1,7 +1,6 @@
 "use client"
 
 import Link from 'next/link'
-import { BrandKitSection } from './BrandKitSection'
 import { BusinessModelSelector } from './BusinessModelSelector'
 import { ProductCatalog } from './ProductCatalog'
 import { ResolvedBusinessFacts } from './ResolvedBusinessFacts'
@@ -40,7 +39,7 @@ function DataSources({ googleStatus, meta }) {
 
 /**
  * Business Profile — the ONE place to manage a project's business and brand for Social AI:
- *   1 Business type · 2 Business information · 3 Brand Kit · 4 Services or Products · 5 How Social AI sees it.
+ *   1 Business type · 2 Business information · 3 Services or Products · 4 How Social AI sees it.
  * Server state lives in React Query (useSocialBusinessProfile, the same entry Connect Accounts reads for the Google
  * connection, so one request serves both pages); there is no local copy. The business type is the user's own answer
  * and decides whether Services or the Product Catalog is offered.
@@ -57,7 +56,7 @@ export function BusinessProfileScreen() {
           <div className="space-y-10" key={activeProjectId} data-testid="business-profile-page">
             <nav aria-label="Business Profile sections" className="flex flex-wrap gap-2 text-sm">
               {[
-                ['#business-type', 'Business type'], ['#business-information', 'Business information'], ['#brand-kit', 'Brand Kit'],
+                ['#business-type', 'Business type'], ['#business-information', 'Business information'],
                 ['#offerings', model === 'product' ? 'Products' : model === 'service' ? 'Services' : 'Services or products'], ['#social-ai-view', 'How Social AI sees it'],
               ].map(([href, label]) => (
                 <a key={href} href={href} className="rounded-full border border-slate-200 bg-white px-3 py-1 font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900">{label}</a>
@@ -74,15 +73,10 @@ export function BusinessProfileScreen() {
               <SocialBusinessProfileEditor projectId={activeProjectId} section="overrides" profile={editableProfile} resolved={resolvedProfile} />
             </section>
 
-            <section aria-labelledby="brand-kit" className="scroll-mt-20">
-              <SectionHeader id="brand-kit" number="3" title="Brand Kit" description="Your brand and audience: logo, voice, messaging, colours and fonts." />
-              <BrandKitSection projectId={activeProjectId} resolvedProfile={resolvedProfile} editableProfile={editableProfile} />
-            </section>
-
             <section aria-labelledby="offerings" className="scroll-mt-20">
               <SectionHeader
                 id="offerings"
-                number="4"
+                number="3"
                 title={model === 'product' ? 'Products' : model === 'service' ? 'Services' : 'Services or products'}
                 description={model === 'product' ? 'The products you sell, with their details and images.' : model === 'service' ? 'The services you provide.' : 'What you offer — shown once you choose your business type.'}
               />
@@ -97,7 +91,7 @@ export function BusinessProfileScreen() {
             </section>
 
             <section aria-labelledby="social-ai-view" className="scroll-mt-20">
-              <SectionHeader id="social-ai-view" number="5" title="How Social AI sees your business" description="A read-only preview of the resolved profile your strategy, content and designs are built from." />
+              <SectionHeader id="social-ai-view" number="4" title="How Social AI sees your business" description="A read-only preview of the resolved profile your strategy, content and designs are built from." />
               <ResolvedBusinessFacts resolvedProfile={resolvedProfile} />
               <DataSources googleStatus={googleStatus} meta={resolvedProfile.meta} />
             </section>

@@ -13,15 +13,19 @@ import { RequestChangesDialog } from '@/components/social-media/RequestChangesDi
 import { ConfirmSchedulePanel } from '@/components/social-media/ConfirmSchedulePanel'
 import { PostListSkeleton, PostListError } from '@/components/social-media/ScheduledPostList'
 import SocialMediaToastStack from '@/components/social-media/SocialMediaToastStack'
+import { ApproveAttentionDialog } from '@/components/social-media/design/ApproveAttentionDialog'
+import { useSlideRegenerate } from '@/hooks/useSocialMediaAI'
+import { trackDesignJob } from '@/lib/socialMedia/designJobs'
 import { useToastQueue } from '@/hooks/useToastQueue'
 import { useProject } from '@/contexts/ProjectContext'
 import { useUploadSocialMedia } from '@/hooks/useDashboardQueries'
 import {
   useSocialAccounts, useApprovalPosts, useApprovalSettings, useSubmitContentForReview, useApproveContent, useRequestContentChanges,
-  useSubmitDesignForReview, useApproveDesign, useRequestDesignChanges, useUpdatePostContent, useReschedulePost,
+  useSubmitDesignForReview, useApproveDesign, useRequestDesignChanges, useUpdatePostContent, useReschedulePost, useSocialContentCalendar,
+  nextStateAfterContentApproval,
 } from '@/hooks/useSocialMediaAI'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
-import { mapPublicationToApprovalPost } from '@/lib/socialMedia/postMapper'
+import { mapPublicationToApprovalPost, captionKey } from '@/lib/socialMedia/postMapper'
 import { APPROVAL_TABS } from '@/lib/socialMediaAIDummyData'
 
 const VALID_TAB_IDS = new Set(APPROVAL_TABS.map((tab) => tab.id))
@@ -58,6 +62,16 @@ function ContentApprovalsContent() {
   const accounts = useSocialAccounts(activeProjectId)
   const list = useApprovalPosts(activeProjectId)
   const settings = useApprovalSettings(activeProjectId)
+  const calendar = useSocialContentCalendar(activeProjectId)
+  const plannedDates = useMemo(() => {
+    const map = new Map()
+    for (const item of calendar.data?.items || []) {
+      for (const id of item.publicationIds || []) map.set(String(id), item.date)
+      map.set(`item:${item.id}`, item.date)
+    }
+    return map
+  }, [calendar.data])
+  const plannedDateOf = (post) => (post ? (plannedDates.get(String(post.id)) || (post.plan?.calendarItemId ? plannedDates.get(`item:${post.plan.calendarItemId}`) : null) || null) : null)
 
   const submitContent = useSubmitContentForReview(activeProjectId)
   const approveContent = useApproveContent(activeProjectId)
@@ -79,6 +93,8 @@ function ContentApprovalsContent() {
   const [dialogError, setDialogError] = useState(null)
   const [scheduling, setScheduling] = useState(false)
   const [scheduleError, setScheduleError] = useState(null)
+  const [attention, setAttention] = useState(null) // { post, items } - the slides that need attention, from a refused approval
+  const slideRegenerate = useSlideRegenerate(activeProjectId, attention?.post?.id)
 
   const tabPosts = useMemo(() => list.posts.filter((p) => p.approvalTabs.includes(activeTab)), [list.posts, activeTab])
   const counts = useMemo(
@@ -102,7 +118,7 @@ function ContentApprovalsContent() {
     setScheduleError(null)
   }, [selectedId, selectedPost?.content])
 
-  const dirty = !!selectedPost && caption !== selectedPost.content
+  const dirty = !!selectedPost && captionKey(caption) !== captionKey(selectedPost.content)
   const accountName = selectedPost ? accounts[selectedPost.platform]?.name : null
 
   function handleTabChange(tabId) {
@@ -113,6 +129,41 @@ function ContentApprovalsContent() {
   /** One place for "run a mutation, toast the outcome, show the backend's refusal". */
   // Set synchronously: a fast double-click can reach this twice before React re-renders the disabled button.
   const actionInFlight = useRef(false)
+  /**
+   * "Approve design" with the quality guard: the server refuses a design whose slides need attention (DESIGN_NEEDS_ATTENTION + the list);
+   * the reviewer then approves anyway (recorded with their name) or regenerates the flagged slide.
+   */
+  function approveDesignGuarded(post, acknowledgeAttention = false) {
+    if (actionInFlight.current) return
+    actionInFlight.current = true
+    setPendingAction('approve-design')
+    setActionError(null)
+    approveDesign.mutate({ publicationId: post.id, version: post.approval.designVersion, acknowledgeAttention }, {
+      onSuccess: () => { notify(acknowledgeAttention ? 'Design approved, with the slides that need attention.' : 'Design approved.', 'success'); setAttention(null) },
+      onError: (error) => {
+        if ((error?.details?.code || error?.code) === 'DESIGN_NEEDS_ATTENTION') { setAttention({ post, items: error.details?.attention || [] }); return }
+        const message = describeApiError(error, 'That action could not be completed.').message
+        setActionError(message)
+        notify(message, 'danger')
+      },
+      onSettled: () => { actionInFlight.current = false; setPendingAction(null) },
+    })
+  }
+
+  async function regenerateFlagged() {
+    const { post, items } = attention
+    const first = items[0]
+    if (!first?.key) { window.location.assign(`/app/social-media/creative-studio?publicationId=${encodeURIComponent(post.id)}`); return }
+    try {
+      await slideRegenerate.mutateAsync({ publicationId: post.id, contentVersion: post.approval.contentVersion, designVersion: post.approval.designVersion, slideKey: first.key })
+      trackDesignJob({ projectId: activeProjectId, publicationId: post.id, label: `Slide ${first.slide}` })
+      notify(`Regenerating slide ${first.slide}…`, 'default')
+      setAttention(null)
+    } catch (error) {
+      notify(describeApiError(error, 'The slide could not be regenerated.').message, 'danger')
+    }
+  }
+
   function run(label, mutation, variables, { success, onSuccess } = {}) {
     if (actionInFlight.current) return
     actionInFlight.current = true
@@ -143,6 +194,30 @@ function ContentApprovalsContent() {
       setActiveTab(tabs[0])
       setSelectedPostId(publication.id)
     }
+  }
+
+  const MOVED_TO = { design_review: 'Content approved — moved to Design review.', design_approved: 'Content approved — moved to Approved.', content_approved: 'Content approved — moved to Approved. Add a design before it can be scheduled.' }
+
+  function handleApproveContent(post = selectedPost) {
+    if (!post || actionInFlight.current) return
+    actionInFlight.current = true
+    setPendingAction('approve-content')
+    setActionError(null)
+    const variables = { publicationId: post.id, version: post.approval.contentVersion, nextState: nextStateAfterContentApproval(post, settings.data) }
+    approveContent.mutate(variables, {
+      onSuccess: (res) => {
+        const state = res?.data?.publication?.approval?.state
+        notify(MOVED_TO[state] || 'Content approved.', 'success')
+        // the post has left this tab: the next post waiting here is selected (or the empty state shows)
+        setSelectedPostId(null)
+      },
+      onError: (error) => {
+        const message = describeApiError(error, 'The content could not be approved.').message
+        setActionError(message)
+        notify(`Not approved: ${message}`, 'danger', { action: { label: 'Retry', onClick: () => handleApproveContent(post) } })
+      },
+      onSettled: () => { actionInFlight.current = false; setPendingAction(null) },
+    })
   }
 
   const SCHEDULE_REMOVED = 'The change withdrew the post\'s approval, so its schedule was removed. Approve it again, then schedule it again.'
@@ -236,39 +311,55 @@ function ContentApprovalsContent() {
         <PostListError message={describeApiError(list.error, 'Posts could not be loaded.').message} onRetry={() => list.refetch()} retrying={list.isFetching} />
       ) : selectedPost ? (
         <>
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)_300px]">
-            <ApprovalPostList posts={tabPosts} selectedPostId={selectedId} onSelectPost={setSelectedPostId} emptyTitle={empty.title} emptyMessage={empty.message} />
+          {/*
+            Every section is a full-width horizontal band: the posts as a strip on top, then the selected post's design (slide left,
+            controls right), its caption (editor left, feed preview right) and its brief (the facts in a row). While scheduling, the
+            schedule band comes first. Inside each band the two sides stack below ~900px of main width.
+          */}
+          <div className="space-y-5" data-testid="approvals-layout">
+            <ApprovalPostList horizontal posts={tabPosts} selectedPostId={selectedId} onSelectPost={setSelectedPostId} emptyTitle={empty.title} emptyMessage={empty.message} />
 
-            <div className="flex flex-col gap-5">
-              <ContentEditor
-                post={selectedPost}
-                caption={caption}
-                onCaptionChange={setCaption}
-                dirty={dirty}
-                saving={pendingAction === 'save' && updatePost.isPending}
-                onSave={handleSave}
-                error={actionError}
-              />
-              <DesignApprovalPanel post={selectedPost} projectId={activeProjectId} uploading={upload.isPending || (updatePost.isPending && pendingAction === null)} error={designError} onReplace={handleReplaceDesign} />
-            </div>
-
-            <div className="flex flex-col gap-5">
-              {scheduling && selectedPost.canSchedule ? (
-                <ConfirmSchedulePanel
-                  key={selectedPost.id}
-                  post={selectedPost}
-                  accountName={accountName}
-                  pendingAction={pendingAction === 'schedule' ? 'confirm' : null}
-                  error={scheduleError}
-                  onConfirm={handleConfirmSchedule}
-                  onClose={() => setScheduling(false)}
-                />
-              ) : (
-                <>
-                  <PostBrief post={selectedPost} />
-                  <ApprovalInfoCard settings={settings.data} />
-                </>
-              )}
+            <div className="flex min-w-0 flex-col gap-5" data-testid="approvals-workspace">
+              {(() => {
+                const editor = (
+                  <ContentEditor
+                    post={selectedPost}
+                    caption={caption}
+                    onCaptionChange={setCaption}
+                    dirty={dirty}
+                    saving={pendingAction === 'save' && updatePost.isPending}
+                    onSave={handleSave}
+                    error={actionError}
+                    wide
+                  />
+                )
+                const design = <DesignApprovalPanel wide post={selectedPost} projectId={activeProjectId} uploading={upload.isPending || (updatePost.isPending && pendingAction === null)} error={designError} onReplace={handleReplaceDesign} />
+                const confirming = scheduling && selectedPost.canSchedule
+                const schedule = confirming ? (
+                  <ConfirmSchedulePanel
+                    wide
+                    key={selectedPost.id}
+                    post={selectedPost}
+                    accountName={accountName}
+                    pendingAction={pendingAction === 'schedule' ? 'confirm' : null}
+                    error={scheduleError}
+                    onConfirm={handleConfirmSchedule}
+                    onClose={() => setScheduling(false)}
+                  />
+                ) : null
+                // full-width bands, top to bottom: (schedule, while scheduling) -> design -> edit content -> brief
+                return (
+                  <>
+                    {schedule && <div className="min-w-0" data-testid="approvals-schedule">{schedule}</div>}
+                    <div className="min-w-0" data-testid="approvals-primary">{design}</div>
+                    <div className="min-w-0" data-testid="approvals-secondary">{editor}</div>
+                    <div className="grid min-w-0 grid-cols-1 items-start gap-5 @min-[1000px]/main:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]" data-testid="approvals-tertiary">
+                      <PostBrief wide post={selectedPost} plannedDate={plannedDateOf(selectedPost)} />
+                      <ApprovalInfoCard settings={settings.data} />
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
 
@@ -278,9 +369,9 @@ function ContentApprovalsContent() {
             unsaved={dirty}
             scheduling={scheduling}
             onSubmitContent={() => run('submit-content', submitContent, selectedPost.id, { success: 'Submitted for review.' })}
-            onApproveContent={() => run('approve-content', approveContent, { publicationId: selectedPost.id, version: selectedPost.approval.contentVersion }, { success: 'Content approved.' })}
-            onSubmitDesign={() => run('submit-design', submitDesign, selectedPost.id, { success: 'Design submitted for review.' })}
-            onApproveDesign={() => run('approve-design', approveDesign, { publicationId: selectedPost.id, version: selectedPost.approval.designVersion }, { success: 'Design approved.' })}
+            onApproveContent={() => handleApproveContent()}
+            onSubmitDesign={() => run('submit-design', submitDesign, selectedPost.id, { success: selectedPost.media.length === 0 && selectedPost.platform !== 'instagram' ? 'Approved — moved to Approved.' : 'Design submitted for review.' })}
+            onApproveDesign={() => approveDesignGuarded(selectedPost)}
             onRequestChanges={(stage) => { setDialogError(null); setChangesStage(stage) }}
             onSchedule={() => { setScheduleError(null); setScheduling(true) }}
           />
@@ -301,6 +392,15 @@ function ContentApprovalsContent() {
         error={dialogError}
         onOpenChange={(open) => { if (!open) setChangesStage(null) }}
         onSubmit={handleChangesSubmit}
+      />
+
+      <ApproveAttentionDialog
+        open={!!attention}
+        items={attention?.items || []}
+        pending={pendingAction === 'approve-design' ? 'approve' : slideRegenerate.isPending ? 'regenerate' : null}
+        onApproveAnyway={() => approveDesignGuarded(attention.post, true)}
+        onRegenerate={regenerateFlagged}
+        onClose={() => setAttention(null)}
       />
 
       <SocialMediaToastStack toasts={toasts} onDismiss={dismiss} />

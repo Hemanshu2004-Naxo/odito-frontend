@@ -15,6 +15,7 @@ import {
 } from '@/hooks/useSocialMediaAI'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
 import { FORMAT_LABELS, OBJECTIVE_LABELS, KPI_LABELS, ASSET_LABELS, ITEM_STATUS_LABELS, ITEM_STATUS_TONE, formatPlanDate, weekdayName, plannedCopyFor } from '@/lib/socialMedia/contentCalendar'
+import { pluralize } from '@/lib/pluralize'
 import {
   PLATFORM_LABEL, itemToForm, newItemForm, formToPatch, isDirty, validateForm, serverFieldErrors, supportedFormats, textLength, hookIndexOf,
 } from '@/lib/socialMedia/calendarItemForm'
@@ -255,7 +256,7 @@ function ItemEditor({ projectId, item, options, onClose }) {
         // say what happened to the approval - the person approved the OLD words
         const lead = data.unchanged
           ? `The AI wrote the same words as before, so nothing changed.${data.approvalStatus === 'approved' ? ' The plan stays approved.' : ''}`
-          : `Regenerated: ${count} field${count === 1 ? '' : 's'} rewritten.${data.approvalRevoked ? ' The approval was withdrawn: review the new plan and approve it again before creating a post from it.' : ''}`
+          : `Regenerated: ${pluralize(count, 'field')} rewritten.${data.approvalRevoked ? ' The approval was withdrawn: review the new plan and approve it again before creating a post from it.' : ''}`
         setBanner({ kind: 'success', text: `${lead}${warnings.length ? ` ${warnings.join(' ')}` : ''}` })
       },
       onError: (error) => setRegenError(describeApiError(error, 'Could not regenerate the plan.').message),

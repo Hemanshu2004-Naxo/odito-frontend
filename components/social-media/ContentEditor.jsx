@@ -1,4 +1,8 @@
+"use client"
+
+import { useLayoutEffect, useRef } from 'react'
 import { Check, Loader2, MessageSquareWarning } from 'lucide-react'
+import { pluralize } from '@/lib/pluralize'
 import { ContentField, CONTENT_FIELD_CLASS } from './ContentField'
 
 const GREEN = 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -14,6 +18,24 @@ function badgeFor(post) {
   if (a.state === 'design_approved') return { label: post.status === 'scheduled' ? 'Approved · scheduled' : 'Approved · ready to schedule', className: GREEN }
   if (a.state === 'content_review') return { label: a.label, className: SKY }
   return { label: a.label, className: SKY }
+}
+
+/** Facebook shows about this many characters of a caption in the feed before "See more". */
+export const FACEBOOK_FEED_CHARS = 125
+
+/** A textarea that grows with its text up to `share` of the viewport, and opens scrolled to the top when another post is shown. */
+function useAutoGrow(value, resetKey, share = 0.6) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    const max = (typeof window !== 'undefined' ? window.innerHeight : 800) * share
+    el.style.height = `${Math.min(el.scrollHeight + 2, max)}px`
+    el.style.overflowY = el.scrollHeight + 2 > max ? 'auto' : 'hidden'
+  }, [value, share])
+  useLayoutEffect(() => { if (ref.current) ref.current.scrollTop = 0 }, [resetKey])
+  return ref
 }
 
 function formatWhen(iso) {
@@ -47,9 +69,13 @@ function ChangesRequestedNotice({ approval }) {
  * sends the post back to review). Topic / CTA / hashtags / AI regeneration are
  * not part of the post data model, so they are not offered.
  */
-export function ContentEditor({ post, caption, onCaptionChange, dirty, saving, onSave, error }) {
+export function ContentEditor({ post, caption, onCaptionChange, dirty, saving, onSave, error, wide = false }) {
   const badge = badgeFor(post)
   const editable = post.canEdit
+  // as a full-width band the caption box stays short (the feed preview and save sit beside it)
+  const textRef = useAutoGrow(caption, post.id, wide ? 0.42 : 0.6)
+  const length = caption.length
+  const feed = post.platform === 'facebook' && length > FACEBOOK_FEED_CHARS ? caption.slice(0, FACEBOOK_FEED_CHARS) : null
   const approvedWarning = post.approval.managed && (post.approval.state === 'design_approved' || post.approval.state === 'content_approved') && editable
 
   return (
@@ -62,25 +88,49 @@ export function ContentEditor({ post, caption, onCaptionChange, dirty, saving, o
         </span>
       </div>
 
-      <div className="mt-5 flex flex-col gap-4">
-        <ChangesRequestedNotice approval={post.approval} />
+      <div className={wide ? 'mt-5 grid grid-cols-1 items-start gap-5 @min-[900px]/main:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]' : 'mt-5 flex flex-col gap-4'} data-testid="content-editor-body">
+        {!wide && <ChangesRequestedNotice approval={post.approval} />}
 
         <ContentField label="Caption" helper={approvedWarning ? (post.status === 'scheduled' ? 'Editing approved content withdraws its approval and removes its schedule — it goes back to review and must be scheduled again.' : 'Editing approved content withdraws its approval — it goes back to review.') : undefined}>
           <textarea
+            ref={textRef}
             aria-label="Caption"
+            aria-describedby="caption-count"
             value={caption}
             onChange={(e) => onCaptionChange(e.target.value)}
-            rows={6}
+            rows={8}
             disabled={!editable || saving}
-            className={`${CONTENT_FIELD_CLASS} resize-none disabled:cursor-not-allowed disabled:bg-slate-50`}
+            data-testid="caption-input"
+            className={`${CONTENT_FIELD_CLASS} min-h-[12rem] resize-none leading-relaxed disabled:cursor-not-allowed disabled:bg-slate-50`}
           />
+          <div id="caption-count" className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-xs text-slate-600">
+            <span data-testid="caption-count">{pluralize(length, 'character')}</span>
+            {post.platform === 'facebook' && <span>Facebook shows the first {FACEBOOK_FEED_CHARS} characters in the feed</span>}
+          </div>
+          {feed && !wide && (
+            <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700" data-testid="feed-preview">
+              <span className="font-semibold text-slate-900">Shown in feed: </span>
+              <span className="whitespace-pre-wrap">{feed}</span>
+              <span className="font-semibold text-slate-500"> … See more</span>
+            </p>
+          )}
         </ContentField>
+
+        <div className={wide ? 'flex min-w-0 flex-col gap-4' : 'contents'}>
+        {wide && <ChangesRequestedNotice approval={post.approval} />}
+        {feed && wide && (
+          <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700" data-testid="feed-preview">
+            <span className="font-semibold text-slate-900">Shown in feed: </span>
+            <span className="whitespace-pre-wrap">{feed}</span>
+            <span className="font-semibold text-slate-500"> … See more</span>
+          </p>
+        )}
 
         {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
         {editable && (
-          <div className="flex items-center justify-end gap-2">
-            {dirty && <span className="text-xs text-slate-400">Unsaved changes</span>}
+          <div className={`flex items-center gap-2 ${wide ? 'justify-start' : 'justify-end'}`}>
+            {dirty && <span className="text-xs text-slate-600">Unsaved changes</span>}
             <button
               type="button"
               onClick={onSave}
@@ -92,6 +142,7 @@ export function ContentEditor({ post, caption, onCaptionChange, dirty, saving, o
             </button>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

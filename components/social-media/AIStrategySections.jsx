@@ -72,7 +72,7 @@ function Audience({ a }) {
   return (
     <StrategyCard icon={Users} title="Audience" testId="section-audience">
       {none ? (
-        <p className="text-sm text-slate-500" data-testid="audience-missing">No audience has been defined, so none is assumed. Add one in your <Link href="/app/social-media/business-profile#brand-kit" className="font-semibold text-violet-600 hover:text-violet-700">Business profile</Link>.</p>
+        <p className="text-sm text-slate-600" data-testid="audience-missing">No audience has been defined, so none is assumed. Add one in your <Link href="/app/social-media/settings?tab=brand-kit" className="font-semibold text-violet-600 hover:text-violet-700">Brand kit</Link> (Settings).</p>
       ) : (
         <>
           <Labelled label="Primary audience">{a.primaryAudience}</Labelled>
@@ -119,12 +119,12 @@ function Goals({ goals }) {
           {goals.map((g) => (
             <li key={g.goal} className="flex items-start gap-2 py-2 first:pt-0 last:pb-0">
               <Pill className="mt-0.5">{PRIORITY_LABELS[g.priority]}</Pill>
-              <div className="min-w-0"><p className="text-sm font-medium text-slate-800">{g.goal}</p><p className="text-xs text-slate-500">{g.rationale}</p></div>
+              <div className="min-w-0"><p className="text-sm font-medium text-slate-800">{g.goal}</p><p className="text-xs text-slate-600">{g.rationale}</p></div>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-slate-500" data-testid="goals-missing">No goals have been defined, so none are assumed. Add them in your Business profile.</p>
+        <p className="text-sm text-slate-600" data-testid="goals-missing">No goals have been defined, so none are assumed. Add them in your Business profile.</p>
       )}
     </StrategyCard>
   )
@@ -138,7 +138,7 @@ export function Pillars({ pillars }) {
           <li key={p.name} data-testid="pillar-card">
             <div className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-slate-800">{p.name}</span><span className="font-semibold text-violet-600">{p.suggestedPercentage}%</span></div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-violet-500" style={{ width: `${p.suggestedPercentage}%` }} /></div>
-            <p className="mt-1 text-xs text-slate-500">{p.purpose}</p>
+            <p className="mt-1 text-xs text-slate-600">{p.purpose}</p>
             <Expandable label="Topics and formats" openLabel="Hide" testId={`pillar-more-${p.name}`}>
               <Labelled label="Example topics"><Bullets items={p.exampleTopics} /></Labelled>
               <Labelled label="Recommended formats"><Chips items={p.formats} /></Labelled>
@@ -159,7 +159,7 @@ export function Mix({ mix }) {
           <li key={m.type} data-testid={`mix-${m.type}`}>
             <div className="flex items-center justify-between text-sm"><span className="font-medium text-slate-800">{MIX_LABELS[m.type] || m.type}</span><span className="font-semibold text-violet-600">{m.percentage}%</span></div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-violet-500" style={{ width: `${m.percentage}%` }} /></div>
-            <p className="mt-0.5 text-xs text-slate-500">{m.rationale}</p>
+            <p className="mt-0.5 text-xs text-slate-600">{m.rationale}</p>
           </li>
         ))}
       </ul>
@@ -176,7 +176,7 @@ export function TrendingTopics({ topics }) {
       testId="section-trending"
     >
       {topics.length === 0 ? (
-        <p className="text-sm text-slate-500" data-testid="trending-empty">No standout topics were identified for this business.</p>
+        <p className="text-sm text-slate-600" data-testid="trending-empty">No standout topics were identified for this business.</p>
       ) : (
         <ul className="flex flex-col divide-y divide-slate-100">
           {topics.map((t) => (
@@ -186,8 +186,8 @@ export function TrendingTopics({ topics }) {
                 <Pill tone={RELEVANCE_TONE[t.relevance]}>{PRIORITY_LABELS[t.relevance]} relevance</Pill>
                 <Pill>{FRESHNESS[t.freshness] || t.freshness}</Pill>
               </div>
-              <p className="mt-0.5 text-xs text-slate-500">{t.whyItMatters}</p>
-              <p className="mt-0.5 text-sm text-slate-700"><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Angle </span>{t.angle}</p>
+              <p className="mt-0.5 text-xs text-slate-600">{t.whyItMatters}</p>
+              <p className="mt-0.5 text-sm text-slate-700"><span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Angle </span>{t.angle}</p>
             </li>
           ))}
         </ul>
@@ -203,7 +203,7 @@ export function Hooks({ hooks }) {
       <div className="flex flex-col gap-3">
         {categories.map((c) => (
           <div key={c} data-testid={`hooks-${c}`}>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{HOOK_CATEGORY_LABELS[c] || c}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{HOOK_CATEGORY_LABELS[c] || c}</p>
             <ul className="mt-1 flex flex-col gap-1">
               {hooks.filter((h) => h.category === c).map((h) => <li key={h.hook} className="rounded-lg bg-slate-50 px-3 py-1.5 text-sm text-slate-700" data-testid="hook">{h.hook}</li>)}
             </ul>
@@ -225,8 +225,8 @@ export function Competitors({ c }) {
     >
       {!has ? (
         <div data-testid="competitors-none">
-          <p className="text-sm text-slate-500">No competitor data provided.</p>
-          <Link href="/app/social-media/business-profile#brand-kit" className="mt-1 inline-block text-sm font-semibold text-violet-600 hover:text-violet-700">Add competitors in Business Profile</Link>
+          <p className="text-sm text-slate-600">No competitor data provided.</p>
+          <Link href="/app/social-media/settings?tab=brand-kit" className="mt-1 inline-block text-sm font-semibold text-violet-600 hover:text-violet-700">Add competitors in Settings › Brand kit</Link>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -314,7 +314,7 @@ export function Hashtags({ h }) {
           <Labelled label="Per post"><span className="font-semibold">{h.recommendedCount}</span></Labelled>
           <Labelled label="Categories">{h.categories.length ? <Chips items={h.categories} /> : null}</Labelled>
         </div>
-      ) : <p className="text-sm text-slate-500">Hashtags are not recommended for this business.</p>}
+      ) : <p className="text-sm text-slate-600">Hashtags are not recommended for this business.</p>}
     </StrategyCard>
   )
 }
@@ -343,7 +343,7 @@ export function BrandRules({ r }) {
         <Labelled label="Never use these phrases">{r.prohibitedPhrases.length ? <Chips items={r.prohibitedPhrases} /> : null}</Labelled>
         <Labelled label="Messaging rules"><Bullets items={r.messagingRules} /></Labelled>
         <Labelled label="Visual guidelines"><Bullets items={r.visualGuidelines} /></Labelled>
-        {!r.visualGuidelines.length && !r.prohibitedPhrases.length && !r.messagingRules?.length && <p className="text-sm text-slate-500">No brand rules were set.</p>}
+        {!r.visualGuidelines.length && !r.prohibitedPhrases.length && !r.messagingRules?.length && <p className="text-sm text-slate-600">No brand rules were set.</p>}
       </div>
     </StrategyCard>
   )
@@ -365,7 +365,7 @@ export function AIStrategySections({ strategy: s }) {
 
       {!v2 && (
         <p className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600" data-testid="strategy-legacy-note">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
           This strategy was created before brand analysis, recommended topics, working hooks and competitor analysis existed. Regenerate it to include them.
         </p>
       )}

@@ -6,11 +6,20 @@ import { renderWithClient } from '@/test-utils/socialMediaAI'
 import { calendarItem, calendarResponse, calendarOptionsResponse, calendarOptions, itemPublication } from '@/test-utils/socialMediaPlan'
 
 vi.mock('next/link', async () => (await import('@/test-utils/socialMediaAI')).nextLinkMock())
+// Radix's DropdownMenu opens through Pointer Events, which jsdom lacks: the shell is mocked and its items are always rendered (see contentPlan.test.jsx)
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }) => React.createElement(React.Fragment, null, children),
+  DropdownMenuTrigger: ({ children }) => children,
+  DropdownMenuContent: ({ children }) => React.createElement('div', { 'data-testid': 'dropdown-content' }, children),
+  DropdownMenuItem: ({ children, onSelect, disabled, asChild, className, ...props }) => (asChild ? children : React.createElement('button', { type: 'button', onClick: onSelect, disabled, ...props }, children)),
+  DropdownMenuSeparator: () => React.createElement('hr'),
+}))
 
 const api = vi.hoisted(() => ({
   getSocialContentCalendar: vi.fn(), getSocialContentCalendarStatus: vi.fn(), generateSocialContentCalendar: vi.fn(), getSocialAIContentStatus: vi.fn(),
   getSocialCalendarOptions: vi.fn(), updateSocialCalendarItem: vi.fn(), createSocialCalendarItem: vi.fn(), approveSocialCalendarItem: vi.fn(),
   revokeSocialCalendarItemApproval: vi.fn(), regenerateSocialCalendarItem: vi.fn(), generateSocialCalendarItemContent: vi.fn(),
+  getSocialPublications: vi.fn(), getSocialAIStrategy: vi.fn(),
 }))
 vi.mock('@/lib/apiService', () => ({ default: api }))
 
@@ -51,10 +60,11 @@ function load(items = [FB, OTHER], { options = {}, calendar = {} } = {}) {
   api.getSocialCalendarOptions.mockResolvedValue(calendarOptionsResponse(options))
 }
 const mount = () => renderWithClient(<ContentPlanSection projectId="proj-1" />)
+const row = async (id) => { fireEvent.click(await screen.findByTestId('view-list')); return screen.findByTestId(`plan-row-${id}`) }
 const byLabel = (text) => screen.getByLabelText(new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}(\\s*optional)?$`))
 const openItem = async (id = 'i1') => {
   const view = mount()
-  fireEvent.click(await screen.findByTestId(`plan-row-${id}`))
+  fireEvent.click(await row(id))
   await screen.findByLabelText('Topic')
   return view
 }
@@ -65,6 +75,10 @@ const type = (el, value) => fireEvent.change(el, { target: { value } })
 beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset())
   api.getSocialAIContentStatus.mockResolvedValue(emptyContent)
+  api.getSocialPublications.mockResolvedValue({ success: true, data: { publications: [], total: 0 } })
+  api.getSocialAIStrategy.mockResolvedValue({ success: true, data: { status: 'ready', strategy: null } })
+  // "today" inside the fixture calendar (6 Oct - 4 Nov 2026): a new post's default date is not in the past. Only Date is faked.
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-08T12:00:00') })
 })
 afterEach(() => { vi.useRealTimers() })
 
@@ -148,7 +162,7 @@ describe('Calendar item modal — opening and layout', () => {
     let release
     api.getSocialCalendarOptions.mockReturnValueOnce(new Promise((r) => { release = r })).mockResolvedValue(calendarOptionsResponse())
     mount()
-    fireEvent.click(await screen.findByTestId('plan-row-i1'))
+    fireEvent.click(await row('i1'))
     expect(await screen.findByTestId('item-loading')).toHaveAttribute('aria-busy', 'true')
     await act(async () => { release(calendarOptionsResponse()) })
     expect(await screen.findByLabelText('Topic')).toBeInTheDocument()
@@ -159,7 +173,7 @@ describe('Calendar item modal — opening and layout', () => {
     api.getSocialCalendarOptions.mockReset()
     api.getSocialCalendarOptions.mockRejectedValue(new Error('options boom'))
     mount()
-    fireEvent.click(await screen.findByTestId('plan-row-i1'))
+    fireEvent.click(await row('i1'))
     const error = await screen.findByTestId('item-options-error')
     expect(error).toHaveTextContent('options boom')
     api.getSocialCalendarOptions.mockResolvedValue(calendarOptionsResponse())
@@ -194,7 +208,7 @@ describe('Calendar item modal — editing', () => {
     expect(modal()).toBeInTheDocument()
     expect(within(screen.getByTestId('plan-row-i1')).getByTestId('item-topic')).toHaveTextContent('Edited topic')
     expect(screen.getByTestId('item-status')).toHaveTextContent('Edited')
-    expect(within(screen.getByTestId('plan-row-i1')).getByText('Edited')).toBeInTheDocument()
+    expect(within(screen.getByTestId('plan-row-i1')).getByText('Draft')).toBeInTheDocument()
     expect(byLabel('Topic')).toHaveValue('Edited topic')
     expect(screen.getByTestId('item-save')).toBeDisabled()
     expect(api.getSocialContentCalendar).toHaveBeenCalledTimes(1)
@@ -272,7 +286,7 @@ describe('Calendar item modal — editing', () => {
     fireEvent.click(screen.getByTestId('item-cancel'))
     await waitFor(() => expect(screen.queryByTestId('item-modal')).not.toBeInTheDocument())
 
-    fireEvent.click(await screen.findByTestId('plan-row-i1'))
+    fireEvent.click(await row('i1'))
     await screen.findByLabelText('Topic')
     type(byLabel('Topic'), 'Unsaved')
     fireEvent.click(screen.getByTestId('item-cancel'))
@@ -322,7 +336,7 @@ describe('Calendar item modal — platforms (Facebook -> Facebook + Instagram)',
     save()
     await waitFor(() => expect(api.updateSocialCalendarItem).toHaveBeenCalledWith('proj-1', 'i1', { expectedRevision: 0, platforms: ['facebook', 'instagram'] }))
     expect(await screen.findByText('Changes saved.')).toBeInTheDocument()
-    await waitFor(() => expect(within(screen.getByTestId('plan-row-i1')).getByTestId('item-platforms')).toHaveTextContent('FacebookInstagram'))
+    await waitFor(() => expect(within(screen.getByTestId('plan-row-i1')).getByTestId('item-platforms')).toHaveTextContent('Facebook + Instagram'))
   })
 
   it('a platform that is not connected cannot be selected: it is disabled and offers Connect', async () => {

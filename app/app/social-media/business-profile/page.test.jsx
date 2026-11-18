@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { screen, within, waitFor } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { renderWithClient, businessProfileData, fact, productList, productData, apiError } from '@/test-utils/socialMediaAI'
 
 const api = vi.hoisted(() => ({
@@ -33,52 +33,43 @@ const load = (model, extra) => api.getSocialBusinessProfile.mockResolvedValue(wi
 const top = (el) => el.getBoundingClientRect && Array.from(document.body.querySelectorAll('*')).indexOf(el)
 
 describe('Business Profile page — the single place for business and brand information', () => {
-  it('titles the page for what it is and lays out the five sections in order', async () => {
+  it('titles the page for what it is and lays out the four sections in order', async () => {
     load('service')
     renderWithClient(<BusinessProfilePage />)
     expect(screen.getByRole('heading', { level: 1, name: 'Business Profile' })).toBeInTheDocument()
     await screen.findByTestId('business-profile-page')
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Business type', 'Business information', 'Brand Kit', 'Services', 'How Social AI sees your business'])
+    expect(headings).toEqual(['Business type', 'Business information', 'Services', 'How Social AI sees your business'])
     const nav = screen.getByRole('navigation', { name: 'Business Profile sections' })
-    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['#business-type', '#business-information', '#brand-kit', '#offerings', '#social-ai-view'])
+    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['#business-type', '#business-information', '#offerings', '#social-ai-view'])
   })
 
-  it('every management surface exists exactly ONCE on the page — one business type control, one business-information form, one of each Brand Kit form', async () => {
+  it('every management surface exists exactly ONCE on the page — one business type control, one business-information form', async () => {
     load('service')
     renderWithClient(<BusinessProfilePage />)
     await screen.findByTestId('business-profile-page')
-    for (const id of ['business-model', 'editor-overrides', 'editor-identity', 'editor-strategy', 'editor-messaging', 'editor-brand', 'brand-logo', 'brand-preview', 'resolved-facts', 'services']) {
+    for (const id of ['business-model', 'editor-overrides', 'resolved-facts', 'services']) {
       expect(screen.getAllByTestId(id), id).toHaveLength(1)
     }
     expect(screen.getAllByRole('radiogroup', { name: 'Business type' })).toHaveLength(1)
     expect(screen.getAllByLabelText('Business name')).toHaveLength(1)
-    expect(screen.getAllByLabelText('Heading font')).toHaveLength(1)
-    expect(screen.getAllByLabelText('Primary audience')).toHaveLength(1)
   })
 
   it('the sections appear in the documented order on the page', async () => {
     load('product')
     renderWithClient(<BusinessProfilePage />)
     await screen.findByTestId('business-profile-page')
-    const order = ['business-model', 'editor-overrides', 'brand-kit', 'product-catalog', 'resolved-facts'].map((id) => top(screen.getByTestId(id)))
+    const order = ['business-model', 'editor-overrides', 'product-catalog', 'resolved-facts'].map((id) => top(screen.getByTestId(id)))
     expect(order).toEqual([...order].sort((a, b) => a - b))
   })
 
-  it('Brand Kit holds the brand and audience things: logo, identity, audience & strategy, messaging, colours, fonts', async () => {
+  it('the Brand Kit is no longer on the Business Profile page', async () => {
     load('service')
     renderWithClient(<BusinessProfilePage />)
-    const kit = await screen.findByTestId('brand-kit')
-    expect(within(kit).getByTestId('brand-logo')).toBeInTheDocument()
-    for (const label of ['Brand description', 'Brand voice', 'Tone of voice', 'Primary audience', 'Goals', 'Content pillars', 'Unique selling points', 'Phrases to avoid', 'Additional instructions', 'Heading font', 'Body font']) {
-      expect(within(kit).getByLabelText(label), label).toBeInTheDocument()
-    }
-    expect(within(kit).getByRole('button', { name: 'Add an offer' })).toBeInTheDocument()
-    expect(within(kit).getByRole('button', { name: 'Add a competitor' })).toBeInTheDocument()
-    expect(within(kit).getByLabelText('Primary color picker')).toBeInTheDocument()
-    // business information (name, phone, address, ...) is NOT part of the Brand Kit
-    expect(within(kit).queryByLabelText('Business name')).not.toBeInTheDocument()
-    expect(within(kit).queryByLabelText('Phone')).not.toBeInTheDocument()
+    await screen.findByTestId('business-profile-page')
+    expect(screen.queryByTestId('brand-kit')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('brand-logo')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 2, name: 'Brand Kit' })).not.toBeInTheDocument()
   })
 
   it('Business information holds the business facts, each with its source and what an override replaced', async () => {
@@ -114,7 +105,7 @@ describe('Business Profile page — the single place for business and brand info
     expect(api.listSocialProducts).toHaveBeenCalledWith('proj-1')
   })
 
-  it('NO business type yet: section 4 asks for the type and neither catalog is shown', async () => {
+  it('NO business type yet: section 3 asks for the type and neither catalog is shown', async () => {
     load(null)
     renderWithClient(<BusinessProfilePage />)
     expect(await screen.findByTestId('catalog-choose-model')).toBeInTheDocument()
@@ -189,12 +180,10 @@ describe('Business Profile page — the single place for business and brand info
     expect(api.getSocialBusinessProfile).not.toHaveBeenCalled()
   })
 
-  it('layout hooks for small screens: the Brand Kit and page stack to one column below the large breakpoint', async () => {
+  it('layout hooks for small screens: the section nav wraps', async () => {
     load('service')
     renderWithClient(<BusinessProfilePage />)
-    const kit = await screen.findByTestId('brand-kit')
-    expect(kit.className).toMatch(/grid-cols-1\b.*lg:grid-cols-2/)
+    await screen.findByTestId('business-profile-page')
     expect(screen.getByRole('navigation', { name: 'Business Profile sections' }).className).toMatch(/flex-wrap/)
-    await waitFor(() => expect(screen.getByTestId('brand-preview').parentElement.className).toMatch(/lg:sticky/))
   })
 })

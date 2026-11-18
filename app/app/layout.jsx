@@ -5,6 +5,7 @@ import { AuthGuard } from "@/components/guards/AuthGuard"
 import { ProjectAuditGuard } from "@/components/guards/ProjectAuditGuard"
 import SeoScanBar from "@/components/dashboard/seo-scan/SeoScanBar"
 import PageHistory from "@/components/dashboard/history/PageHistory"
+import DesignJobsWatcher from "@/components/social-media/DesignJobsWatcher"
 
 // Every route under /app/* is an authenticated, per-user application screen
 // (dashboard, settings, project data, ...), never public marketing content —
@@ -38,6 +39,8 @@ export default function DashboardGroupLayout({ children }) {
                     <ProjectAuditGuard>
                       <SeoScanBar />
                       <PageHistory />
+                      {/* "your design is done" - a design job keeps running on the server when its page is left */}
+                      <DesignJobsWatcher />
                       {children}
                     </ProjectAuditGuard>
                   </div>

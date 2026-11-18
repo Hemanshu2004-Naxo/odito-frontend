@@ -186,10 +186,12 @@ describe('Design panel - real media only', () => {
     expect(screen.getByTestId('design-status')).toHaveTextContent('Waiting for approval')
   })
 
-  it('with no media there is no placeholder image - just the honest empty state', () => {
+  it('a Facebook text post has no placeholder image and no empty box: one line, "Text post · no design needed", with an optional image', () => {
     renderPanel(post('content_approved'))
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
-    expect(screen.getByTestId('design-panel')).toHaveTextContent('No image or video on this post')
+    expect(screen.getByTestId('design-text-post')).toHaveTextContent('Text post · no design needed')
+    expect(screen.getByTestId('design-panel')).not.toHaveTextContent('No image or video on this post')
+    expect(screen.getByRole('button', { name: /Add image/ })).toBeInTheDocument()
   })
 
   it('there is no approve / schedule / publish control inside the generator', async () => {

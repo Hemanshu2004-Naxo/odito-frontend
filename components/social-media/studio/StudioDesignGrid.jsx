@@ -96,6 +96,7 @@ function DesignCard({ candidate, focused, hasCurrent, canAct, busyId, onFocus, o
             {focused ? ' · chosen for changes' : ''}
           </span>
         </button>
+        {candidate.fallback && <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900" data-testid="design-card-fallback">{candidate.fallback.message}</p>}
         {candidate.instruction && <p className="line-clamp-2 text-xs italic text-slate-500" data-testid="design-card-instruction">Last change asked: {candidate.instruction}</p>}
         {notes.length > 0 && <ul className="space-y-0.5 text-xs text-slate-500">{notes.map((n) => <li key={n}>{NOTE_TEXT[n]}</li>)}</ul>}
         {!candidate.current && (

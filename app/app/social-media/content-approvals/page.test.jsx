@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { screen, waitFor, fireEvent, within } from '@testing-library/react'
+import { screen, waitFor, fireEvent, within, act } from '@testing-library/react'
 import {
   renderWithClient, publication, managedPublication, approvalBlock, installPublicationsApi, statusResponse, ACTIVE_FACEBOOK, ACTIVE_INSTAGRAM, apiError,
 } from '@/test-utils/socialMediaAI'
@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
   uploadSocialMedia: vi.fn(),
   getSocialAIDesignStatus: vi.fn(),
   generateSocialAIDesign: vi.fn(),
+  getSocialContentCalendar: vi.fn(),
 }))
 vi.mock('@/lib/apiService', () => ({ default: api }))
 
@@ -47,6 +48,7 @@ beforeEach(() => {
   project = { _id: 'proj-1', project_name: 'Acme' }
   api.getSocialAccountsStatus.mockResolvedValue(statusResponse({ facebook: ACTIVE_FACEBOOK, instagram: ACTIVE_INSTAGRAM }))
   api.getSocialApprovalSettings.mockResolvedValue({ success: true, data: { settings: { contentApprovalRequired: true, designApprovalRequired: true } } })
+  api.getSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'none', calendar: null, items: [] } })
 })
 
 const seed = (rows) => { store = installPublicationsApi(api, rows); return store }
@@ -157,7 +159,86 @@ describe('Content Approvals — content review', () => {
     await waitFor(() => expect(api.approveSocialContent).toHaveBeenCalledWith('proj-1', 'c1', 3))
     await waitFor(() => expect(tab('Content review')).toHaveTextContent('Content review (0)'))
     expect(tab('Approved')).toHaveTextContent('Approved (1)')
-    expect(await screen.findByText('Content approved.')).toBeInTheDocument()
+    expect(await screen.findByText(/^Content approved — moved to Approved/)).toBeInTheDocument()
+  })
+
+  it('a TEXT post: approving the content makes it approved at once (optimistic), the server confirms, and the next post waiting is selected', async () => {
+    seed([
+      managedPublication('content_review', { id: 't1', content: 'Text only', createdAt: '2026-10-02T10:00:00.000Z' }),
+      managedPublication('content_review', { id: 't2', content: 'Next in line', createdAt: '2026-10-01T10:00:00.000Z' }),
+    ])
+    let finish
+    api.approveSocialContent.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    renderPage()
+    await screen.findByTestId('approval-post-t1')
+    const approve = screen.getByTestId('action-approve-content')
+    fireEvent.click(approve)
+    fireEvent.click(approve) // a double-click sends ONE request
+    // before the server answers, the post has already moved and the counts say so
+    await waitFor(() => expect(tab('Approved')).toHaveTextContent('Approved (1)'))
+    expect(tab('Content review')).toHaveTextContent('Content review (1)')
+    expect(api.approveSocialContent).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Caption')).toHaveValue('Next in line')
+    await act(async () => { finish(setRow('t1', { approval: approvalBlock('design_approved', { contentApprovedAt: '2026-10-02T11:00:00.000Z', contentApprovedBy: 'user-1' }) })) })
+    expect(await screen.findByText('Content approved — moved to Approved.')).toBeInTheDocument()
+    expect(tab('Approved')).toHaveTextContent('Approved (1)')
+  })
+
+  it('a post WITH an image: approving the content moves it to Design review', async () => {
+    seed([managedPublication('content_review', { id: 'm1', content: 'With image', media: [{ url: 'https://cdn.example/a.jpg', type: 'image' }] })])
+    moves(api.approveSocialContent, 'm1', 'design_review')
+    renderPage()
+    await screen.findByTestId('approval-post-m1')
+    fireEvent.click(screen.getByTestId('action-approve-content'))
+    expect(await screen.findByText('Content approved — moved to Design review.')).toBeInTheDocument()
+    await waitFor(() => expect(tab('Design review')).toHaveTextContent('Design review (1)'))
+    expect(tab('Content review')).toHaveTextContent('Content review (0)')
+  })
+
+  it('a FAILED approval rolls the move back, says why in an error toast, and Retry sends it again', async () => {
+    seed([managedPublication('content_review', { id: 'f1', content: 'Will fail' })])
+    api.approveSocialContent.mockRejectedValueOnce(apiError('This content was changed since you reviewed it.', { code: 'VERSION_MISMATCH', status: 409 }))
+    renderPage()
+    await screen.findByTestId('approval-post-f1')
+    fireEvent.click(screen.getByTestId('action-approve-content'))
+    expect(await screen.findByText(/^Not approved: This content was changed since you reviewed it/)).toBeInTheDocument()
+    await waitFor(() => expect(tab('Content review')).toHaveTextContent('Content review (1)'))
+    expect(tab('Approved')).toHaveTextContent('Approved (0)')
+    expect(screen.getByTestId('approval-badge')).toHaveTextContent('Content in review')
+    moves(api.approveSocialContent, 'f1', 'design_approved')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(api.approveSocialContent).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Content approved — moved to Approved.')).toBeInTheDocument()
+  })
+
+  it('"Save changes" stays disabled until the caption really changes (line endings and trailing spaces do not count)', async () => {
+    seed([managedPublication('content_review', { id: 's1', content: 'Line one\r\nLine two' })])
+    renderPage()
+    await screen.findByTestId('approval-post-s1')
+    const save = screen.getByRole('button', { name: 'Save changes' })
+    expect(save).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Caption'), { target: { value: 'Line one\nLine two   ' } })
+    expect(save).toBeDisabled()
+    expect(screen.getByTestId('action-approve-content')).toBeEnabled()
+    fireEvent.change(screen.getByLabelText('Caption'), { target: { value: 'Line one\nLine two, edited' } })
+    expect(save).toBeEnabled()
+    expect(screen.getByTestId('action-approve-content')).toBeDisabled()
+  })
+
+  it('the brief shows the date the content calendar planned (not "Not scheduled"), the caption has a count and the Facebook feed cut', async () => {
+    const long = 'A'.repeat(130)
+    seed([managedPublication('content_review', { id: 'p1', content: long })])
+    api.getSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'ready', calendar: { id: 'cal' }, items: [{ id: 'it1', date: '2026-10-15', publicationIds: ['p1'] }] } })
+    renderPage()
+    await screen.findByTestId('approval-post-p1')
+    await waitFor(() => expect(screen.getByTestId('brief-planned-date')).toHaveTextContent('Thu 15 Oct 2026 · not scheduled yet'))
+    expect(screen.getByTestId('caption-count')).toHaveTextContent('130 characters')
+    expect(screen.getByTestId('feed-preview')).toHaveTextContent(`Shown in feed: ${'A'.repeat(125)} … See more`)
+    // a Facebook text post: one line, no empty design box
+    expect(screen.getByTestId('design-text-post')).toHaveTextContent('Text post · no design needed')
+    // the list row: wrapping title, format icon, status badge
+    expect(within(item('p1')).getByTestId('post-format-icon')).toBeInTheDocument()
+    expect(within(item('p1')).getByTestId('post-status')).toHaveTextContent('Content review')
   })
 
   it('REQUEST CHANGES needs a reason, persists it via the backend, and the post stays in review showing the reason', async () => {
@@ -224,7 +305,8 @@ describe('Content Approvals — content review', () => {
     await waitFor(() => expect(api.updateSocialPublication).toHaveBeenCalledWith('proj-1', 'c1', { content: 'New caption' }))
     await waitFor(() => expect(screen.getByTestId('action-approve-content')).not.toBeDisabled())
     expect(screen.getByLabelText('Caption')).toHaveValue('New caption')
-    expect(screen.getByText('Version 1')).toBeInTheDocument() // design version unchanged
+    fireEvent.click(screen.getByTestId('brief-details-toggle'))
+    expect(within(screen.getByTestId('brief-details')).getByText('Design version').parentElement).toHaveTextContent('Design version1') // unchanged
   })
 
   it('editing APPROVED content tells the user the approval was withdrawn (the backend decided it)', async () => {
@@ -271,9 +353,29 @@ describe('Content Approvals — drafts and design', () => {
     await screen.findByTestId('approval-post-a1')
     moves(api.approveSocialDesign, 'a1', 'design_approved', { designVersion: 2 })
     fireEvent.click(screen.getByTestId('action-approve-design'))
-    await waitFor(() => expect(api.approveSocialDesign).toHaveBeenCalledWith('proj-1', 'a1', 2))
+    await waitFor(() => expect(api.approveSocialDesign).toHaveBeenCalledWith('proj-1', 'a1', 2, false))
     await waitFor(() => expect(tab('Design review')).toHaveTextContent('Design review (0)'))
     expect(tab('Approved')).toHaveTextContent('Approved (1)')
+  })
+
+  it('APPROVE DESIGN with slides that need attention: the server refuses, the reasons are shown; "Approve anyway" approves with the acknowledgement', async () => {
+    searchParams = new URLSearchParams('tab=design-review')
+    seed([managedPublication('design_review', { id: 'c1', media: [{ url: 'https://cdn.example.com/1.jpg', type: 'image' }, { url: 'https://cdn.example.com/2.jpg', type: 'image' }] }, { designVersion: 5 })])
+    const refused = Object.assign(new Error('1 slide needs attention'), { status: 409, details: { code: 'DESIGN_NEEDS_ATTENTION', attention: [{ slide: 2, key: 'p1', score: 6, reasons: ['the QUALITY and PRESSURE chips do not read as one idea'] }] } })
+    api.approveSocialDesign.mockImplementationOnce(async () => { throw refused })
+    renderPage()
+    await screen.findByTestId('approval-post-c1')
+    fireEvent.click(screen.getByTestId('action-approve-design'))
+    const dialog = await screen.findByTestId('approve-attention-dialog')
+    expect(dialog).toHaveTextContent('1 slide needs attention')
+    expect(dialog).toHaveTextContent('Slide 2 · QC 6/10')
+    expect(dialog).toHaveTextContent('the QUALITY and PRESSURE chips do not read as one idea')
+    expect(api.approveSocialDesign).toHaveBeenCalledTimes(1) // refused: nothing approved yet
+    moves(api.approveSocialDesign, 'c1', 'design_approved', { designVersion: 5 })
+    fireEvent.click(screen.getByTestId('approve-anyway'))
+    await waitFor(() => expect(api.approveSocialDesign).toHaveBeenLastCalledWith('proj-1', 'c1', 5, true))
+    await waitFor(() => expect(tab('Approved')).toHaveTextContent('Approved (1)'))
+    expect(screen.queryByTestId('approve-attention-dialog')).toBeNull()
   })
 
   it('design REQUEST CHANGES requires a reason and sends the design version', async () => {

@@ -15,7 +15,7 @@ export function StrategyCard({ icon: Icon, title, subtitle, children, testId, cl
         {Icon && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600"><Icon className="h-4 w-4" /></span>}
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-          {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+          {subtitle && <p className="mt-0.5 text-sm text-slate-700">{subtitle}</p>}
         </div>
         {action}
       </div>
@@ -27,7 +27,7 @@ export function StrategyCard({ icon: Icon, title, subtitle, children, testId, cl
 export const Bullets = ({ items }) => (items?.length ? (
   <ul className="flex flex-col gap-1">
     {items.map((item) => (
-      <li key={item} className="flex items-start gap-2 text-sm text-slate-600"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-slate-400" />{item}</li>
+      <li key={item} className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-slate-500" aria-hidden="true" />{item}</li>
     ))}
   </ul>
 ) : null)
@@ -44,8 +44,8 @@ export function Labelled({ label, children }) {
   if (!children) return null
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <div className="mt-0.5 text-sm text-slate-700">{children}</div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{label}</p>
+      <div className="mt-0.5 text-sm text-slate-800">{children}</div>
     </div>
   )
 }
@@ -81,7 +81,7 @@ export function Group({ title, description, children, testId }) {
     <section className="space-y-3" data-testid={testId} aria-label={title}>
       <div>
         <h2 className="text-base font-bold tracking-tight text-slate-900">{title}</h2>
-        {description && <p className="text-xs text-slate-500">{description}</p>}
+        {description && <p className="text-sm text-slate-700">{description}</p>}
       </div>
       {children}
     </section>

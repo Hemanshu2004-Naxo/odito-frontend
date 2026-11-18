@@ -235,6 +235,17 @@ describe('Creative Studio - three real designs', () => {
     expect(await screen.findAllByTestId('design-skeleton')).toHaveLength(3)
   })
 
+  it('a card drawn without its photograph says why (the server\'s plain reason), and is still a design that can be selected', async () => {
+    const fellBack = studioCandidate(1, { layoutId: 'statement_quote', notes: ['photo_fallback'], fallback: { code: 'DESIGN_IMAGE_MODEL_UNAVAILABLE', message: 'The AI image model Odito is set up to use is not available (it may have been retired), so no photograph could be made. This option uses a layout without a photograph instead.' } })
+    studioReturns(studioState({ generation: studioGeneration({ candidates: [studioCandidate(0), fellBack, studioCandidate(2)] }) }))
+    renderStudio()
+    const notes = await screen.findAllByTestId('design-card-fallback')
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toHaveTextContent('no photograph could be made. This option uses a layout without a photograph instead.')
+    expect(screen.queryByTestId('design-card-failure')).not.toBeInTheDocument()
+    expect(screen.getByTestId('design-card-1')).toHaveAttribute('data-status', 'ready')
+  })
+
   it('a failed card shows the server reason and Try again regenerates just that design', async () => {
     const failed = studioCandidate(2, { status: 'failed', imageUrl: null, failure: { code: 'AI_TIMEOUT', message: 'The design took too long.' } })
     studioReturns(studioState({ generation: studioGeneration({ candidates: [studioCandidate(0), studioCandidate(1), failed] }) }))

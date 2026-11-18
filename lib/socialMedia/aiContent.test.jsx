@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 
 // apiService reads NEXT_PUBLIC_API_URL at import time via apiConfig.
 vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.test.local/api')
@@ -97,9 +97,12 @@ describe('AI provenance in the existing approvals UI', () => {
     expect(screen.queryByTestId('ai-badge')).not.toBeInTheDocument()
   })
 
-  it('the post brief shows source, pillar, objective and strategy version for an AI draft - and nothing extra for others', () => {
+  it('the post brief shows the pillar at once, and source, objective and strategy version under Details for an AI draft - and nothing extra for others', () => {
     const ai = mapPublicationToApprovalPost(managedPublication('content_review', { generation: aiMeta }))
     const { container, unmount } = render(<PostBrief post={ai} />)
+    expect(container.textContent).toContain('Dental tips')
+    expect(container.textContent).not.toContain('AI-generated')
+    fireEvent.click(screen.getByTestId('brief-details-toggle'))
     const text = container.textContent
     expect(text).toContain('AI-generated')
     expect(text).toContain('Dental tips')
@@ -107,6 +110,7 @@ describe('AI provenance in the existing approvals UI', () => {
     expect(within(container).getByText('Strategy version').parentElement).toHaveTextContent('3')
     unmount()
     const plain = render(<PostBrief post={mapPublicationToApprovalPost(managedPublication('content_review'))} />)
+    fireEvent.click(screen.getByTestId('brief-details-toggle'))
     expect(plain.container.textContent).not.toContain('AI-generated')
     expect(plain.container.textContent).not.toContain('Strategy version')
   })

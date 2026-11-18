@@ -34,7 +34,7 @@ export function ApprovalActionBar({ post, pendingAction = null, unsaved = false,
   if (post.canSubmitContent) {
     status = 'This draft has not been submitted for approval.'
     actions = (
-      <Primary testId="action-submit-content" onClick={onSubmitContent} disabled={unsaved} title={unsavedHint} pending={pendingAction === 'submit-content'} pendingLabel="Submitting…">
+      <Primary testId="action-submit-content" onClick={onSubmitContent} disabled={unsaved || busy} title={unsavedHint} pending={pendingAction === 'submit-content'} pendingLabel="Submitting…">
         Submit for review
       </Primary>
     )
@@ -43,15 +43,23 @@ export function ApprovalActionBar({ post, pendingAction = null, unsaved = false,
     actions = (
       <>
         <button type="button" data-testid="action-request-content-changes" onClick={() => onRequestChanges('content')} disabled={busy} className={SECONDARY}>Request changes</button>
-        <Primary testId="action-approve-content" onClick={onApproveContent} disabled={unsaved} title={unsavedHint} pending={pendingAction === 'approve-content'} pendingLabel="Approving…">
+        <Primary testId="action-approve-content" onClick={onApproveContent} disabled={unsaved || busy} title={unsavedHint} pending={pendingAction === 'approve-content'} pendingLabel="Approving…">
           Approve content
         </Primary>
       </>
     )
+  } else if (post.canSubmitDesign && post.media.length === 0 && post.platform !== 'instagram') {
+    // a text post approved before text posts skipped the design step: there is no design, so this completes the approval
+    status = 'Content is approved. This is a text post, so there is no design to review.'
+    actions = (
+      <Primary testId="action-submit-design" onClick={onSubmitDesign} disabled={busy} pending={pendingAction === 'submit-design'} pendingLabel="Finishing…">
+        Finish approval
+      </Primary>
+    )
   } else if (post.canSubmitDesign) {
     status = 'Content is approved. Submit the design for approval next.'
     actions = (
-      <Primary testId="action-submit-design" onClick={onSubmitDesign} pending={pendingAction === 'submit-design'} pendingLabel="Submitting…">
+      <Primary testId="action-submit-design" onClick={onSubmitDesign} disabled={busy} pending={pendingAction === 'submit-design'} pendingLabel="Submitting…">
         Submit design for review
       </Primary>
     )

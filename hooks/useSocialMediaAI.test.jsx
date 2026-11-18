@@ -349,7 +349,7 @@ describe('approval workflow hooks', () => {
     ['approve content', useApproveContent, 'approveSocialContent', { publicationId: 'p1', version: 3 }, [PID, 'p1', 3]],
     ['request content changes', useRequestContentChanges, 'requestSocialContentChanges', { publicationId: 'p1', version: 3, reason: 'Shorter' }, [PID, 'p1', 3, 'Shorter']],
     ['submit design', useSubmitDesignForReview, 'submitSocialDesignForReview', 'p1', [PID, 'p1']],
-    ['approve design', useApproveDesign, 'approveSocialDesign', { publicationId: 'p1', version: 2 }, [PID, 'p1', 2]],
+    ['approve design', useApproveDesign, 'approveSocialDesign', { publicationId: 'p1', version: 2 }, [PID, 'p1', 2, false]],
     ['request design changes', useRequestDesignChanges, 'requestSocialDesignChanges', { publicationId: 'p1', version: 2, reason: 'Crop' }, [PID, 'p1', 2, 'Crop']],
   ])('%s calls its endpoint and refreshes every publishing query (lists, calendar, counts)', async (_label, useHook, method, variables, expectedArgs) => {
     api[method].mockResolvedValue({ success: true, data: { publication: {} } })

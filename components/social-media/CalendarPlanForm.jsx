@@ -11,6 +11,7 @@ import {
 } from '@/lib/socialMedia/contentCalendar'
 import { useSocialContentCalendarPreview, useStartMetaConnection } from '@/hooks/useSocialMediaAI'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
+import { pluralize } from '@/lib/pluralize'
 
 const ORDER = ['facebook', 'instagram']
 const INPUT = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-100 disabled:opacity-60'
@@ -23,7 +24,7 @@ const INPUT = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tex
  * "Posts per week" is the TOTAL number of posts, not a number per platform. The exact number of posts comes from the server's
  * preview (no AI involved) before anything is generated. Only platforms that are connected AND covered by the strategy can be chosen.
  */
-export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, platformStates = null, limits, pending = false, submitLabel = 'Generate calendar', onSubmit, onCancel = null, error = null }) {
+export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, platformStates = null, limits, pending = false, submitLabel = 'Generate calendar', onSubmit, onCancel = null, error = null, initialStartDate, initialMonths, title = 'Plan your content calendar' }) {
   const available = useMemo(() => ORDER.filter((p) => (strategy?.platforms || []).includes(p) && connectedPlatforms?.[p]), [strategy, connectedPlatforms])
   // The choice made when the strategy was created is where the first calendar starts (the person changes it only if they want to). A strategy
   // saved before the wizard has none, and the form falls back to the strategy's recommendation as before.
@@ -31,8 +32,8 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, plat
   const [postsPerWeek, setPostsPerWeek] = useState(() => saved?.postsPerWeek ?? defaultPostsPerWeek(strategy?.recommended))
   const [platforms, setPlatforms] = useState(() => { const wanted = (saved?.platforms || []).filter((p) => available.includes(p)); return new Set(wanted.length ? wanted : available) })
   const reconnect = useStartMetaConnection(projectId)
-  const [startDate, setStartDate] = useState(() => defaultStartDate())
-  const [months, setMonths] = useState(() => (saved && saved.months >= (limits?.minMonths ?? MIN_MONTHS) && saved.months <= (limits?.maxMonths ?? MAX_MONTHS) ? saved.months : MIN_MONTHS))
+  const [startDate, setStartDate] = useState(() => initialStartDate || defaultStartDate())
+  const [months, setMonths] = useState(() => (Number.isInteger(initialMonths) ? initialMonths : saved && saved.months >= (limits?.minMonths ?? MIN_MONTHS) && saved.months <= (limits?.maxMonths ?? MAX_MONTHS) ? saved.months : MIN_MONTHS))
   const [mode, setMode] = useState('ai_optimized')
 
   const minMonths = limits?.minMonths ?? MIN_MONTHS
@@ -63,6 +64,7 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, plat
   const quota = previewData?.quota
   const quotaLine = describeQuota(quota)
 
+  const splitText = (strategy?.platformSplit || []).filter((x) => selected.includes(x.platform) && x.postsPerWeek > 0).map((x) => `${PLATFORM_LABELS[x.platform]} ${x.postsPerWeek}`).join(', ')
   const sameAsStrategy = !!saved && saved.postsPerWeek === postsPerWeek && saved.months === months && [...saved.platforms].sort().join() === selected.join()
 
   function submit(e) {
@@ -73,25 +75,25 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, plat
 
   return (
     <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" data-testid="calendar-plan-form" aria-label="Plan a content calendar">
-      <h2 className="text-base font-bold text-slate-900">Plan your content calendar</h2>
-      <p className="mt-0.5 text-sm text-slate-500">Choose how much to post and where. Odito plans and writes every post from your strategy: topic, hook, caption, hashtags, call to action and creative direction, with a version for each platform. Nothing is published.</p>
+      <h2 className="text-base font-bold text-slate-900">{title}</h2>
+      <p className="mt-0.5 text-sm text-slate-700">Choose how much to post and where. Odito plans and writes every post from your strategy: topic, hook, caption, hashtags, call to action and creative direction, with a version for each platform. Nothing is published.</p>
 
       {saved && (
         <p role="note" data-testid="plan-strategy-note" className={`mt-3 rounded-lg border px-3 py-2 text-sm ${sameAsStrategy ? 'border-violet-200 bg-violet-50 text-violet-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
           {sameAsStrategy
-            ? `Using the settings from your strategy: ${saved.postsPerWeek} post${saved.postsPerWeek === 1 ? '' : 's'} per week for ${saved.months} month${saved.months === 1 ? '' : 's'}. You only need to choose a start date.`
-            : `You changed the settings from your strategy (${saved.postsPerWeek} per week, ${saved.months} month${saved.months === 1 ? '' : 's'}). This calendar will use your new settings. Your strategy is not changed.`}
+            ? `Using the settings from your strategy: ${pluralize(saved.postsPerWeek, 'post')} per week for ${pluralize(saved.months, 'month')}. You only need to choose a start date.`
+            : `You changed the settings from your strategy (${saved.postsPerWeek} per week, ${pluralize(saved.months, 'month')}). This calendar will use your new settings. Your strategy is not changed.`}
         </p>
       )}
 
       <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <fieldset>
           <legend className="text-sm font-semibold text-slate-800">How many posts per week?</legend>
-          <p className="mt-0.5 text-xs text-slate-500">Total posts, not per platform.{rec ? ` Your strategy recommends ${rec}.` : ''}</p>
+          <p className="mt-0.5 text-xs text-slate-600">Total posts, not per platform.{rec ? ` Your strategy recommends ${rec}.` : ''}</p>
           <div role="radiogroup" aria-label="Posts per week" className="mt-2 flex flex-wrap gap-2" data-testid="posts-per-week">
             {POSTS_PER_WEEK_OPTIONS.map((n) => (
               <label key={n} className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border text-sm font-semibold transition-colors focus-within:ring-2 focus-within:ring-violet-200 ${postsPerWeek === n ? 'border-violet-500 bg-violet-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                <input type="radio" name="posts-per-week" value={n} checked={postsPerWeek === n} onChange={() => setPostsPerWeek(n)} className="sr-only" aria-label={`${n} post${n === 1 ? '' : 's'} per week`} />
+                <input type="radio" name="posts-per-week" value={n} checked={postsPerWeek === n} onChange={() => setPostsPerWeek(n)} className="sr-only" aria-label={`${pluralize(n, 'post')} per week`} />
                 {n}
               </label>
             ))}
@@ -100,7 +102,7 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, plat
 
         <fieldset>
           <legend className="text-sm font-semibold text-slate-800">Which platforms?</legend>
-          <p className="mt-0.5 text-xs text-slate-500">Only connected platforms can be planned.</p>
+          <p className="mt-0.5 text-xs text-slate-600">Only connected platforms can be planned.</p>
           <div className="mt-2 flex flex-col gap-2" data-testid="platforms">
             {ORDER.map((p) => {
               const inStrategy = (strategy?.platforms || []).includes(p)
@@ -128,7 +130,7 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, plat
 
         <fieldset className="lg:col-span-2">
           <legend className="text-sm font-semibold text-slate-800">How long should the calendar run?</legend>
-          <p className="mt-0.5 text-xs text-slate-500">Whole calendar months, counted from your start date.</p>
+          <p className="mt-0.5 text-xs text-slate-600">Whole calendar months, counted from your start date.</p>
           <div className="mt-2 flex flex-wrap items-end gap-x-6 gap-y-3">
             <div role="radiogroup" aria-label="Calendar length in months" className="flex flex-wrap gap-2" data-testid="duration-months">
               {DURATION_OPTIONS.filter((o) => o.months >= minMonths && o.months <= maxMonths).map((o) => (
@@ -148,12 +150,12 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, plat
         {selected.length > 1 && (
           <fieldset className="lg:col-span-2">
             <legend className="text-sm font-semibold text-slate-800">How should posts be shared between platforms?</legend>
-            <div role="radiogroup" aria-label="Distribution" className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3" data-testid="distribution">
+            <div role="radiogroup" aria-label="Distribution" className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="distribution">
               {DISTRIBUTION_OPTIONS.map((o) => (
                 <label key={o.value} className={`flex cursor-pointer flex-col gap-0.5 rounded-xl border p-3 transition-colors focus-within:ring-2 focus-within:ring-violet-200 ${mode === o.value ? 'border-violet-400 bg-violet-50/60' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
                   <input type="radio" name="distribution" value={o.value} checked={mode === o.value} onChange={() => setMode(o.value)} className="sr-only" />
                   <span className="text-sm font-semibold text-slate-800">{o.label}</span>
-                  <span className="text-xs text-slate-500">{o.description}</span>
+                  <span className="text-xs text-slate-600">{o.description}</span>
                 </label>
               ))}
             </div>
@@ -165,16 +167,16 @@ export function CalendarPlanForm({ projectId, strategy, connectedPlatforms, plat
         {posts && selected.length ? (
           <>
             <p>
-              <strong>{exact !== null ? `${exact} posts` : `About ${posts} posts`}</strong> over {months} month{months === 1 ? '' : 's'} ({days} days) · {postsPerWeek} per week · {platformsLabel(selected)}
+              <strong>{exact !== null ? pluralize(exact, 'post') : `About ${pluralize(posts, 'post')}`}</strong> over {pluralize(months, 'month')} ({pluralize(days, 'day')}) · {postsPerWeek} per week · {platformsLabel(selected)}
               {calculating && <span className="text-slate-400"> · checking…</span>}
-              {selected.length > 1 && mode === 'ai_optimized' ? '. A post can be planned for both platforms, so it may become more than one publication.' : '.'}
+              {selected.length > 1 && mode === 'ai_optimized' && splitText ? `. Each week: ${splitText}.` : '.'}
             </p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-600">
               {exact !== null ? 'This is the exact number: Odito sets the dates, so every full week gets your chosen number of posts.' : 'The exact number is confirmed once the dates are worked out.'}
-              {partialWeeks.length > 0 && ` The ${partialWeeks.length === 1 ? 'week' : 'weeks'} at the ${partialWeeks.length === 1 ? 'edge' : 'edges'} of the period that only partly fall inside it get a proportional share (${partialWeeks.map((w) => `${w.posts} for ${w.days} day${w.days === 1 ? '' : 's'}`).join(', ')}).`}
+              {partialWeeks.length > 0 && ` The ${partialWeeks.length === 1 ? 'week' : 'weeks'} at the ${partialWeeks.length === 1 ? 'edge' : 'edges'} of the period that only partly fall inside it get a proportional share (${partialWeeks.map((w) => `${w.posts} for ${pluralize(w.days, 'day')}`).join(', ')}).`}
               {previewData?.steps > 1 && ` Long calendars are planned in ${previewData.steps} steps, so they take longer to finish; you can leave the page meanwhile.`}
             </p>
-            {quotaLine && <p className="mt-1 text-xs text-slate-500" data-testid="plan-quota">{quotaLine}</p>}
+            {quotaLine && <p className="mt-1 text-xs text-slate-600" data-testid="plan-quota">{quotaLine}</p>}
           </>
         ) : 'Choose your start date and platforms to see how many posts to expect.'}
       </div>

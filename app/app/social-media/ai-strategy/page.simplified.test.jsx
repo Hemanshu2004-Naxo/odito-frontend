@@ -38,18 +38,25 @@ beforeEach(() => {
   api.previewSocialAIStrategyPlan.mockResolvedValue(planPreviewResponse())
 })
 
+// "Detailed insights" is four tabs; each old detail area lives in one of them (Radix tabs activate on mouse down)
+const DETAIL_TAB = { content: 'content', outlook: 'content', voice: 'voice', rules: 'voice', brand: 'voice', platforms: 'platforms', hashtags: 'platforms', basis: 'sources', more: 'sources', competitors: 'sources' }
+const openTab = (group) => { const tab = screen.getByTestId(`details-tab-${group}`); fireEvent.mouseDown(tab); fireEvent.click(tab) }
+
 describe('Strategy overview', () => {
   it('shows the strategy name, platforms, posts per week, planning period, planned posts and status - and the three actions', async () => {
     load()
     render()
-    expect(await screen.findByTestId('strategy-ready-title')).toHaveTextContent('Your AI strategy is ready.')
-    expect(screen.getByTestId('strategy-name')).toHaveTextContent('Acme Dental social strategy · version 1')
+    expect(await screen.findByTestId('strategy-ready-title')).toHaveTextContent('Your AI strategy is ready')
+    expect(screen.getByTestId('strategy-name')).toHaveTextContent('Acme Dental social strategy · version 1 · generated')
+    // "ready" is said once: no separate status badge, no status tile - four facts only
+    expect(screen.queryByTestId('strategy-status')).not.toBeInTheDocument()
     const stats = screen.getByTestId('strategy-stats')
     expect(within(stats).getByTestId('stat-platforms')).toHaveTextContent('Facebook')
     expect(within(stats).getByTestId('stat-frequency')).toHaveTextContent('3')
     expect(within(stats).getByTestId('stat-duration')).toHaveTextContent('3 months')
-    expect(within(stats).getByTestId('stat-posts')).toHaveTextContent('about 39')
-    expect(within(stats).getByTestId('stat-status')).toHaveTextContent('Ready')
+    expect(within(stats).getByTestId('stat-posts')).toHaveTextContent('About 39')
+    expect(within(stats).queryByTestId('stat-status')).not.toBeInTheDocument()
+    expect(within(stats).getAllByRole('term')).toHaveLength(4)
     expect(screen.getByTestId('edit-strategy')).toHaveTextContent('Edit strategy')
     expect(screen.getByTestId('regenerate-strategy')).toHaveTextContent('Regenerate strategy')
     const cta = screen.getByTestId('create-calendar-cta')
@@ -83,20 +90,43 @@ describe('Strategy overview', () => {
     api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'ready', strategy: strategyDoc() }))
     render()
     expect(await screen.findByTestId('strategy-summary')).toBeInTheDocument()
-    expect(screen.getByTestId('section-pillars')).toBeInTheDocument()
-    expect(screen.queryByTestId('details-outlook')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('details-competitors')).not.toBeInTheDocument()
+    expect(screen.getByTestId('section-pillar-mix')).toBeInTheDocument()
+    expect(screen.queryByTestId('section-outlook')).not.toBeInTheDocument()
+    openTab('sources')
+    expect(screen.queryByTestId('section-competitors')).not.toBeInTheDocument()
   })
 
-  it('when a calendar already exists for THIS strategy the primary action becomes "View content calendar", and says so', async () => {
+  it('when a calendar already exists for THIS strategy the action becomes "View content calendar" and Planned posts shows its real count and dates', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-08T12:00:00') })
     load()
     const mine = calendarState({ status: 'ready', items: [] })
     mine.calendar.strategy = { id: 'strat-1', version: 1 } // the id of the strategy loaded above
+    mine.calendar.plan = { ...mine.calendar.plan, totalItems: 13 }
     api.getSocialContentCalendar.mockResolvedValue({ success: true, data: mine })
     render()
     await screen.findByTestId('strategy-overview')
     await waitFor(() => expect(screen.getByTestId('create-calendar-cta')).toHaveTextContent('View content calendar'))
-    expect(screen.getByTestId('calendar-handoff-note')).toHaveTextContent('A content calendar already exists for this strategy')
+    const posts = screen.getByTestId('stat-posts')
+    expect(posts).toHaveTextContent('13 posts')
+    expect(posts).toHaveTextContent('Tue 6 Oct – Mon 12 Oct 2026')
+    expect(posts).not.toHaveTextContent('About')
+    expect(screen.queryByTestId('calendar-handoff-note')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('plan-ended')).not.toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('a plan made from this strategy that has ended says so on the strategy page too, with "Plan next month"', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-16T12:00:00') })
+    load()
+    const mine = calendarState({ status: 'ready', items: [] })
+    mine.calendar.strategy = { id: 'strat-1', version: 1 }
+    api.getSocialContentCalendar.mockResolvedValue({ success: true, data: mine })
+    render()
+    const ended = await screen.findByTestId('plan-ended')
+    expect(ended).toHaveTextContent('This plan ended on Mon 12 Oct 2026')
+    expect(within(ended).getByRole('link', { name: 'Plan next month' })).toHaveAttribute('href', '/app/social-media/content-calendar?plan=next')
+    expect(screen.getByTestId('stat-posts')).toHaveTextContent('ended')
+    vi.useRealTimers()
   })
 
   it('a calendar made from a DIFFERENT (older) strategy does not claim to be this one\'s', async () => {
@@ -125,45 +155,48 @@ describe('Strategy page — concise by default, complete on demand', () => {
     load()
     render()
     await screen.findByTestId('strategy-highlights')
-    for (const id of ['strategy-summary', 'section-goals', 'section-audience', 'section-pillars', 'section-posting', 'section-metrics']) expect(screen.getByTestId(id)).toBeInTheDocument()
+    for (const id of ['strategy-summary', 'section-goals', 'section-audience', 'section-pillar-mix', 'section-posting', 'section-metrics']) expect(screen.getByTestId(id)).toBeInTheDocument()
     expect(screen.getByTestId('strategy-summary')).toHaveTextContent('Build local trust with practical dental education')
     expect(screen.getByTestId('section-metrics')).toHaveTextContent('Booking enquiries')
     expect(screen.getByTestId('section-posting')).toHaveTextContent('3 posts per week for 3 months')
-    // none of the detail is in the page until asked for
-    for (const id of ['section-hashtags', 'section-cta', 'section-tone', 'section-brand', 'section-hooks', 'section-trending', 'section-competitors', 'section-brand-analysis', 'section-platforms', 'section-mix', 'section-recommendations', 'section-outlook']) {
+    // the detail of the other tabs is not in the page until its tab is chosen (the Content tab is the open one)
+    for (const id of ['section-hashtags', 'section-cta', 'section-tone', 'section-brand', 'section-competitors', 'section-brand-analysis', 'section-platforms', 'section-recommendations']) {
       expect(screen.queryByTestId(id)).not.toBeInTheDocument()
     }
   })
 
-  it('each detail area has a one-line preview and an explicit "View details" button that reports its state', async () => {
+  it('the detail is four groups (tabs), not ten identical rows: choosing one shows its sections and reports its state', async () => {
     load()
     render()
     await screen.findByTestId('strategy-details')
-    const toggle = screen.getByTestId('details-toggle-hashtags')
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(toggle).toHaveTextContent('View details')
-    expect(screen.getByTestId('details-preview-hashtags')).toHaveTextContent('A few local tags.')
-    fireEvent.click(toggle)
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(toggle).toHaveTextContent('Hide')
-    expect(screen.getByTestId('section-hashtags')).toHaveTextContent('A few local tags.')
-    expect(screen.getByRole('region', { name: 'Hashtag guidance' })).toBeInTheDocument()
-    fireEvent.click(toggle)
+    const tabs = within(screen.getByRole('tablist', { name: 'Detailed insights' })).getAllByRole('tab')
+    expect(tabs.map((t) => t.textContent)).toEqual(['Content & campaigns', 'Brand voice & rules', 'Platforms & hashtags', 'Sources & assumptions'])
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByTestId('section-hashtags')).not.toBeInTheDocument()
+    openTab('platforms')
+    expect(screen.getByTestId('details-tab-platforms')).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('section-hashtags')).toHaveTextContent('A few local tags.')
+    expect(screen.queryByTestId('section-hooks')).not.toBeInTheDocument()
   })
 
   it('NOTHING stored is lost: with every detail area open, the extra fields of a full strategy are all reachable', async () => {
     load()
     render()
     await screen.findByTestId('strategy-details')
-    // two passes: the areas first, then the "show details" inside each of them
-    for (let pass = 0; pass < 2; pass += 1) for (const el of within(screen.getByTestId('strategy-details')).queryAllByRole('button', { expanded: false })) fireEvent.click(el)
-    const text = screen.getByTestId('strategy-details').textContent
+    // every tab in turn, and the "show details" inside each of them
+    let text = ''
+    for (const group of ['content', 'voice', 'platforms', 'sources']) {
+      openTab(group)
+      for (const el of within(screen.getByTestId('strategy-details')).queryAllByRole('button', { expanded: false })) fireEvent.click(el)
+      text += screen.getByTestId('strategy-details').textContent
+      if (group === 'content') expect(screen.getByTestId('campaign-ideas')).toHaveTextContent('A week of short tips')
+    }
+    // with no competitors supplied there is no competitor analysis at all: it is listed under "Improve this strategy" instead
+    expect(text).not.toContain('No competitor data provided')
     for (const stored of [
       'Back-to-school check-ups', 'Smile check week', // outlook
       'Brushing basics', 'Carousel', // pillar topics and formats
       'Most people brush too hard. Here is the fix.', 'A calm checklist for a first visit', // hooks, trending
-      'No competitor data provided', // competitor analysis
       'Clear family-dentistry focus', 'More educational authority content', 'Little proof content so far', // brand analysis (the weaknesses are two levels down)
       'Warm and professional', 'Reassuring', 'Plain language', 'Jargon', // tone
       'Community and offers', 'Local families look for trusted practices.', // platforms
@@ -172,15 +205,27 @@ describe('Strategy page — concise by default, complete on demand', () => {
       'Post consistently for 8 weeks', // recommendations
       'Acme Dental', // the stored business snapshot
     ]) expect(text, stored).toContain(stored)
-    expect(screen.getByTestId('campaign-ideas')).toHaveTextContent('A week of short tips')
   })
 
-  it('shows at most three goals and says how many more the strategy holds', async () => {
+  it('shows three goals, then "Show all goals"; a priority badge only when the priorities differ', async () => {
     load({ strategy: v3({ goals: ['a', 'b', 'c', 'd', 'e'].map((g, i) => ({ goal: `Goal ${g}`, priority: i === 0 ? 'high' : 'medium', rationale: `Because ${g}` })) }) })
-    render()
+    const first = render()
     const goals = await screen.findByTestId('section-goals')
     expect(within(goals).getAllByRole('listitem')).toHaveLength(3)
-    expect(goals).toHaveTextContent('2 more goals in the strategy.')
+    expect(within(goals).getByText('High')).toBeInTheDocument()
+    const toggle = screen.getByTestId('goals-toggle')
+    expect(toggle).toHaveTextContent('Show all goals (5)')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(toggle)
+    expect(within(goals).getAllByRole('listitem')).toHaveLength(5)
+    expect(toggle).toHaveTextContent('Show fewer goals')
+    first.unmount()
+
+    load({ strategy: v3({ goals: ['a', 'b'].map((g) => ({ goal: `Goal ${g}`, priority: 'high', rationale: `Because ${g}` })) }) })
+    render()
+    const same = await screen.findByTestId('section-goals')
+    expect(within(same).queryByText('High')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('goals-toggle')).not.toBeInTheDocument()
   })
 })
 
@@ -269,9 +314,9 @@ describe('Strategy page — responsive and accessible structure', () => {
     render()
     await screen.findByTestId('strategy-details')
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
-    expect(screen.getByRole('region', { name: 'Strategy overview' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Your AI strategy is ready' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Detailed insights' })).toBeInTheDocument()
-    for (const toggle of screen.getAllByTestId(/^details-toggle-/)) { expect(toggle.tagName).toBe('BUTTON'); expect(toggle.closest('h3')).not.toBeNull() }
+    for (const tab of screen.getAllByRole('tab')) expect(tab.tagName).toBe('BUTTON')
   })
 
   it('stacks on small screens: grids are single-column by default and the stats wrap (no fixed widths)', async () => {

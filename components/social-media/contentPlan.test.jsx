@@ -6,8 +6,17 @@ import { renderWithClient } from '@/test-utils/socialMediaAI'
 import { calendarItem, calendarState, calendarResponse, calendarGeneration, calendarOptionsResponse, itemPublication } from '@/test-utils/socialMediaPlan'
 
 vi.mock('next/link', async () => (await import('@/test-utils/socialMediaAI')).nextLinkMock())
+// Radix's DropdownMenu opens through Pointer Events, which jsdom does not implement: the shell is mocked so the menu ITEMS (what the page
+// offers, and what each one does) are tested directly. Items are always rendered.
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }) => React.createElement(React.Fragment, null, children),
+  DropdownMenuTrigger: ({ children }) => children,
+  DropdownMenuContent: ({ children }) => React.createElement('div', { 'data-testid': 'dropdown-content' }, children),
+  DropdownMenuItem: ({ children, onSelect, disabled, asChild, className, ...props }) => (asChild ? children : React.createElement('button', { type: 'button', onClick: onSelect, disabled, ...props }, children)),
+  DropdownMenuSeparator: () => React.createElement('hr'),
+}))
 
-const api = vi.hoisted(() => ({ getSocialContentCalendar: vi.fn(), getSocialContentCalendarStatus: vi.fn(), generateSocialContentCalendar: vi.fn(), previewSocialContentCalendar: vi.fn(), resumeSocialContentCalendar: vi.fn(), cancelSocialContentCalendar: vi.fn(), getMetaConnectUrl: vi.fn(), getSocialCalendarHistory: vi.fn(), getSocialCalendarVersion: vi.fn(), restoreSocialCalendarVersion: vi.fn(), getSocialAIContentStatus: vi.fn(), getSocialCalendarOptions: vi.fn() }))
+const api = vi.hoisted(() => ({ getSocialContentCalendar: vi.fn(), getSocialContentCalendarStatus: vi.fn(), generateSocialContentCalendar: vi.fn(), previewSocialContentCalendar: vi.fn(), resumeSocialContentCalendar: vi.fn(), cancelSocialContentCalendar: vi.fn(), getMetaConnectUrl: vi.fn(), getSocialCalendarHistory: vi.fn(), getSocialCalendarVersion: vi.fn(), restoreSocialCalendarVersion: vi.fn(), getSocialAIContentStatus: vi.fn(), getSocialCalendarOptions: vi.fn(), getSocialPublications: vi.fn(), getSocialAIStrategy: vi.fn() }))
 vi.mock('@/lib/apiService', () => ({ default: api }))
 
 import { ContentPlanSection } from './ContentPlanSection'
@@ -24,12 +33,17 @@ const ready = (over = {}) => calendarResponse({ status: 'ready', items: ITEMS, .
 const none = (over = {}) => calendarResponse({ status: 'none', ...over })
 
 const load = (response) => api.getSocialContentCalendar.mockResolvedValue(response)
+const listView = async () => { fireEvent.click(await screen.findByTestId('view-list')); return screen.findByTestId('plan-table') }
 const mount = () => renderWithClient(<ContentPlanSection projectId="proj-1" />)
 
 beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset())
   api.getSocialAIContentStatus.mockResolvedValue({ success: true, data: { status: 'none', generation: null, publication: null } })
   api.getSocialCalendarOptions.mockResolvedValue(calendarOptionsResponse())
+  api.getSocialPublications.mockResolvedValue({ success: true, data: { publications: [], total: 0 } })
+  api.getSocialAIStrategy.mockResolvedValue({ success: true, data: { status: 'ready', strategy: null } })
+  // "today" is inside the fixture calendar (6-12 Oct 2026), so it is a current plan, not an ended one. Only Date is faked.
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-08T12:00:00') })
   // stands in for the server's exact preview (the real rule is tested in the backend); the form only has to show what it is told
   api.previewSocialContentCalendar.mockImplementation(async (pid, c) => {
     const endDate = periodEndDate(c.startDate, c.months)
@@ -134,8 +148,8 @@ describe('Content plan — the planning form', () => {
   it('shows the distribution modes only when two platforms are selected', async () => {
     const f = await form()
     const dist = within(f).getByTestId('distribution')
-    expect(within(dist).getAllByRole('radio').map((r) => r.value)).toEqual(['ai_optimized', 'balanced', 'platform_specific'])
-    expect(within(dist).getByRole('radio', { name: /AI optimized/ })).toBeChecked()
+    expect(within(dist).getAllByRole('radio').map((r) => r.value)).toEqual(['ai_optimized', 'balanced'])
+    expect(within(dist).getByRole('radio', { name: /Follow your strategy/ })).toBeChecked()
     fireEvent.click(within(within(f).getByTestId('platforms')).getAllByRole('checkbox')[1])
     expect(within(f).queryByTestId('distribution')).not.toBeInTheDocument()
   })
@@ -219,7 +233,7 @@ describe('Content plan — the planning form', () => {
     expect(summary).not.toHaveTextContent('About')
     expect(summary).toHaveTextContent('This is the exact number')
     expect(summary).toHaveTextContent('proportional share')
-    expect(summary).toHaveTextContent('may become more than one publication')
+    expect(summary).not.toHaveTextContent('may become more than one publication') // a post is never doubled across platforms
     expect(summary).toHaveTextContent(/planned in \d+ steps/)
   })
 
@@ -298,7 +312,7 @@ describe('Content plan — the planning form', () => {
     const f = await form()
     fireEvent.click(within(f).getByRole('radio', { name: '5 posts per week' }))
     fireEvent.click(within(within(f).getByTestId('duration-months')).getByRole('radio', { name: '3 months' }))
-    fireEvent.click(within(within(f).getByTestId('distribution')).getByRole('radio', { name: /Balanced/ }))
+    fireEvent.click(within(within(f).getByTestId('distribution')).getByRole('radio', { name: /Even split/ }))
     fireEvent.click(within(f).getByTestId('generate-calendar-button'))
     await waitFor(() => expect(api.generateSocialContentCalendar).toHaveBeenCalledTimes(1))
     const [pid, body] = api.generateSocialContentCalendar.mock.calls[0]
@@ -312,7 +326,7 @@ describe('Content plan — the planning form', () => {
   it('a single selected platform is always sent as balanced, whatever mode was picked before', async () => {
     api.generateSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'generating' } })
     const f = await form()
-    fireEvent.click(within(within(f).getByTestId('distribution')).getByRole('radio', { name: /Platform-specific/ }))
+    fireEvent.click(within(within(f).getByTestId('distribution')).getByRole('radio', { name: /Even split/ }))
     fireEvent.click(within(within(f).getByTestId('platforms')).getAllByRole('checkbox')[1])
     fireEvent.click(within(f).getByTestId('generate-calendar-button'))
     await waitFor(() => expect(api.generateSocialContentCalendar).toHaveBeenCalled())
@@ -347,7 +361,7 @@ describe('Content plan — the planning form', () => {
 
 describe('Content plan — asynchronous generation', () => {
   it('while the server is generating: a status banner, no form, no regenerate, and it polls the cheap status endpoint', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.useRealTimers(); vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-10-08T12:00:00') })
     load(none({ status: 'generating', generation: calendarGeneration() }))
     api.getSocialContentCalendarStatus.mockResolvedValue({ success: true, data: { status: 'generating' } })
     mount()
@@ -362,7 +376,7 @@ describe('Content plan — asynchronous generation', () => {
   })
 
   it('when the poll reports it finished, the full plan is fetched and the banner goes', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.useRealTimers(); vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-10-08T12:00:00') })
     api.getSocialContentCalendar
       .mockResolvedValueOnce(none({ status: 'generating', generation: calendarGeneration() }))
       .mockResolvedValue(ready())
@@ -370,7 +384,7 @@ describe('Content plan — asynchronous generation', () => {
     mount()
     await screen.findByTestId('plan-generating')
     await act(async () => { await vi.advanceTimersByTimeAsync(3500) })
-    expect(await screen.findByTestId('plan-table')).toBeInTheDocument()
+    expect(await listView()).toBeInTheDocument()
     expect(screen.queryByTestId('plan-generating')).not.toBeInTheDocument()
     expect(api.getSocialContentCalendar).toHaveBeenCalledTimes(2)
   })
@@ -389,7 +403,7 @@ describe('Content plan — asynchronous generation', () => {
     mount()
     const failed = await screen.findByTestId('plan-failed')
     expect(failed).toHaveTextContent('Your previous calendar (version 1) is shown below and is unchanged.')
-    expect(screen.getByTestId('plan-table')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-grid')).toBeInTheDocument()
   })
 })
 
@@ -491,7 +505,7 @@ describe('Content plan — long generations: progress, waiting to retry, and a c
     load({ success: true, data: { ...ready().data, ...partialState({ calendar: ready().data.calendar, items: ITEMS, strategy: ready().data.strategy, connectedPlatforms: ready().data.connectedPlatforms, limits: ready().data.limits, stale: ready().data.stale }) } })
     mount()
     expect(await screen.findByTestId('plan-partial')).toHaveTextContent('Your previous calendar is unchanged and shown underneath.')
-    expect(screen.getByTestId('plan-table')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-grid')).toBeInTheDocument()
   })
 })
 
@@ -505,7 +519,7 @@ describe('Content plan — version history', () => {
   const openHistory = async () => {
     load(ready())
     mount()
-    await screen.findByTestId('plan-table')
+    await listView()
     fireEvent.click(screen.getByTestId('open-history'))
     return screen.findByTestId('calendar-history')
   }
@@ -519,7 +533,7 @@ describe('Content plan — version history', () => {
     ]
     load(ready({ items }))
     mount()
-    await screen.findByTestId('plan-table')
+    await listView()
     fireEvent.click(screen.getByTestId('regenerate-calendar'))
     fireEvent.click(within(await screen.findByTestId('calendar-plan-form')).getByTestId('generate-calendar-button'))
     const dialog = await screen.findByRole('dialog')
@@ -594,7 +608,7 @@ describe('Content plan — version history', () => {
 })
 
 describe('Content plan — a ready calendar', () => {
-  const open = async (response = ready()) => { load(response); mount(); return screen.findByTestId('plan-table') }
+  const open = async (response = ready()) => { load(response); mount(); return listView() }
 
   it('shows one compact row per post with date, platforms, format, pillar, topic/hook, focus, CTA and status', async () => {
     const table = await open()
@@ -605,23 +619,22 @@ describe('Content plan — a ready calendar', () => {
     expect(within(row).getByTestId('item-pillar')).toHaveTextContent('Meet the team')
     expect(within(row).getByTestId('item-topic')).toHaveTextContent('Meet Dr Lee')
     expect(within(row).getByTestId('item-hook')).toHaveTextContent('The face behind your smile')
-    expect(within(row).getByTestId('item-cta')).toHaveTextContent('Book a check-up')
     expect(within(row).getByTestId('item-focus')).toHaveTextContent('Brand')
-    expect(row).toHaveTextContent('Planned')
+    expect(row).toHaveTextContent('Draft')
   })
 
   it('shows the linked service or product name — and "Brand" when a post is about neither', async () => {
     const table = await open()
     expect(within(within(table).getByTestId('plan-row-i2')).getByTestId('item-focus')).toHaveTextContent('Family check-up')
     expect(within(within(table).getByTestId('plan-row-i3')).getByTestId('item-focus')).toHaveTextContent('Whitening kit')
-    expect(within(within(table).getByTestId('plan-row-i3')).getByTestId('item-platforms')).toHaveTextContent('FacebookInstagram')
+    expect(within(within(table).getByTestId('plan-row-i3')).getByTestId('item-platforms')).toHaveTextContent('Facebook + Instagram')
   })
 
   it('flags posts that need a careful review and shows cancelled ones as such', async () => {
     const table = await open()
-    expect(within(within(table).getByTestId('plan-row-i3')).getByLabelText('Needs review')).toBeInTheDocument()
-    expect(within(within(table).getByTestId('plan-row-i1')).queryByLabelText('Needs review')).not.toBeInTheDocument()
-    expect(within(table).getByTestId('plan-row-i4')).toHaveTextContent('Cancelled')
+    expect(within(within(table).getByTestId('plan-row-i3')).getByLabelText('Needs a careful review')).toBeInTheDocument()
+    expect(within(within(table).getByTestId('plan-row-i1')).queryByLabelText('Needs a careful review')).not.toBeInTheDocument()
+    expect(within(table).getByTestId('plan-row-i4')).toHaveTextContent('Failed')
   })
 
   it('has a responsive layout: the column header only from xl, rows stack on small screens', async () => {
@@ -632,23 +645,53 @@ describe('Content plan — a ready calendar', () => {
 
   it('summary: provenance, size, range, per-platform counts, planned-vs-target pillar mix', async () => {
     await open()
-    expect(screen.getByTestId('plan-provenance')).toHaveTextContent('Generated from Strategy v3 · Calendar v1')
+    expect(screen.getByTestId('plan-provenance')).toHaveTextContent('From Strategy v3 · Calendar v1')
     const facts = screen.getByTestId('plan-facts')
-    expect(facts).toHaveTextContent('4 posts')
+    // 4 posts: i1 Facebook, i2 + i4 Instagram, i3 both - a cross-post is counted once, never 1 + 2 + 1 = 5
+    expect(facts).toHaveTextContent('4 posts · 1 Facebook only · 2 Instagram only · 1 on both')
     expect(facts).toHaveTextContent('3 per week')
-    expect(facts).toHaveTextContent('Facebook 1, Instagram 2')
     const dist = screen.getByTestId('pillar-distribution')
-    expect(within(dist).getByTestId('distribution-Dental tips')).toHaveTextContent('2 posts · 66.7% (target 60%)')
-    expect(within(dist).getByTestId('distribution-Meet the team')).toHaveTextContent('(target 40%)')
+    expect(within(dist).getByTestId('distribution-Dental tips')).toHaveTextContent('66.7% of 60% target · 2 posts')
+    expect(within(dist).getByTestId('distribution-Dental tips')).toHaveAttribute('data-off-target', 'true')
+    expect(within(dist).getByTestId('distribution-Dental tips')).toHaveTextContent('More than 5 points above target')
+    expect(within(dist).getByTestId('distribution-Meet the team')).toHaveTextContent('of 40% target')
   })
 
-  it('warnings are collapsed until asked for', async () => {
-    await open(ready({ calendar: { ...calendarState({ status: 'ready', items: ITEMS }).calendar, plan: { ...calendarState({ status: 'ready', items: ITEMS }).calendar.plan, warnings: ['Two hooks were reused to keep the topics distinct.'] } } }))
-    const toggle = screen.getByRole('button', { name: 'Odito adjusted 1 thing' })
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Two hooks were reused to keep the topics distinct.')).not.toBeInTheDocument()
-    fireEvent.click(toggle)
-    expect(within(screen.getByTestId('plan-warnings')).getByText('Two hooks were reused to keep the topics distinct.')).toBeInTheDocument()
+  it('every adjustment Odito made is a visible line with its reason (and its date when it has one)', async () => {
+    const warnings = ['Two hooks were reused to keep the topics distinct.', '2026-10-07: the same format (carousel) is used three posts in a row.']
+    await open(ready({ calendar: { ...calendarState({ status: 'ready', items: ITEMS }).calendar, plan: { ...calendarState({ status: 'ready', items: ITEMS }).calendar.plan, warnings } } }))
+    const box = screen.getByTestId('plan-warnings')
+    expect(box).toHaveTextContent('Odito adjusted 2 things in this plan')
+    expect(within(box).getByText('Two hooks were reused to keep the topics distinct.')).toBeInTheDocument()
+    expect(box).toHaveTextContent('Wed 7 Oct: The same format (carousel) is used three posts in a row.')
+    expect(within(box).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('says when the calendar does not follow its strategy, with each reason, and offers to regenerate', async () => {
+    await open(ready({ conformance: { follows: false, issues: [{ code: 'OFF_DAYS', message: '3 posts are on days outside your strategy\'s posting days (Tuesday, Thursday, Saturday).' }, { code: 'PLATFORM_SPLIT', message: 'The platform split does not match your strategy (Facebook 2, Instagram 1 per week): 4 posts go to both platforms.' }] } }))
+    const banner = screen.getByTestId('calendar-conformance')
+    expect(banner).toHaveTextContent('This calendar does not follow your strategy')
+    expect(banner).toHaveTextContent('3 posts are on days outside')
+    expect(banner).toHaveTextContent('4 posts go to both platforms')
+    fireEvent.click(within(banner).getByRole('button', { name: 'Regenerate calendar' }))
+    expect(await screen.findByTestId('calendar-plan-form')).toBeInTheDocument()
+  })
+
+  it('a plan that has ended says so, mutes its posts, and offers to plan the next month (starting the day after, for one month)', async () => {
+    vi.setSystemTime(new Date('2026-11-16T12:00:00'))
+    load(ready())
+    mount()
+    const ended = await screen.findByTestId('plan-ended')
+    expect(ended).toHaveTextContent('This plan ended on Mon 12 Oct 2026')
+    expect(screen.queryByTestId('calendar-stale')).not.toBeInTheDocument()
+    const table = await listView()
+    expect(within(table).getByTestId('plan-row-i1')).toHaveAttribute('data-past', 'true')
+    expect(table).toHaveTextContent('Past · 4')
+    fireEvent.click(within(ended).getByRole('button', { name: 'Plan next month' }))
+    const f = await screen.findByTestId('calendar-plan-form')
+    expect(f).toHaveTextContent('Plan your next month')
+    expect(within(f).getByLabelText('Start date')).toHaveValue('2026-11-17')
+    expect(within(within(f).getByTestId('duration-months')).getByRole('radio', { name: '1 month' })).toBeChecked()
   })
 
   it('an empty calendar says so', async () => {
@@ -657,18 +700,53 @@ describe('Content plan — a ready calendar', () => {
     expect(await screen.findByTestId('plan-empty')).toBeInTheDocument()
   })
 
-  it('switches between the table and the weekly calendar grid', async () => {
+  it('switches between the list and the month calendar: every day numbered, today marked, days outside the plan greyed, month navigation', async () => {
     await open()
     fireEvent.click(screen.getByRole('button', { name: 'Calendar' }))
     const grid = await screen.findByTestId('plan-grid')
     expect(screen.queryByTestId('plan-table')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Calendar' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('calendar-month')).toHaveTextContent('October 2026')
+    // October 2026 starts on a Thursday: the grid runs Mon 28 Sep - Sun 1 Nov, five weeks, every cell numbered
+    expect(within(grid).getAllByTestId(/^plan-week-/)).toHaveLength(5)
+    expect(within(grid).getByTestId('plan-day-2026-10-02')).toHaveAttribute('data-in-range', 'false')
+    expect(within(grid).getByTestId('plan-day-2026-10-06')).toHaveAttribute('data-in-range', 'true')
+    expect(within(grid).getByTestId('plan-day-2026-10-08')).toHaveAttribute('aria-label', expect.stringContaining('today'))
+    expect(within(grid).getByTestId('plan-day-2026-10-20')).toHaveTextContent('20')
+    const chip = within(grid).getByTestId('plan-chip-i1')
+    expect(chip).toHaveTextContent('Meet Dr Lee')
+    expect(chip).toHaveTextContent('Draft')
+    expect(chip).toHaveAttribute('title', 'Meet Dr Lee')
+    expect(chip.className).toMatch(/border-l-4/)
     expect(within(grid).getAllByTestId(/^plan-chip-/)).toHaveLength(4)
-    // 2026-10-06 and 2026-10-14 are Tuesdays of different weeks
-    expect(within(grid).getAllByTestId(/^plan-week-/)).toHaveLength(2)
-    expect(within(grid).getByTestId('plan-chip-i1')).toHaveTextContent('Meet Dr Lee')
-    fireEvent.click(screen.getByRole('button', { name: 'Table' }))
-    expect(await screen.findByTestId('plan-table')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next month' }))
+    expect(screen.getByTestId('calendar-month')).toHaveTextContent('November 2026')
+    expect(within(screen.getByTestId('plan-grid')).queryAllByTestId(/^plan-chip-/)).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+    expect(screen.getByTestId('calendar-month')).toHaveTextContent('October 2026')
+    fireEvent.click(screen.getByRole('button', { name: 'List' }))
+    expect(await listView()).toBeInTheDocument()
+  })
+
+  it('filters every post by status', async () => {
+    await open()
+    fireEvent.change(screen.getByTestId('status-filter'), { target: { value: 'failed' } })
+    const table = screen.getByTestId('plan-table')
+    expect(within(table).getAllByTestId(/^plan-row-/)).toHaveLength(1)
+    expect(within(table).getByTestId('plan-row-i4')).toBeInTheDocument()
+    fireEvent.change(screen.getByTestId('status-filter'), { target: { value: 'all' } })
+    expect(within(screen.getByTestId('plan-table')).getAllByTestId(/^plan-row-/)).toHaveLength(4)
+  })
+
+  it('one primary "Add post" menu (plan a post, generate one with AI, Creative Studio); history and regenerate live in the "More" menu', async () => {
+    await open()
+    expect(screen.getByTestId('add-post')).toHaveTextContent('Add post')
+    expect(screen.getByTestId('add-plan-item')).toHaveTextContent('Plan a post')
+    expect(screen.getByTestId('add-ai-post')).toHaveTextContent('Generate a post with AI')
+    expect(screen.getByRole('link', { name: 'Open Creative Studio' })).toHaveAttribute('href', '/app/social-media/creative-studio')
+    expect(screen.getByRole('button', { name: 'More calendar actions' })).toBeInTheDocument()
+    expect(screen.getByTestId('open-history')).toHaveTextContent('Version history')
+    expect(screen.getByTestId('regenerate-calendar')).toHaveTextContent('Regenerate calendar')
   })
 
   it('opens a centered MODAL (not a drawer) with the post\'s planning fields, its status and its plan provenance', async () => {
@@ -691,6 +769,7 @@ describe('Content plan — a ready calendar', () => {
   it('a grid chip opens the same modal', async () => {
     await open()
     fireEvent.click(screen.getByRole('button', { name: 'Calendar' }))
+    await screen.findByTestId('plan-grid')
     fireEvent.click(await screen.findByTestId('plan-chip-i2'))
     expect(await screen.findByLabelText('Topic')).toHaveValue('5 brushing mistakes')
     expect(screen.getByTestId('item-modal')).toHaveTextContent('5 brushing mistakes')
@@ -710,7 +789,7 @@ describe('Content plan — staleness and regeneration', () => {
   it('no stale notice when nothing changed', async () => {
     load(ready())
     mount()
-    await screen.findByTestId('plan-table')
+    await listView()
     expect(screen.queryByTestId('calendar-stale')).not.toBeInTheDocument()
   })
 
@@ -721,7 +800,7 @@ describe('Content plan — staleness and regeneration', () => {
     expect(banner).toHaveTextContent('Your strategy has changed since this calendar was generated.')
     expect(banner).toHaveTextContent('Strategy v3; the current strategy is v4')
     expect(banner).toHaveTextContent('Nothing was regenerated automatically.')
-    expect(screen.getByTestId('plan-table')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-grid')).toBeInTheDocument()
     expect(api.generateSocialContentCalendar).not.toHaveBeenCalled()
   })
 
@@ -735,11 +814,11 @@ describe('Content plan — staleness and regeneration', () => {
   it('Regenerate opens the form (with the old calendar still showing) and Cancel closes it', async () => {
     load(ready())
     mount()
-    await screen.findByTestId('plan-table')
+    await listView()
     expect(screen.queryByTestId('calendar-plan-form')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('regenerate-calendar'))
     const form = await screen.findByTestId('calendar-plan-form')
-    expect(screen.getByTestId('plan-table')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-table')).toBeInTheDocument() // the old calendar is still showing
     expect(within(form).getByTestId('generate-calendar-button')).toHaveTextContent('Regenerate calendar')
     fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByTestId('calendar-plan-form')).not.toBeInTheDocument()
@@ -748,7 +827,7 @@ describe('Content plan — staleness and regeneration', () => {
   it('regeneration is CONFIRMED first: nothing is sent until the user agrees; keeping the calendar sends nothing', async () => {
     load(ready())
     mount()
-    await screen.findByTestId('plan-table')
+    await listView()
     fireEvent.click(screen.getByTestId('regenerate-calendar'))
     fireEvent.click(within(await screen.findByTestId('calendar-plan-form')).getByTestId('generate-calendar-button'))
     const dialog = await screen.findByRole('dialog')
@@ -767,7 +846,7 @@ describe('Content plan — staleness and regeneration', () => {
     api.getSocialContentCalendarStatus.mockResolvedValue({ success: true, data: { status: 'generating' } })
     api.generateSocialContentCalendar.mockResolvedValue({ success: true, data: { status: 'generating' } })
     const { queryClient } = mount()
-    await screen.findByTestId('plan-table')
+    await listView()
     fireEvent.click(screen.getByTestId('regenerate-calendar'))
     fireEvent.click(within(await screen.findByTestId('calendar-plan-form')).getByTestId('generate-calendar-button'))
     const dialog = await screen.findByRole('dialog')
@@ -792,7 +871,7 @@ describe('Content plan — staleness and regeneration', () => {
   it('is planning only: no caption, design, schedule or publish control anywhere on the plan', async () => {
     load(ready())
     mount()
-    await screen.findByTestId('plan-table')
+    await listView()
     expect(screen.queryByRole('button', { name: /generate (caption|content|design)|create design|schedule|publish|post now/i })).not.toBeInTheDocument()
   })
 })

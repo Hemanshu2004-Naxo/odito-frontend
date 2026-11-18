@@ -16,6 +16,7 @@ import { StudioRefinePanel } from './StudioRefinePanel'
 import { StudioBrandPanel } from './StudioBrandPanel'
 import { StudioProgress } from './StudioProgress'
 import { StudioGateNotice, StudioLoading, StudioError, StudioNoContent } from './StudioNotices'
+import { ConceptStudio } from './ConceptStudio'
 
 /**
  * The real Creative Studio for ONE publication. Every fact on screen is the server's (GET /social/ai-design/studio): the post's approved
@@ -117,6 +118,8 @@ export function StudioWorkspace({ projectId, publicationId }) {
       : <StudioError title="Couldn't load Creative Studio" message={message} onRetry={() => query.refetch()} retrying={query.isFetching} testId="studio-load-error" />
   }
   if (!studio) return null
+  // Concept Studio: compare concepts -> pick -> single image or carousel (posts with real product photos keep the original studio)
+  if (studio.pipeline === 'concept') return <ConceptStudio projectId={projectId} publicationId={publicationId} studio={studio} />
 
   const failedGeneration = state !== STUDIO_STATES.GENERATING && generation?.status === 'failed' && generation.failure && dismissedFailure !== `${generation.id}:${generation.finishedAt}` ? generation : null
   const showOpenApproval = state === STUDIO_STATES.DESIGN_REVIEW || state === STUDIO_STATES.DESIGN_APPROVED || state === STUDIO_STATES.DESIGN_SELECTED

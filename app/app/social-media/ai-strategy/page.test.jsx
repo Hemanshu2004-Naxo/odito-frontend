@@ -42,7 +42,10 @@ async function runWizard({ frequency, months, confirm = true } = {}) {
   }
   return wizard
 }
-const openDetails = (id) => { fireEvent.click(screen.getByTestId(`details-toggle-${id}`)) }
+// "Detailed insights" is four tabs; each old detail area lives in one of them (Radix tabs activate on mouse down)
+const DETAIL_TAB = { content: 'content', outlook: 'content', voice: 'voice', rules: 'voice', brand: 'voice', platforms: 'platforms', hashtags: 'platforms', basis: 'sources', more: 'sources', competitors: 'sources' }
+const openTab = (group) => { const tab = screen.getByTestId(`details-tab-${group}`); fireEvent.mouseDown(tab); fireEvent.click(tab) }
+const openDetails = (id) => openTab(DETAIL_TAB[id])
 
 describe('AI Strategy — loading real strategy state', () => {
   it('LOADING: skeletons, then content', async () => {
@@ -83,6 +86,33 @@ describe('AI Strategy — loading real strategy state', () => {
     expect(screen.queryByTestId('strategy-summary')).not.toBeInTheDocument()
   })
 
+  it('the gaps card links to where each gap is filled: Settings › Brand kit first, then Business profile / Connect Accounts only when needed', async () => {
+    const gap = (field) => ({ field, importance: 'high', reason: 'x', source: 'profile' })
+    api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'none', profile: { gaps: [gap('businessModel'), gap('audience'), gap('connectedPlatforms'), gap('brand')] } }))
+    const view = renderPage()
+    const card = await screen.findByTestId('strategy-gaps')
+    expect(within(card).getByTestId('strategy-gaps-count')).toHaveTextContent('4 gaps')
+    // every gap has its own button straight to the field that fills it
+    const action = (field) => within(card).getByTestId(`gap-action-${field}`)
+    expect([action('businessModel'), action('audience'), action('connectedPlatforms'), action('brand')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Choose business type', '/app/social-media/business-profile#business-type'],
+      ['Add your audience', '/app/social-media/settings?tab=brand-kit'],
+      ['Connect accounts', '/app/social-media/connect-accounts'],
+      ['Set brand colours', '/app/social-media/settings?tab=brand-kit'],
+    ])
+    // collapsible
+    const toggle = within(card).getByTestId('strategy-gaps-toggle')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(toggle)
+    expect(within(card).queryByTestId('gap-audience')).not.toBeInTheDocument()
+    view.unmount()
+
+    // duplicates the server already merged are never listed twice, even from an older response
+    api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'none', profile: { gaps: [gap('audience'), gap('goals'), gap('audience')] } }))
+    renderPage()
+    expect(within(await screen.findByTestId('strategy-gaps')).getAllByTestId(/^gap-action-/)).toHaveLength(2)
+  })
+
   it('a profile too thin to generate from: the button is disabled and the server\'s reason is shown', async () => {
     api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'none', profile: { canGenerate: false, blockers: [{ field: 'description', reason: 'Add a business description or category in the Business profile.' }] } }))
     renderPage()
@@ -97,8 +127,9 @@ describe('AI Strategy — a ready strategy', () => {
     api.getSocialAIStrategy.mockResolvedValue(ready())
     renderPage()
     expect(await screen.findByTestId('strategy-summary')).toHaveTextContent('Build local trust with practical dental education')
-    expect(screen.getByTestId('strategy-status-title')).toHaveTextContent('Strategy v1 ready')
-    expect(screen.getByTestId('strategy-ready-title')).toHaveTextContent('Your AI strategy is ready.')
+    // "ready" is said once, by the overview
+    expect(screen.queryByTestId('strategy-status')).not.toBeInTheDocument()
+    expect(screen.getByTestId('strategy-ready-title')).toHaveTextContent('Your AI strategy is ready')
     openDetails('voice')
     expect(screen.getByTestId('section-positioning')).toHaveTextContent('A friendly neighbourhood dental practice.')
     expect(screen.getByTestId('section-audience')).toHaveTextContent('Young families nearby')
@@ -111,6 +142,7 @@ describe('AI Strategy — a ready strategy', () => {
     expect(within(screen.getByTestId('platform-facebook')).getByText('Connected')).toBeInTheDocument()
     expect(within(screen.getByTestId('platform-instagram')).getByText('Not connected')).toBeInTheDocument()
     expect(screen.getByTestId('section-posting')).toHaveTextContent('4 posts per week')
+    openDetails('voice')
     expect(screen.getByTestId('section-tone')).toHaveTextContent('Warm and professional')
     openDetails('hashtags')
     expect(screen.getByTestId('section-hashtags')).toHaveTextContent('A few local tags.')
@@ -167,25 +199,24 @@ describe('AI Strategy — a ready strategy', () => {
     }
   })
 
-  it('the strategy text is read-only: no inputs, sliders or edit fields on the page itself (the wizard is a separate dialog that is closed; the only controls are the post generator\'s three selects)', async () => {
+  it('the strategy text is read-only: no inputs, sliders or edit fields on the page itself (the wizard is a separate dialog that is closed)', async () => {
     api.getSocialAIStrategy.mockResolvedValue(ready())
     renderPage()
     await screen.findByTestId('strategy-summary')
-    const controls = Array.from(document.querySelectorAll('input, textarea, select, [role="slider"]'))
-    expect(controls.filter((el) => !el.closest('[data-testid="single-post-generator"]'))).toHaveLength(0)
-    expect(controls.every((el) => el.tagName === 'SELECT')).toBe(true)
-    expect(controls).toHaveLength(3)
+    expect(Array.from(document.querySelectorAll('input, textarea, select, [role="slider"]'))).toHaveLength(0)
   })
 
-  it('the post generator appears only for a READY strategy - not while generating, not with no strategy', async () => {
+  it('generating a single post lives in the Content Calendar: a READY strategy only links to it', async () => {
     api.getSocialAIStrategy.mockResolvedValue(strategyResponse({ status: 'none' }))
     const first = renderPage()
     await screen.findByTestId('strategy-empty')
-    expect(screen.queryByTestId('single-post-generator')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('generate-post-link')).not.toBeInTheDocument()
     first.unmount()
     api.getSocialAIStrategy.mockResolvedValue(ready())
     renderPage()
-    expect(await screen.findByTestId('single-post-generator')).toBeInTheDocument()
+    const link = await screen.findByTestId('generate-post-link')
+    expect(within(link).getByRole('link', { name: 'Generate one from the Content Calendar' })).toHaveAttribute('href', '/app/social-media/content-calendar')
+    expect(screen.queryByTestId('single-post-generator')).not.toBeInTheDocument()
   })
 })
 
@@ -338,7 +369,7 @@ describe('AI Strategy — Business Profile changed', () => {
     expect(screen.getByTestId('profile-changes')).toHaveTextContent('Goals, Business name')
     expect(within(banner).getByRole('link', { name: 'Review changes' })).toHaveAttribute('href', '/app/social-media/business-profile')
     expect(screen.getByTestId('strategy-summary')).toBeInTheDocument()
-    expect(screen.getByTestId('strategy-status-title')).toHaveTextContent('may be out of date')
+    expect(screen.queryByTestId('strategy-status')).not.toBeInTheDocument() // the banner above says it; no second badge
     expect(api.generateSocialAIStrategy).not.toHaveBeenCalled()
   })
 

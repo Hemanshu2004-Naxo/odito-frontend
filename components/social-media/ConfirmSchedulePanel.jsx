@@ -29,7 +29,7 @@ function buildTimezoneOptions(postTimezone) {
  * longer editable, ...) is shown verbatim in `error`. Keyed by post.id from the
  * parent, so every field resets to the newly selected post's own values.
  */
-export function ConfirmSchedulePanel({ post, accountName, pendingAction = null, error = null, onConfirm, onSaveForLater, onClose = null }) {
+export function ConfirmSchedulePanel({ post, accountName, pendingAction = null, error = null, onConfirm, onSaveForLater, onClose = null, wide = false }) {
   const initial = useMemo(() => toScheduleFormValues(post), [post.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [date, setDate] = useState(initial.date)
   const [time, setTime] = useState(initial.time)
@@ -57,11 +57,12 @@ export function ConfirmSchedulePanel({ post, accountName, pendingAction = null, 
       <h2 className="text-base font-bold text-slate-900">Confirm schedule</h2>
       <p className="mt-1 text-sm text-slate-500">Review your post details and confirm the schedule.</p>
 
-      <div className="mt-4">
+      <div className={wide ? 'mt-4 grid grid-cols-1 items-start gap-5 @min-[900px]/main:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_200px]' : ''} data-testid="confirm-schedule-body">
+      <div className={wide ? '' : 'mt-4'}>
         <SchedulePreview post={post} accountName={accountName} />
       </div>
 
-      <div className="mt-5 flex flex-col gap-4">
+      <div className={wide ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : 'mt-5 flex flex-col gap-4'}>
         <div>
           <p className="mb-2 text-sm font-medium text-slate-700">Post to</p>
           {platform && (
@@ -83,7 +84,7 @@ export function ConfirmSchedulePanel({ post, accountName, pendingAction = null, 
         <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{shownError}</p>
       )}
 
-      <div className="mt-5 flex flex-col gap-2.5">
+      <div className={wide ? 'flex flex-col gap-2.5' : 'mt-5 flex flex-col gap-2.5'}>
         <button
           type="button"
           onClick={handleConfirm}
@@ -115,6 +116,7 @@ export function ConfirmSchedulePanel({ post, accountName, pendingAction = null, 
           {pendingAction === 'save' && <Loader2 className="h-4 w-4 animate-spin" />}
           {pendingAction === 'save' ? 'Saving…' : 'Save for later'}
         </button>}
+      </div>
       </div>
     </div>
   )

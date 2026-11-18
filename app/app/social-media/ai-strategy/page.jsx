@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, Sparkles, XCircle, RefreshCw } from 'lucide-react'
+import { Loader2, Sparkles, XCircle, RefreshCw, Wand2 } from 'lucide-react'
 import { StrategyStatusCard } from '@/components/social-media/StrategyStatusCard'
 import { StrategyProfileChangedBanner } from '@/components/social-media/StrategyProfileChangedBanner'
 import { StrategyBusinessContext } from '@/components/social-media/StrategyBusinessContext'
@@ -11,12 +11,14 @@ import { StrategyOverview } from '@/components/social-media/StrategyOverview'
 import { StrategyHighlights } from '@/components/social-media/StrategyHighlights'
 import { StrategyDetails } from '@/components/social-media/StrategyDetails'
 import { StrategyWizard } from '@/components/social-media/StrategyWizard'
-import { SingleAIPostGenerator } from '@/components/social-media/SingleAIPostGenerator'
+import { PlanEndedBanner } from '@/components/social-media/CalendarPlanSummary'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useProject } from '@/contexts/ProjectContext'
 import { useSocialAIStrategy, useGenerateSocialAIStrategy, useSocialContentCalendar } from '@/hooks/useSocialMediaAI'
 import { describeApiError } from '@/lib/socialMedia/failureMessages'
 import { statusView, formatDateTime } from '@/lib/socialMedia/aiStrategy'
+import { planHasEnded } from '@/lib/socialMedia/contentCalendar'
+import { pluralize } from '@/lib/pluralize'
 
 /**
  * Social Media AI — AI Strategy, driven entirely by the backend.
@@ -44,7 +46,7 @@ export default function AIStrategyPage() {
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">AI Strategy</h1>
-        <p className="mt-1 text-sm text-slate-500">Your brand&apos;s strategy: who you are, who you talk to and what you say. The calendar turns it into a plan.</p>
+        <p className="mt-1 text-sm text-slate-700">Who you are, who you talk to and what you say. The content calendar turns it into posts.</p>
       </div>
       {view && <StrategyStatusCard view={view} />}
     </div>
@@ -56,7 +58,7 @@ export default function AIStrategyPage() {
         {header(null)}
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm" data-testid="no-project">
           <p className="text-sm font-semibold text-slate-700">No project selected</p>
-          <p className="mt-1 text-sm text-slate-400">Select or create a project to generate its social strategy.</p>
+          <p className="mt-1 text-sm text-slate-700">Select or create a project to generate its social strategy.</p>
         </div>
       </div>
     )
@@ -100,6 +102,8 @@ export default function AIStrategyPage() {
   const startError = generate.isError ? describeApiError(generate.error, 'Could not start the strategy generation.').message : null
   const businessName = strategy?.profileSnapshot?.data?.business?.name || activeProject?.project_name || ''
   const calendar = calendarQuery.data?.calendar ? { ...calendarQuery.data.calendar } : null
+  // the plan made from THIS strategy has ended: said here too, with the next step
+  const planEnded = !!calendar && !!strategy && calendar.strategy?.id === strategy.id && planHasEnded(calendar.config)
 
   const openWizard = (mode) => { if (busy || !canGenerate) return; generate.reset(); setWizard(mode) }
 
@@ -117,7 +121,7 @@ export default function AIStrategyPage() {
 
   return (
     <div className="flex-1 space-y-6 pb-16">
-      {header(statusView(state))}
+      {header(strategy && !serverGenerating && !failedAttempt ? null : statusView(state))}
 
       {profile?.changed && strategy && (
         <StrategyProfileChangedBanner changes={profile.changes} busy={busy} onRegenerate={() => openWizard('regenerate')} />
@@ -144,7 +148,7 @@ export default function AIStrategyPage() {
               <p className="text-sm font-semibold text-red-800">The last attempt to generate a strategy failed.</p>
               <p className="mt-0.5 text-sm text-red-700" data-testid="strategy-failed-message">{failedAttempt.failure?.message}</p>
               {strategy && <p className="mt-0.5 text-sm text-red-700">Your previous strategy (version {strategy.version}) is shown below and is unchanged.</p>}
-              {failedAttempt.planning && <p className="mt-0.5 text-sm text-red-700" data-testid="strategy-failed-choice">Your choices were kept: {failedAttempt.planning.postsPerWeek} posts per week for {failedAttempt.planning.months} month{failedAttempt.planning.months === 1 ? '' : 's'}.</p>}
+              {failedAttempt.planning && <p className="mt-0.5 text-sm text-red-700" data-testid="strategy-failed-choice">Your choices were kept: {pluralize(failedAttempt.planning.postsPerWeek, 'post')} per week for {pluralize(failedAttempt.planning.months, 'month')}.</p>}
             </div>
           </div>
           <button type="button" onClick={() => openWizard('regenerate')} disabled={busy || !canGenerate} data-testid="retry-strategy" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-100 disabled:opacity-60">
@@ -163,10 +167,19 @@ export default function AIStrategyPage() {
       {strategy ? (
         <>
           {!serverGenerating && <StrategyOverview strategy={strategy} businessName={businessName} calendar={calendar} busy={busy} onEdit={() => openWizard('edit')} onRegenerate={() => openWizard('regenerate')} />}
-          <StrategyHighlights strategy={strategy.strategy} planning={strategy.planning} />
+          {!serverGenerating && planEnded && <PlanEndedBanner endDate={calendar.config.endDate} planNextHref="/app/social-media/content-calendar?plan=next" />}
+          <StrategyHighlights
+            strategy={strategy.strategy}
+            planning={strategy.planning}
+            improve={<StrategyGapsCard gaps={strategy.strategyGaps} title="Improve this strategy" subtitle="Add these and regenerate for a more specific strategy." />}
+          />
           <StrategyDetails strategy={strategy.strategy} basedOn={<StrategyBusinessContext snapshot={strategy.profileSnapshot} />} />
-          {!serverGenerating && <SingleAIPostGenerator projectId={activeProjectId} strategyState={state} />}
-          <StrategyGapsCard gaps={strategy.strategyGaps} title="Gaps in this strategy" subtitle="Information that was missing when this strategy was generated." />
+          {!serverGenerating && (
+            <p className="flex items-center gap-2 text-sm text-slate-700" data-testid="generate-post-link">
+              <Wand2 className="h-4 w-4 text-violet-600" aria-hidden="true" />
+              Want a single post now? <Link href="/app/social-media/content-calendar" className="font-semibold text-violet-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Generate one from the Content Calendar</Link> (Add post).
+            </p>
+          )}
         </>
       ) : (
         !serverGenerating && (
@@ -174,7 +187,7 @@ export default function AIStrategyPage() {
             <div data-testid="strategy-empty" className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-14 text-center">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-50 text-violet-600"><Sparkles className="h-6 w-6" /></span>
               <p className="text-base font-semibold text-slate-800">You don&apos;t have an AI strategy yet</p>
-              <p className="max-w-md text-sm text-slate-500">Odito will use your Business profile — what it knows about your business, audience, goals and brand — to propose what to publish. First you choose how often to post and for how long.</p>
+              <p className="max-w-md text-sm text-slate-700">Odito will use your Business profile — what it knows about your business, audience, goals and brand — to propose what to publish. First you choose how often to post and for how long.</p>
               <button
                 type="button" onClick={() => openWizard('create')} disabled={busy || !canGenerate} data-testid="generate-button"
                 className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 active:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
@@ -183,7 +196,7 @@ export default function AIStrategyPage() {
                 {busy ? 'Generating…' : 'Create AI Strategy'}
               </button>
             </div>
-            <StrategyGapsCard gaps={profile?.gaps} title="Make your strategy more specific" subtitle="These details are missing from your Business profile. You can generate without them, but the strategy will be more generic." />
+            <StrategyGapsCard gaps={profile?.gaps} title="Make your strategy more specific" subtitle="These details are missing from your Brand kit or Business profile. You can generate without them, but the strategy will be more generic." />
           </>
         )
       )}

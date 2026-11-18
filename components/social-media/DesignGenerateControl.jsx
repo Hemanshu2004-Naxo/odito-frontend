@@ -78,6 +78,7 @@ export function DesignGenerateControl({ projectId, post }) {
       {creative && (
         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600" data-testid="design-creative">
           <p><span className="font-semibold text-slate-800">Creative direction: {creative.label}</span>{creative.referencePhotos ? ' · built on your product photo' : ''}{creative.logoApplied ? ' · your logo added' : ''}</p>
+          {creative.fallback && <p role="status" className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900" data-testid="design-fallback">{creative.fallback.message}</p>}
           {(creative.notes || []).filter((n) => CREATIVE_NOTES[n]).map((n) => <p key={n} className="mt-1 text-xs text-slate-500" data-testid={`design-note-${n}`}>{CREATIVE_NOTES[n]}</p>)}
         </div>
       )}

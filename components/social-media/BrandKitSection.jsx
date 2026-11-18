@@ -1,6 +1,7 @@
 "use client"
 
 import { BrandLogoCard } from './BrandLogoCard'
+import { BrandFontsCard } from './BrandFontsCard'
 import { SocialBusinessProfileEditor } from './SocialBusinessProfileEditor'
 import { SocialMediaImage } from './SocialMediaImage'
 import { hasValue } from '@/lib/socialMedia/businessProfile'
@@ -46,6 +47,7 @@ export function BrandKitSection({ projectId, resolvedProfile, editableProfile })
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2" data-testid="brand-kit">
       <div className="space-y-5">
         <BrandLogoCard projectId={projectId} logo={resolvedProfile.media.logo} />
+        <BrandFontsCard projectId={projectId} fonts={editableProfile?.brand?.fonts} names={{ heading: editableProfile?.brand?.fontHeading || null, body: editableProfile?.brand?.fontBody || null }} />
         <SocialBusinessProfileEditor projectId={projectId} section="identity" profile={editableProfile} />
         <SocialBusinessProfileEditor projectId={projectId} section="strategy" profile={editableProfile} />
         <SocialBusinessProfileEditor projectId={projectId} section="messaging" profile={editableProfile} />

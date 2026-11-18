@@ -3,6 +3,7 @@
 import { AlertTriangle, Loader2, PlayCircle, Trash2 } from 'lucide-react'
 import { formatDateTime } from '@/lib/socialMedia/aiStrategy'
 import { formatPlanDate, platformsLabel } from '@/lib/socialMedia/contentCalendar'
+import { pluralize } from '@/lib/pluralize'
 
 /** How far a generation got, from the server's own counts (never an animation pretending to know). */
 export function GenerationProgress({ progress, className = '' }) {
@@ -15,7 +16,7 @@ export function GenerationProgress({ progress, className = '' }) {
         <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${percent}%` }} />
       </div>
       <p className="mt-1 text-xs text-slate-600" data-testid="generation-progress-text">
-        {total ? `${planned} of ${total} posts planned` : 'Getting started…'}
+        {total ? `${planned} of ${pluralize(total, 'post')} planned` : 'Getting started…'}
         {progress?.totalBatches > 1 && total ? ` · step ${Math.min(progress.completedBatches + 1, progress.totalBatches)} of ${progress.totalBatches}` : ''}
       </p>
     </div>

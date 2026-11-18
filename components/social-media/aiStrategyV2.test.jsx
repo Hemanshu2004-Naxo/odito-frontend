@@ -119,7 +119,7 @@ describe('AI Strategy v2 — a compact strategic document', () => {
     view()
     const card = screen.getByTestId('section-competitors')
     expect(within(card).getByTestId('competitors-none')).toHaveTextContent('No competitor data provided.')
-    expect(within(card).getByRole('link', { name: 'Add competitors in Business Profile' })).toHaveAttribute('href', '/app/social-media/business-profile#brand-kit')
+    expect(within(card).getByRole('link', { name: 'Add competitors in Settings › Brand kit' })).toHaveAttribute('href', '/app/social-media/settings?tab=brand-kit')
     expect(card).not.toHaveTextContent('What to do differently')
   })
 
@@ -174,7 +174,7 @@ describe('AI Strategy v2 — a compact strategic document', () => {
   it('missing audience / goals are stated plainly, never filled in; the audience note links to where to add them', () => {
     view(strategyBodyV2({ audience: { primaryAudience: '', secondaryAudiences: [], painPoints: [], needs: [], motivations: [], buyingTriggers: [], objections: [], interests: [] }, goals: [] }))
     expect(screen.getByTestId('audience-missing')).toHaveTextContent('No audience has been defined, so none is assumed')
-    expect(within(screen.getByTestId('audience-missing')).getByRole('link', { name: 'Business profile' })).toHaveAttribute('href', '/app/social-media/business-profile#brand-kit')
+    expect(within(screen.getByTestId('audience-missing')).getByRole('link', { name: 'Brand kit' })).toHaveAttribute('href', '/app/social-media/settings?tab=brand-kit')
     expect(screen.getByTestId('goals-missing')).toBeInTheDocument()
     expect(within(screen.getByTestId('section-audience')).queryByRole('button', { name: 'Show details' })).not.toBeInTheDocument()
     expect(screen.getByTestId('overview-primary-audience')).toHaveTextContent('Not defined yet')
@@ -242,10 +242,11 @@ describe('AI Strategy page — calendar hand-off', () => {
     expect(screen.queryByTestId('create-calendar-cta')).not.toBeInTheDocument()
   })
 
-  it('shows the strategy BEFORE the single-post generator (the brain first, the execution tool after)', async () => {
+  it('shows the strategy, and only a link to the post generator after it (generating lives in the Content Calendar)', async () => {
     await load(strategyBodyV2())
     const summary = await screen.findByTestId('strategy-summary')
-    const generator = await screen.findByTestId('single-post-generator')
-    expect(summary.compareDocumentPosition(generator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const link = await screen.findByTestId('generate-post-link')
+    expect(summary.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('single-post-generator')).not.toBeInTheDocument()
   })
 })

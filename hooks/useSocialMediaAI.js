@@ -419,9 +419,52 @@ export function useSubmitContentForReview(projectId) {
   return usePublicationMutation(projectId, (publicationId) => apiService.submitSocialContentForReview(projectId, publicationId))
 }
 
-/** `version` is the content version the reviewer SAW; the backend refuses a stale one (VERSION_MISMATCH). */
+/**
+ * The approval state a post moves to when its content is approved - the same rule as the backend (approvalWorkflow.afterContentApproved):
+ * a Facebook post without media has no design to review (approved); a post with media goes to design review; an Instagram post without
+ * media waits for a design (content_approved). Only used to show the move at once; the server's answer replaces it.
+ */
+export function nextStateAfterContentApproval(post, settings) {
+  const hasMedia = (post?.media || []).length > 0
+  if (settings && settings.designApprovalRequired === false) return 'design_approved'
+  if (hasMedia) return 'design_review'
+  return post?.platform === 'instagram' ? 'content_approved' : 'design_approved'
+}
+
+/** Applies `patch(publication)` to the publication with `id` in every cached publishing list; returns the snapshot to roll back to. */
+function patchCachedPublication(queryClient, projectId, id, patch) {
+  const snapshot = queryClient.getQueriesData({ queryKey: publishingKey(projectId) })
+  queryClient.setQueriesData({ queryKey: publishingKey(projectId) }, (old) => (
+    old && Array.isArray(old.publications)
+      ? { ...old, publications: old.publications.map((p) => (p.id === id ? patch(p) : p)) }
+      : old
+  ))
+  return snapshot
+}
+
+/**
+ * `version` is the content version the reviewer SAW; the backend refuses a stale one (VERSION_MISMATCH). The post moves to its next state in
+ * the cache at once (`nextState`, optimistic), the server's answer replaces it, and a failure rolls the cache back to what it was.
+ */
 export function useApproveContent(projectId) {
-  return usePublicationMutation(projectId, ({ publicationId, version }) => apiService.approveSocialContent(projectId, publicationId, version))
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ publicationId, version }) => apiService.approveSocialContent(projectId, publicationId, version),
+    onMutate: async ({ publicationId, nextState }) => {
+      if (!nextState) return { snapshot: null }
+      await queryClient.cancelQueries({ queryKey: publishingKey(projectId) })
+      const snapshot = patchCachedPublication(queryClient, projectId, publicationId, (p) => ({ ...p, approval: { ...(p.approval || {}), state: nextState, stage: nextState, needsChanges: false } }))
+      return { snapshot }
+    },
+    onSuccess: (res, { publicationId }) => {
+      const saved = res?.data?.publication
+      if (saved) patchCachedPublication(queryClient, projectId, publicationId, () => saved)
+    },
+    onError: (_error, _vars, context) => {
+      for (const [key, data] of context?.snapshot || []) queryClient.setQueryData(key, data)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: publishingKey(projectId) }),
+  })
 }
 
 /** The reason is required and persisted by the backend; the post stays in content review. */
@@ -434,7 +477,7 @@ export function useSubmitDesignForReview(projectId) {
 }
 
 export function useApproveDesign(projectId) {
-  return usePublicationMutation(projectId, ({ publicationId, version }) => apiService.approveSocialDesign(projectId, publicationId, version))
+  return usePublicationMutation(projectId, ({ publicationId, version, acknowledgeAttention = false }) => apiService.approveSocialDesign(projectId, publicationId, version, acknowledgeAttention))
 }
 
 export function useRequestDesignChanges(projectId) {
@@ -527,6 +570,24 @@ export function useDeleteSocialBrandLogo(projectId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => apiService.deleteSocialBrandLogo(projectId),
+    onSuccess: (res) => { if (res?.data) queryClient.setQueryData(socialBusinessProfileKey(projectId), res.data) },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: socialBusinessProfileKey(projectId) }),
+  })
+}
+
+export function useUploadSocialBrandFont(projectId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ file, role, weight, onProgress }) => apiService.uploadSocialBrandFont(projectId, file, { role, weight }, onProgress),
+    onSuccess: (res) => { if (res?.data) queryClient.setQueryData(socialBusinessProfileKey(projectId), res.data) },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: socialBusinessProfileKey(projectId) }),
+  })
+}
+
+export function useDeleteSocialBrandFont(projectId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ role, weight }) => apiService.deleteSocialBrandFont(projectId, { role, weight }),
     onSuccess: (res) => { if (res?.data) queryClient.setQueryData(socialBusinessProfileKey(projectId), res.data) },
     onSettled: () => queryClient.invalidateQueries({ queryKey: socialBusinessProfileKey(projectId) }),
   })
@@ -1183,11 +1244,70 @@ export function useStudioRegenerate(projectId, publicationId) {
   })
 }
 
-/** Select design / Replace design: attaches the chosen candidate to the post (to Design Review). Never approves. */
+/**
+ * Select design / Replace design: attaches the chosen candidate to the post (to Design Review). Never approves. In Concept Studio the pick
+ * starts a background RENDER (202): the generation it returns is written into the cache so the progress shows at once.
+ */
 export function useStudioSelect(projectId, publicationId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (request) => apiService.selectSocialStudioDesign(projectId, { publicationId, ...request }),
+    onSuccess: (res) => { if (res?.data?.rendering) startedStudioGeneration(queryClient, projectId, publicationId, res) },
     onSettled: () => settleStudio(queryClient, projectId, publicationId),
+  })
+}
+
+// ── Carousel slides (Content Approvals + Creative Studio) ───────────────
+
+export const designSlidesKey = (projectId, publicationId) => ['social', 'design-slides', projectId, publicationId]
+
+/** The post's carousel slides (order, files, QC, needs attention). Polls only while a slide job runs on the post. */
+export function useDesignSlides(projectId, publicationId, { enabled = true } = {}) {
+  return useQuery({
+    queryKey: designSlidesKey(projectId, publicationId),
+    queryFn: async () => (await apiService.getDesignSlides(projectId, publicationId))?.data || null,
+    enabled: !!projectId && !!publicationId && enabled,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (q) => (q.state.data?.busy || q.state.data?.generation?.active ? STUDIO_POLL_MS : false),
+  })
+}
+
+function slideMutation(fn) {
+  return function useSlideMutation(projectId, publicationId) {
+    const queryClient = useQueryClient()
+    return useMutation({
+      mutationFn: (request) => fn(projectId, { publicationId, ...request }),
+      onSuccess: (res) => {
+        const generation = res?.data?.generation
+        if (generation) queryClient.setQueryData(designSlidesKey(projectId, publicationId), (prev) => (prev ? { ...prev, generation, busy: !!generation.active } : prev))
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({ queryKey: designSlidesKey(projectId, publicationId) })
+        queryClient.invalidateQueries({ queryKey: socialStudioKey(projectId, publicationId), exact: true })
+        queryClient.invalidateQueries({ queryKey: publishingKey(projectId) })
+      },
+    })
+  }
+}
+/** "Regenerate this slide" (background job, 202), reorder, delete - each a new design version: the post goes back to Design Review. */
+export const useSlideRegenerate = slideMutation((projectId, r) => apiService.regenerateDesignSlide(projectId, r))
+export const useSlideReorder = slideMutation((projectId, r) => apiService.reorderDesignSlides(projectId, r))
+export const useSlideDelete = slideMutation((projectId, r) => apiService.deleteDesignSlide(projectId, r))
+
+// ── Design jobs (the "done" notification) ────────────────────────────────
+
+export const designJobsKey = (projectId) => ['social', 'design-jobs', projectId]
+export const DESIGN_JOBS_POLL_MS = 5000
+
+/** The project's running / just-finished design jobs. Polls only while `watching` (a job this browser started is not yet announced). */
+export function useDesignJobs(projectId, { watching = false } = {}) {
+  return useQuery({
+    queryKey: designJobsKey(projectId),
+    queryFn: async () => (await apiService.getDesignJobs(projectId))?.data?.jobs || [],
+    enabled: !!projectId && watching,
+    staleTime: 0,
+    refetchInterval: watching ? DESIGN_JOBS_POLL_MS : false,
+    refetchIntervalInBackground: true,
   })
 }

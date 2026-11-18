@@ -1,37 +1,12 @@
 "use client"
 
-import { useId, useState } from 'react'
-import { ChevronDown, Lightbulb, ShieldCheck } from 'lucide-react'
+import { Lightbulb, ShieldCheck } from 'lucide-react'
+// the Radix primitive itself: the shared ui/tabs wrapper carries dark-theme styles this light page must not inherit
+import { Tabs as TabsPrimitive } from 'radix-ui'
 import { StrategyCard, Bullets, Labelled } from './StrategyParts'
 import {
   BrandAnalysis, Positioning, TrendingTopics, Hooks, Competitors, Platforms, Cta, Hashtags, Tone, BrandRules, Pillars, Mix,
 } from './AIStrategySections'
-
-/** One collapsible area: a title, a one-line preview, and an explicit button. The content is not rendered while it is closed. */
-function Panel({ id, title, preview, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen)
-  const region = useId()
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white" data-testid={`details-${id}`}>
-      <h3>
-        <button
-          type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls={region} data-testid={`details-toggle-${id}`}
-          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 sm:px-5"
-        >
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold text-slate-900">{title}</span>
-            {preview && !open && <span className="mt-0.5 block truncate text-xs text-slate-500" data-testid={`details-preview-${id}`}>{preview}</span>}
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-violet-600">{open ? 'Hide' : 'View details'}<ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} /></span>
-        </button>
-      </h3>
-      {open && <div id={region} role="region" aria-label={title} className="space-y-4 border-t border-slate-100 p-4 sm:p-5">{children}</div>}
-    </section>
-  )
-}
-
-const first = (...values) => values.find((v) => (Array.isArray(v) ? v.length : !!v)) || null
-const joinPreview = (list, n = 2) => (list || []).slice(0, n).join(' · ')
 
 function PlanOutlook({ o }) {
   return (
@@ -39,14 +14,14 @@ function PlanOutlook({ o }) {
       {o.seasonalThemes?.length > 0 && (
         <Labelled label="Seasonal themes for your planning period">
           <ul className="flex flex-col gap-2">
-            {o.seasonalThemes.map((t) => <li key={t.theme} className="text-sm text-slate-600"><span className="font-semibold text-slate-800">{t.theme}</span>{t.timing ? <span className="text-slate-400"> · {t.timing}</span> : null}<span className="block text-xs text-slate-500">{t.idea}</span></li>)}
+            {o.seasonalThemes.map((t) => <li key={t.theme} className="text-sm text-slate-700"><span className="font-semibold text-slate-900">{t.theme}</span>{t.timing ? <span className="text-slate-600"> · {t.timing}</span> : null}<span className="block text-sm text-slate-700">{t.idea}</span></li>)}
           </ul>
         </Labelled>
       )}
       {o.campaignIdeas?.length > 0 && (
         <Labelled label="Campaign ideas">
           <ul className="flex flex-col gap-2" data-testid="campaign-ideas">
-            {o.campaignIdeas.map((c) => <li key={c.name} className="text-sm text-slate-600"><span className="font-semibold text-slate-800">{c.name}</span><span className="block text-xs text-slate-500">{c.idea}</span></li>)}
+            {o.campaignIdeas.map((c) => <li key={c.name} className="text-sm text-slate-700"><span className="font-semibold text-slate-900">{c.name}</span><span className="block text-sm text-slate-700">{c.idea}</span></li>)}
           </ul>
         </Labelled>
       )}
@@ -54,69 +29,82 @@ function PlanOutlook({ o }) {
   )
 }
 
+const TRIGGER = 'rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 data-[state=active]:bg-white data-[state=active]:text-violet-800 data-[state=active]:shadow-sm'
+
 /**
- * Everything the strategy stores that the main view leaves out, kept one click away. Nothing is dropped: every field the schema stores is
- * reachable here (or in the main view), and a section with no data is simply not offered.
+ * Everything the strategy stores that the main view leaves out, in four groups (tabs: arrow keys move between them). Nothing is dropped: every
+ * stored field is reachable here or in the main view. A section with no data is not offered - in particular there is no competitor analysis
+ * when no competitors were supplied (that is listed under "Improve this strategy" instead).
  */
 export function StrategyDetails({ strategy: s, basedOn = null }) {
   const outlook = s.planOutlook
   const hasOutlook = outlook && (outlook.seasonalThemes?.length || outlook.campaignIdeas?.length)
   const brand = s.brandAnalysis
   const hasBrand = brand && [brand.strengths, brand.opportunities, brand.risks, brand.weaknesses, brand.differentiators, brand.personality].some((l) => l?.length)
-  const t = s.toneAndVoice
   const rules = s.brandRules
   const hasRules = rules && (rules.prohibitedPhrases?.length || rules.messagingRules?.length || rules.visualGuidelines?.length)
-  return (
-    <section className="space-y-2.5" aria-label="Detailed insights" data-testid="strategy-details">
-      <div>
-        <h2 className="text-base font-bold tracking-tight text-slate-900">Detailed insights</h2>
-        <p className="text-xs text-slate-500">The full thinking behind the strategy. Open only what you need.</p>
-      </div>
+  const hasCompetitors = !!s.competitorAnalysis?.hasCompetitorData
 
-      {hasOutlook && (
-        <Panel id="outlook" title="Campaign ideas and seasonal themes" preview={first(joinPreview(outlook.campaignIdeas?.map((c) => c.name)), joinPreview(outlook.seasonalThemes?.map((x) => x.theme)))}>
-          <PlanOutlook o={outlook} />
-        </Panel>
-      )}
-      <Panel id="content" title="Detailed content recommendations" preview={joinPreview(s.contentPillars.map((p) => p.name), 3)}>
-        <Pillars pillars={s.contentPillars} />
-        <Mix mix={s.contentMix} />
-        {s.trendingTopics && <TrendingTopics topics={s.trendingTopics} />}
-        {s.workingHooks?.length > 0 && <Hooks hooks={s.workingHooks} />}
-      </Panel>
-      <Panel id="voice" title="Brand voice and messaging" preview={first(t.primaryTone, s.positioning?.messagingAngle)}>
-        <Tone t={t} />
-        <Positioning p={s.positioning} />
-      </Panel>
-      <Panel id="platforms" title="Platform-specific guidance" preview={joinPreview(s.platformStrategy.map((p) => p.role), 1)}>
-        <Platforms platforms={s.platformStrategy} />
-        <Cta c={s.ctaStrategy} />
-      </Panel>
-      <Panel id="hashtags" title="Hashtag guidance" preview={s.hashtagStrategy.enabled ? first(s.hashtagStrategy.approach) : 'Hashtags are not recommended for this business.'}>
-        <Hashtags h={s.hashtagStrategy} />
-      </Panel>
-      {s.competitorAnalysis && (
-        <Panel id="competitors" title="Competitor analysis" preview={s.competitorAnalysis.hasCompetitorData ? joinPreview(s.competitorAnalysis.differentiationOpportunities, 1) : 'No competitor data provided.'}>
-          <Competitors c={s.competitorAnalysis} />
-        </Panel>
-      )}
-      {hasBrand && (
-        <Panel id="brand" title="Brand analysis" preview={joinPreview(brand.strengths, 2)}>
-          <BrandAnalysis b={brand} />
-        </Panel>
-      )}
-      {hasRules && (
-        <Panel id="rules" title="Brand rules" preview={first(joinPreview(rules.messagingRules, 1), joinPreview(rules.prohibitedPhrases, 3))}>
-          <BrandRules r={rules} />
-        </Panel>
-      )}
-      {basedOn && <Panel id="basis" title="What this strategy is based on" preview="The business facts Odito used">{basedOn}</Panel>}
-      {(s.recommendations.length > 0 || s.assumptions.length > 0) && (
-        <Panel id="more" title="Additional recommendations and assumptions" preview={joinPreview(s.recommendations, 1)}>
+  const groups = [
+    {
+      id: 'content', label: 'Content & campaigns',
+      body: (
+        <>
+          {hasOutlook && <PlanOutlook o={outlook} />}
+          <Pillars pillars={s.contentPillars} />
+          <Mix mix={s.contentMix} />
+          {s.trendingTopics && <TrendingTopics topics={s.trendingTopics} />}
+          {s.workingHooks?.length > 0 && <Hooks hooks={s.workingHooks} />}
+        </>
+      ),
+    },
+    {
+      id: 'voice', label: 'Brand voice & rules',
+      body: (
+        <>
+          <Tone t={s.toneAndVoice} />
+          <Positioning p={s.positioning} />
+          {hasBrand && <BrandAnalysis b={brand} />}
+          {hasRules && <BrandRules r={rules} />}
+        </>
+      ),
+    },
+    {
+      id: 'platforms', label: 'Platforms & hashtags',
+      body: (
+        <>
+          <Platforms platforms={s.platformStrategy} />
+          <Cta c={s.ctaStrategy} />
+          <Hashtags h={s.hashtagStrategy} />
+        </>
+      ),
+    },
+    {
+      id: 'sources', label: 'Sources & assumptions',
+      body: (
+        <>
+          {basedOn}
+          {hasCompetitors && <Competitors c={s.competitorAnalysis} />}
           {s.recommendations.length > 0 && <StrategyCard icon={Lightbulb} title="Recommendations" testId="section-recommendations"><Bullets items={s.recommendations} /></StrategyCard>}
           {s.assumptions.length > 0 && <StrategyCard icon={ShieldCheck} title="Assumptions the AI made" subtitle="Check these against what you know about your business." testId="section-assumptions"><Bullets items={s.assumptions} /></StrategyCard>}
-        </Panel>
-      )}
+        </>
+      ),
+    },
+  ]
+
+  return (
+    <section className="space-y-3" aria-labelledby="strategy-details-title" data-testid="strategy-details">
+      <h2 id="strategy-details-title" className="text-base font-bold tracking-tight text-slate-900">Detailed insights</h2>
+      <TabsPrimitive.Root defaultValue="content" className="flex flex-col gap-3">
+        <TabsPrimitive.List aria-label="Detailed insights" className="flex w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 sm:w-fit">
+          {groups.map((g) => <TabsPrimitive.Trigger key={g.id} value={g.id} className={TRIGGER} data-testid={`details-tab-${g.id}`}>{g.label}</TabsPrimitive.Trigger>)}
+        </TabsPrimitive.List>
+        {groups.map((g) => (
+          <TabsPrimitive.Content key={g.id} value={g.id} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:p-5" data-testid={`details-${g.id}`}>
+            {g.body}
+          </TabsPrimitive.Content>
+        ))}
+      </TabsPrimitive.Root>
     </section>
   )
 }

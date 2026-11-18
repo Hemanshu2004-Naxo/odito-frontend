@@ -17,6 +17,7 @@ vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => mobile }))
 vi.mock('next/link', async () => (await import('@/test-utils/socialMediaAI')).nextLinkMock())
 
 import ContentCalendarPage from './page'
+import { PublishedCalendarView } from '@/components/social-media/PublishedCalendarView'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -31,12 +32,20 @@ beforeEach(() => {
 // post's own-timezone date is the same calendar day for every runner timezone.
 const weekday = (offsetDays) => DateTime.local().startOf('week').plus({ days: offsetDays }).toFormat('yyyy-LL-dd')
 const at = (offsetDays, time = '12:00:00') => `${weekday(offsetDays)}T${time}.000Z`
-const renderPage = () => {
-  const view = renderWithClient(<ContentCalendarPage />)
-  fireEvent.click(screen.getByRole('tab', { name: 'Scheduled & published' }))
-  return view
-}
+// The page no longer has a "Scheduled & published" tab (real posts are on the one calendar, see contentPlan.test.jsx); the week/month view
+// of real posts is tested on its own component, which is kept for reuse.
+const renderPage = () => renderWithClient(project ? <PublishedCalendarView projectId={project._id} /> : <ContentCalendarPage />)
 const post = (id) => screen.getByTestId(`calendar-post-${id}`)
+
+describe('Content Calendar — one calendar, no second view', () => {
+  it('has one heading and no tab row: planned, scheduled and published posts share the calendar', async () => {
+    renderWithClient(<ContentCalendarPage />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Content Calendar' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Scheduled & published' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Add content' })).not.toBeInTheDocument()
+  })
+})
 
 describe('Content Calendar — real scheduled posts', () => {
   it('LOADING: a calendar skeleton while the backend answers', () => {

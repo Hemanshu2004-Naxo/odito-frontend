@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { renderWithClient, apiError, businessProfileData } from '@/test-utils/socialMediaAI'
 
 const api = vi.hoisted(() => ({ getSocialApprovalSettings: vi.fn(), updateSocialApprovalSettings: vi.fn(), getSocialBusinessProfile: vi.fn(), updateSocialBusinessProfile: vi.fn() }))
@@ -9,6 +9,8 @@ vi.mock('@/lib/apiService', () => ({ default: api }))
 
 let project = { _id: 'proj-1', project_name: 'Acme' }
 vi.mock('next/link', async () => (await import('@/test-utils/socialMediaAI')).nextLinkMock())
+let searchParams = new URLSearchParams()
+vi.mock('next/navigation', () => ({ useSearchParams: () => searchParams }))
 vi.mock('@/contexts/ProjectContext', () => ({
   useProject: () => ({ activeProject: project, activeProjectId: project ? project._id : null, projects: [], setActiveProject: vi.fn() }),
 }))
@@ -18,6 +20,7 @@ import SocialMediaSettingsPage from './page'
 beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset())
   project = { _id: 'proj-1', project_name: 'Acme' }
+  searchParams = new URLSearchParams()
   api.getSocialBusinessProfile.mockResolvedValue(businessProfileData({ google: true }))
 })
 
@@ -72,18 +75,55 @@ describe('Settings — approval rules are saved by the backend', () => {
   })
 })
 
-describe('Settings — application configuration only (the business lives in Business Profile)', () => {
+describe('Settings — application configuration plus the Brand kit (business information lives in Business Profile)', () => {
   const tabNames = () => screen.getAllByRole('button').map((b) => b.textContent).filter((t) => ['Publishing', 'Team & approvals', 'Notifications', 'Business profile', 'Brand kit'].includes(t))
 
-  it('the tabs are Publishing, Team & approvals and Notifications — no Business profile or Brand kit tab — and Publishing is the default', async () => {
+  it('the tabs are Publishing, Team & approvals, Notifications and Brand kit — no Business profile tab — and Publishing is the default', async () => {
     api.getSocialApprovalSettings.mockResolvedValue(settings())
     renderWithClient(<SocialMediaSettingsPage />)
-    expect(tabNames()).toEqual(['Publishing', 'Team & approvals', 'Notifications'])
+    expect(tabNames()).toEqual(['Publishing', 'Team & approvals', 'Notifications', 'Brand kit'])
     expect(await screen.findByText('Default publishing platforms')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Publishing' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('no business, brand, services, products or Google information is shown or editable in any tab, and none is requested', async () => {
+  it('the Brand kit tab shows the full Brand Kit (logo, identity, strategy, messaging, colours, fonts, preview) — and no business information', async () => {
+    api.getSocialApprovalSettings.mockResolvedValue(settings())
+    renderWithClient(<SocialMediaSettingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Brand kit' }))
+    const kit = await screen.findByTestId('brand-kit')
+    for (const id of ['brand-logo', 'editor-identity', 'editor-strategy', 'editor-messaging', 'editor-brand', 'brand-preview']) {
+      expect(within(kit).getAllByTestId(id), id).toHaveLength(1)
+    }
+    expect(within(kit).getByLabelText('Heading font')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Business name')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('editor-overrides')).not.toBeInTheDocument()
+    expect(api.getSocialBusinessProfile).toHaveBeenCalledWith('proj-1')
+  })
+
+  it('?tab=brand-kit opens the Brand kit tab directly (the link other pages use); an unknown tab falls back to Publishing', async () => {
+    api.getSocialApprovalSettings.mockResolvedValue(settings())
+    searchParams = new URLSearchParams('tab=brand-kit')
+    const view = renderWithClient(<SocialMediaSettingsPage />)
+    expect(await screen.findByTestId('brand-kit')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Brand kit' })).toHaveAttribute('aria-pressed', 'true')
+    view.unmount()
+
+    searchParams = new URLSearchParams('tab=nope')
+    renderWithClient(<SocialMediaSettingsPage />)
+    expect(screen.getByRole('button', { name: 'Publishing' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('the business profile is requested only once the Brand kit tab is opened', async () => {
+    api.getSocialApprovalSettings.mockResolvedValue(settings())
+    renderWithClient(<SocialMediaSettingsPage />)
+    await waitFor(() => expect(sw('Content approval required')).not.toBeDisabled())
+    expect(api.getSocialBusinessProfile).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Brand kit' }))
+    await screen.findByTestId('brand-kit')
+    expect(api.getSocialBusinessProfile).toHaveBeenCalledTimes(1)
+  })
+
+  it('no business, brand, services, products or Google information is shown or editable in the other tabs, and none is requested', async () => {
     api.getSocialApprovalSettings.mockResolvedValue(settings())
     renderWithClient(<SocialMediaSettingsPage />)
     for (const name of ['Publishing', 'Team & approvals', 'Notifications']) {

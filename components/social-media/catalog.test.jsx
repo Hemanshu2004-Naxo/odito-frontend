@@ -21,6 +21,12 @@ vi.mock('@/contexts/ProjectContext', () => ({
 vi.mock('next/link', async () => (await import('@/test-utils/socialMediaAI')).nextLinkMock())
 
 import { BusinessProfileScreen } from './BusinessProfileScreen'
+import { BrandKitSettings } from './BrandKitSettings'
+import { useProject } from '@/contexts/ProjectContext'
+
+// The Brand Kit moved from Business Profile to Settings -> Brand kit; the combined view keeps the old page's surface.
+function BrandKitTab() { return <BrandKitSettings projectId={useProject().activeProjectId} /> }
+function ProfileAndBrandKit() { return <><BusinessProfileScreen /><BrandKitTab /></> }
 import { StrategyProfileChangedBanner } from './StrategyProfileChangedBanner'
 import { StrategyBusinessContext } from './StrategyBusinessContext'
 
@@ -33,8 +39,8 @@ const SERVER_MODEL = (businessModel) => ({ editable: { exists: true, businessMod
 const load = (opts = {}) => api.getSocialBusinessProfile.mockResolvedValue(businessProfileData({ google: true, ...opts }))
 const withModel = (model, extra = {}) => businessProfileData({ google: true, ...SERVER_MODEL(model), ...extra, editable: { ...SERVER_MODEL(model).editable, ...(extra.editable || {}) } })
 const loadModel = (model, extra) => api.getSocialBusinessProfile.mockResolvedValue(withModel(model, extra))
-const renderSettings = () => renderWithClient(<BusinessProfileScreen />)
-const renderBrand = () => renderWithClient(<BusinessProfileScreen />)
+const renderSettings = () => renderWithClient(<ProfileAndBrandKit />)
+const renderBrand = () => renderWithClient(<BrandKitTab />)
 const file = (name = 'photo.png', type = 'image/png', size = 2048) => new File([new Uint8Array(size)], name, { type })
 const pickFiles = (input, files) => fireEvent.change(input, { target: { files } })
 
