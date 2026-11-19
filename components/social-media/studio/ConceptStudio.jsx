@@ -17,7 +17,7 @@ import { StudioGateNotice, StudioError } from './StudioNotices'
 
 /**
  * CONCEPT STUDIO (Creative Studio on the concept pipeline). Every fact is the server's (GET /social/ai-design/studio):
- *   1. Format   single image or carousel (a carousel needs a caption with 3-6 numbered points; the server says whether it can)
+ *   1. Format   single image or carousel (the caption's own 3-6 numbered/bulleted points, or Odito splits a longer caption into 3-6; the server says whether it can)
  *   2. Compare  3 DIFFERENT concepts as low-quality previews (cheap sketches: a picture, a headline, the idea)
  *   3. Pick     the chosen concept is rendered at full quality - one image, or a carousel whose hook is that concept - quality-checked and
  *               attached to the post for design review. Slides below the quality bar are marked "needs attention".
@@ -78,7 +78,9 @@ export function ConceptStudio({ projectId, publicationId, studio }) {
               <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Design format">
                 {[
                   { id: 'single', icon: ImageIcon, title: 'Single image', text: 'One designed image for the post.' },
-                  { id: 'carousel', icon: GalleryHorizontalEnd, title: 'Carousel', text: carouselOk ? `A hook slide, one slide per point (${studio.formats.carousel.points}), and a call-to-action slide.` : studio.formats?.carousel?.reason || 'Not available for this caption.' },
+                  { id: 'carousel', icon: GalleryHorizontalEnd, title: 'Carousel', text: !carouselOk ? studio.formats?.carousel?.reason || 'Not available for this caption.'
+                    : studio.formats.carousel.points ? `A hook slide, one slide per point (${studio.formats.carousel.points}), and a call-to-action slide.`
+                      : 'A hook slide, 3 to 6 slides with the main points of your caption, and a call-to-action slide.' },
                 ].map((o) => {
                   const disabled = busy || (o.id === 'carousel' && !carouselOk)
                   const on = format === o.id

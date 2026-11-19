@@ -189,6 +189,8 @@ function ConnectAccountsPageContent() {
         onConnected={() => notify('Facebook Page connected.', 'success')}
         onSwitched={(account) => notify(`Switched to ${account?.name || 'that Page'}.`, 'success')}
         onConnectAnother={() => { setPageDialog(null); beginOAuth({ reconnect: false }) }}
+        // re-prompts Meta's consent so more Pages / Business Portfolios can be shared with Odito
+        onChoosePages={() => { setPageDialog(null); beginOAuth({ reconnect: true }) }}
       />
 
       <ConfirmActionDialog

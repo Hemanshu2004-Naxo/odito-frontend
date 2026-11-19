@@ -45,7 +45,8 @@ const RETRYABLE_INSTAGRAM_REASONS = new Set(['ACCESS_DENIED', 'DISCOVERY_FAILED'
 // (the Social Media AI module) scope local theme-variable overrides onto the
 // dialog, so it matches its page instead of following the dashboard theme.
 // Omitted everywhere else — the dialog is unchanged for existing callers.
-export default function FacebookPageSelectorDialog({ open, onOpenChange, projectId, mode, onConnected, onSwitched, onConnectAnother, contentClassName = '' }) {
+// `onChoosePages` (optional, connect mode): restarts Meta's consent with re-prompt so the person can share more Pages with Odito.
+export default function FacebookPageSelectorDialog({ open, onOpenChange, projectId, mode, onConnected, onSwitched, onConnectAnother, onChoosePages, contentClassName = '' }) {
   const isConnectMode = mode === 'connect'
 
   const [selectedId, setSelectedId] = useState(null)
@@ -67,11 +68,15 @@ export default function FacebookPageSelectorDialog({ open, onOpenChange, project
     ? (pagesQuery.data?.data?.pages || []).map((p) => ({
         id: p.id, name: p.name, category: p.category, picture: normalizeImageUrl(p.picture),
         alreadyConnected: !!p.alreadyConnected, isActive: !!p.isActive,
+        // false only when Meta listed the Page without giving Odito a Page token — shown, never hidden, but not selectable
+        canConnect: p.canConnect !== false,
       }))
     : (accountsQuery.data?.data?.accounts || []).map((a) => ({
         id: a.id, name: a.name, category: null, picture: normalizeImageUrl(a.picture),
-        alreadyConnected: true, isActive: !!a.isActive,
+        alreadyConnected: true, isActive: !!a.isActive, canConnect: true,
       }))
+  // connect mode: Pages in the person's Business Portfolios that Meta did NOT share with Odito (not ticked in Meta's dialog)
+  const unsharedPages = isConnectMode ? (pagesQuery.data?.data?.unsharedPages || []) : []
 
   const isLoading = isConnectMode ? pagesQuery.isLoading : accountsQuery.isLoading
   const isError = isConnectMode ? pagesQuery.isError : accountsQuery.isError
@@ -110,7 +115,7 @@ export default function FacebookPageSelectorDialog({ open, onOpenChange, project
   }
 
   function handleCardClick(page) {
-    if (isMutating) return
+    if (isMutating || !page.canConnect) return
     setSelectedId(page.id)
   }
 
@@ -272,13 +277,16 @@ export default function FacebookPageSelectorDialog({ open, onOpenChange, project
                       <button
                         key={page.id}
                         type="button"
-                        disabled={isMutating}
+                        disabled={isMutating || !page.canConnect}
                         onClick={() => handleCardClick(page)}
                         aria-pressed={isSelected}
+                        data-testid={`page-card-${page.id}`}
                         className={`relative flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all ${
-                          isSelected
-                            ? 'border-[#1877F2] bg-[#1877F2]/5'
-                            : 'border-border hover:border-muted-foreground/30 hover:bg-muted/40'
+                          !page.canConnect
+                            ? 'cursor-not-allowed border-dashed border-border opacity-60'
+                            : isSelected
+                              ? 'border-[#1877F2] bg-[#1877F2]/5'
+                              : 'border-border hover:border-muted-foreground/30 hover:bg-muted/40'
                         }`}
                       >
                         {isActive && (
@@ -302,7 +310,10 @@ export default function FacebookPageSelectorDialog({ open, onOpenChange, project
                           <p className="text-xs text-muted-foreground truncate w-full -mt-1">{page.category}</p>
                         )}
 
-                        {!isActive && (
+                        {!isActive && !page.canConnect && (
+                          <span className="text-xs text-muted-foreground">Meta gave no access to this Page</span>
+                        )}
+                        {!isActive && page.canConnect && (
                           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${page.alreadyConnected ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
                             {page.alreadyConnected ? 'Connected' : 'Connect'}
@@ -312,6 +323,34 @@ export default function FacebookPageSelectorDialog({ open, onOpenChange, project
                     )
                   })}
                 </div>
+              </div>
+            )}
+
+            {isConnectMode && !isLoading && !isError && (unsharedPages.length > 0 || onChoosePages) && (
+              <div className="rounded-lg border border-dashed px-3 py-2.5" data-testid="unshared-pages">
+                {unsharedPages.length > 0 ? (
+                  <>
+                    <p className="text-xs font-medium">
+                      {unsharedPages.length === 1 ? '1 Page in your Business Portfolios isn’t shared with Odito' : `${unsharedPages.length} Pages in your Business Portfolios aren’t shared with Odito`}
+                    </p>
+                    <ul className="mt-1.5 flex flex-col gap-1">
+                      {unsharedPages.map((u) => (
+                        <li key={u.id} className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                          <span className="truncate">{u.name || 'Untitled Page'}</span>
+                          {u.businessName && <span className="shrink-0 truncate">{u.businessName}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1.5 text-xs text-muted-foreground">To use them, reconnect and tick them in Facebook&apos;s &ldquo;choose Pages&rdquo; step.</p>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Missing a Page? Reconnect and tick it in Facebook&apos;s &ldquo;choose Pages&rdquo; step.</p>
+                )}
+                {onChoosePages && (
+                  <Button size="sm" variant="outline" className="mt-2" disabled={isMutating} onClick={() => { handleOpenChange(false); onChoosePages() }}>
+                    Choose which Pages Odito can use
+                  </Button>
+                )}
               </div>
             )}
 

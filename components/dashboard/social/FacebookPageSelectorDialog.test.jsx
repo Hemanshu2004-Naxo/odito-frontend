@@ -359,3 +359,42 @@ describe('FacebookPageSelectorDialog — no stale selection across close/reopen'
     expect(pageCard('Already Connected Page').getAttribute('aria-pressed')).toBe('true')
   })
 })
+
+describe('FacebookPageSelectorDialog — Pages beyond /me/accounts', () => {
+  const many = Array.from({ length: 17 }, (_, i) => ({ id: `p${i + 1}`, name: `Page number ${i + 1}`, category: 'Business', picture: null, alreadyConnected: false, isActive: false }))
+
+  it('renders every Page the backend returns — more than 14', () => {
+    pagesResult = { isLoading: false, isError: false, data: { data: { pages: many, unsharedPages: [] } } }
+    render({ mode: 'connect' })
+    expect(document.body.querySelectorAll('[data-testid^="page-card-"]').length).toBe(17)
+  })
+
+  it('a Page with no Page token is shown, labelled, and cannot be selected', () => {
+    pagesResult = { isLoading: false, isError: false, data: { data: { pages: [{ id: 'nt', name: 'No Token Page', category: 'Business', picture: null, canConnect: false }], unsharedPages: [] } } }
+    render({ mode: 'connect' })
+    const card = document.body.querySelector('[data-testid="page-card-nt"]')
+    expect(card.textContent).toContain('Meta gave no access to this Page')
+    expect(card.disabled).toBe(true)
+    act(() => { card.click() })
+    const connectBtn = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Connect')
+    expect(connectBtn.disabled).toBe(true)
+  })
+
+  it('lists portfolio Pages not shared with Odito, and "Choose which Pages" restarts consent', () => {
+    const onChoosePages = vi.fn()
+    pagesResult = { isLoading: false, isError: false, data: { data: { pages: many.slice(0, 2), unsharedPages: [{ id: 'u1', name: 'Sapphire Digital Agency', businessName: 'Sapphire Digital Agency', reason: 'NOT_SHARED_WITH_APP' }] } } }
+    render({ mode: 'connect', onChoosePages })
+    const box = document.body.querySelector('[data-testid="unshared-pages"]')
+    expect(box.textContent).toContain('1 Page in your Business Portfolios isn')
+    expect(box.textContent).toContain('Sapphire Digital Agency')
+    const btn = Array.from(box.querySelectorAll('button')).find((b) => b.textContent.includes('Choose which Pages Odito can use'))
+    act(() => { btn.click() })
+    expect(onChoosePages).toHaveBeenCalledTimes(1)
+  })
+
+  it('no unshared Pages and no reconnect handler: nothing extra is shown', () => {
+    pagesResult = { isLoading: false, isError: false, data: { data: { pages: many.slice(0, 2), unsharedPages: [] } } }
+    render({ mode: 'connect' })
+    expect(document.body.querySelector('[data-testid="unshared-pages"]')).toBeNull()
+  })
+})

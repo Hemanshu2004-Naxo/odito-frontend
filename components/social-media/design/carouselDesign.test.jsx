@@ -168,10 +168,16 @@ describe('Concept Studio', () => {
     expect(pendingDesignJobs('proj-1')).toHaveLength(1)
   })
 
-  it('a caption without numbered points cannot be a carousel: the option says why and is disabled', () => {
-    renderWithClient(<ConceptStudio projectId="proj-1" publicationId="pub-1" studio={conceptState({ formats: { single: { allowed: true }, carousel: { allowed: false, points: 0, reason: 'A carousel needs a caption with 3 to 6 numbered points.' } } })} />)
+  it('a caption Odito will split into points: the carousel option is enabled and says so', () => {
+    renderWithClient(<ConceptStudio projectId="proj-1" publicationId="pub-1" studio={conceptState({ formats: { single: { allowed: true }, carousel: { allowed: true, points: null, source: 'outline', reason: null } } })} />)
+    expect(screen.getByTestId('format-carousel')).not.toBeDisabled()
+    expect(screen.getByTestId('format-carousel')).toHaveTextContent('3 to 6 slides with the main points of your caption')
+  })
+
+  it('a caption too short for a carousel: the option says why and is disabled', () => {
+    renderWithClient(<ConceptStudio projectId="proj-1" publicationId="pub-1" studio={conceptState({ formats: { single: { allowed: true }, carousel: { allowed: false, points: 0, reason: 'This caption is too short to split into carousel slides.' } } })} />)
     expect(screen.getByTestId('format-carousel')).toBeDisabled()
-    expect(screen.getByTestId('format-carousel')).toHaveTextContent('3 to 6 numbered points')
+    expect(screen.getByTestId('format-carousel')).toHaveTextContent('too short to split')
   })
 
   it('while the carousel is being made, the live progress shows the stages and the slides', () => {
