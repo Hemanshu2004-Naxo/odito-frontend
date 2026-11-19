@@ -198,9 +198,9 @@ describe('Design panel - real media only', () => {
     renderPanel(post('content_approved'))
     await screen.findByTestId('design-generate')
     const box = screen.getByTestId('design-generate')
-    const buttons = Array.from(box.querySelectorAll('button'))
-    expect(buttons).toHaveLength(1)
-    expect(buttons[0].textContent).toMatch(/Generate design/)
+    // the format switch (Single image / Carousel) and the one Generate button - nothing else
+    const buttons = Array.from(box.querySelectorAll('button')).map((b) => b.textContent)
+    expect(buttons).toEqual(['Single image', 'Carousel', 'Generate design'])
     expect(box.textContent).not.toMatch(/schedule post|publish now/i)
   })
 
@@ -272,7 +272,8 @@ describe('Design generate control - the creative direction that was chosen', () 
     api.getSocialAIDesignStatus.mockResolvedValue(ready(p, { type: 'product_showcase', label: 'Product showcase', logoApplied: true, referencePhotos: 1, notes: [] }))
     renderPanel(p)
     const box = await screen.findByTestId('design-creative')
-    expect(box).toHaveTextContent('Creative direction: Product showcase')
+    // no concept recorded (a rule-based design): its label is all there is
+    expect(box).toHaveTextContent('Product showcase')
     expect(box).toHaveTextContent('built on your product photo')
     expect(box).toHaveTextContent('your logo added')
   })
@@ -304,6 +305,91 @@ describe('Design generate control - the creative direction that was chosen', () 
 
   it('the offer text describes a designed creative from the caption, plan and brand (not "drawing an image")', async () => {
     renderPanel(post('content_approved'))
-    expect(await screen.findByTestId('design-generate')).toHaveTextContent('Odito designs a professional creative for this post from its approved caption, your content plan and your brand.')
+    expect(await screen.findByTestId('design-generate')).toHaveTextContent('Odito designs it from the approved caption, your content plan and your brand.')
+  })
+
+  it('shows the concept in plain words (the big idea), not "Creative direction: 3D render · Editorial magazine cover"', async () => {
+    const p = post('design_review', { media: MEDIA })
+    api.getSocialAIDesignStatus.mockResolvedValue(ready(p, { type: '3d_render', label: '3D render · Editorial magazine cover', logoApplied: false, referencePhotos: 0, notes: [], concept: { bigIdea: 'Three heavy anchors chained to a small website on a desk.', headline: 'x', visualStyle: '3d_render', layout: 'editorial_cover' } }))
+    renderPanel(p)
+    const box = await screen.findByTestId('design-creative')
+    expect(screen.getByTestId('design-concept')).toHaveTextContent('Three heavy anchors chained to a small website on a desk.')
+    expect(box.textContent).not.toMatch(/Creative direction|Editorial magazine cover/)
+  })
+})
+
+describe('Design generate control - the format (choice -> calendar plan -> caption)', () => {
+  const fmt = (over = {}) => ({ recommended: 'carousel', source: 'plan', plannedFormat: 'carousel', current: null, mismatch: false, carousel: { allowed: true, available: true, points: 3, source: 'caption', style: 'bullets' }, needsChoice: false, code: null, message: null, ...over })
+  const status = (p, designFormat) => ({ success: true, data: { status: 'none', generation: null, publication: null, designFormat } })
+  beforeEach(() => { api.generateSocialAIDesign.mockResolvedValue(startBody()) })
+
+  it('the switch defaults to the server\'s rule: a post planned as a carousel starts on Carousel, and no format is sent', async () => {
+    const p = post('content_approved')
+    api.getSocialAIDesignStatus.mockResolvedValue(status(p, fmt()))
+    renderPanel(p)
+    await waitFor(() => expect(screen.getByTestId('design-format-carousel')).toHaveAttribute('aria-checked', 'true'))
+    expect(screen.getByTestId('design-format-source')).toHaveTextContent('Planned as a carousel in your content calendar.')
+    fireEvent.click(screen.getByTestId('generate-design-button'))
+    await waitFor(() => expect(api.generateSocialAIDesign).toHaveBeenCalled())
+    const body = api.generateSocialAIDesign.mock.calls[0][1]
+    expect(body.format).toBeUndefined()
+  })
+
+  it('a bullet/emoji caption list without a plan defaults to Carousel too; no list -> Single image', async () => {
+    const p = post('content_approved')
+    api.getSocialAIDesignStatus.mockResolvedValue(status(p, fmt({ source: 'caption', plannedFormat: null, carousel: { allowed: true, available: true, points: 4, source: 'caption', style: 'emoji_numbers' } })))
+    const { unmount } = renderPanel(p)
+    await waitFor(() => expect(screen.getByTestId('design-format-carousel')).toHaveAttribute('aria-checked', 'true'))
+    expect(screen.getByTestId('design-format-source')).toHaveTextContent('Your caption lists 4 points: one slide each.')
+    unmount()
+    api.getSocialAIDesignStatus.mockResolvedValue(status(p, fmt({ recommended: 'single', source: 'caption', plannedFormat: null })))
+    renderPanel(p)
+    await waitFor(() => expect(screen.getByTestId('design-format-single')).toHaveAttribute('aria-checked', 'true'))
+  })
+
+  it('an explicit choice overrides the plan and is sent as `format`', async () => {
+    const p = post('design_review', { media: MEDIA })
+    api.getSocialAIDesignStatus.mockResolvedValue(status(p, fmt()))
+    renderPanel(p)
+    await waitFor(() => expect(screen.getByTestId('design-format-carousel')).toHaveAttribute('aria-checked', 'true'))
+    fireEvent.click(screen.getByTestId('design-format-single'))
+    fireEvent.click(screen.getByTestId('generate-design-button'))
+    await waitFor(() => expect(api.generateSocialAIDesign).toHaveBeenCalled())
+    expect(api.generateSocialAIDesign.mock.calls[0][1].format).toBe('single')
+  })
+
+  it('planned carousel with no clear points: the question, Generate is disabled, "Make a single image" sends format single', async () => {
+    const p = post('content_approved')
+    const message = 'Planned as carousel, but the caption has no clear points. Make a single image or edit the caption?'
+    api.getSocialAIDesignStatus.mockResolvedValue(status(p, fmt({ carousel: { allowed: false, available: true, points: 0, source: null, style: null }, needsChoice: true, code: 'CAROUSEL_NEEDS_POINTS', message })))
+    renderPanel(p)
+    expect(await screen.findByTestId('format-question')).toHaveTextContent(message)
+    expect(screen.getByTestId('generate-design-button')).toBeDisabled()
+    fireEvent.click(screen.getByTestId('format-question-single'))
+    await waitFor(() => expect(api.generateSocialAIDesign).toHaveBeenCalled())
+    expect(api.generateSocialAIDesign.mock.calls[0][1].format).toBe('single')
+  })
+
+  it('the server\'s refusal (422 CAROUSEL_NEEDS_POINTS) is shown as the same question, not as an error', async () => {
+    const p = post('content_approved')
+    api.getSocialAIDesignStatus.mockResolvedValue(status(p, fmt()))
+    const message = 'This caption has no clear points to split into carousel slides. Make a single image or edit the caption?'
+    api.generateSocialAIDesign.mockRejectedValue(Object.assign(new Error(message), { status: 422, details: { code: 'CAROUSEL_NEEDS_POINTS' } }))
+    renderPanel(p)
+    await waitFor(() => expect(screen.getByTestId('design-format-carousel')).toHaveAttribute('aria-checked', 'true'))
+    fireEvent.click(screen.getByTestId('generate-design-button'))
+    expect(await screen.findByTestId('format-question')).toHaveTextContent(message)
+    expect(screen.queryByTestId('design-start-error')).toBeNull()
+  })
+
+  it('an existing single image on a post planned as carousel: "Planned as carousel" badge + "Regenerate as carousel" (nothing changes until clicked)', async () => {
+    const p = post('design_review', { media: MEDIA })
+    api.getSocialAIDesignStatus.mockResolvedValue(status(p, fmt({ current: 'single', mismatch: true })))
+    renderPanel(p)
+    expect(await screen.findByTestId('planned-carousel-badge')).toHaveTextContent('Planned as carousel')
+    expect(api.generateSocialAIDesign).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('regenerate-as-carousel'))
+    await waitFor(() => expect(api.generateSocialAIDesign).toHaveBeenCalled())
+    expect(api.generateSocialAIDesign.mock.calls[0][1].format).toBe('carousel')
   })
 })

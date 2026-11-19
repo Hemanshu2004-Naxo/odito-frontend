@@ -29,7 +29,9 @@ export function ConceptStudio({ projectId, publicationId, studio }) {
   const select = useStudioSelect(projectId, publicationId)
   const { toasts, notify, dismiss } = useToastQueue()
   const generation = studio.generation
-  const [format, setFormat] = useState(generation?.format || (studio.formats?.carousel?.allowed && studio.content?.platform ? 'single' : 'single'))
+  // the default follows the server's rule (the calendar plan, else the caption's list) - the same as Content Approvals; never just 'single'
+  const recommended = studio.formats?.recommended || null
+  const [format, setFormat] = useState(recommended?.recommended === 'carousel' && studio.formats?.carousel?.allowed ? 'carousel' : 'single')
   const [error, setError] = useState(null)
   const [confirm, setConfirm] = useState(null)
 
@@ -80,7 +82,7 @@ export function ConceptStudio({ projectId, publicationId, studio }) {
                   { id: 'single', icon: ImageIcon, title: 'Single image', text: 'One designed image for the post.' },
                   { id: 'carousel', icon: GalleryHorizontalEnd, title: 'Carousel', text: !carouselOk ? studio.formats?.carousel?.reason || 'Not available for this caption.'
                     : studio.formats.carousel.points ? `A hook slide, one slide per point (${studio.formats.carousel.points}), and a call-to-action slide.`
-                      : 'A hook slide, 3 to 6 slides with the main points of your caption, and a call-to-action slide.' },
+                      : 'A hook slide, 3 to 8 slides with the main points of your caption, and a call-to-action slide.' },
                 ].map((o) => {
                   const disabled = busy || (o.id === 'carousel' && !carouselOk)
                   const on = format === o.id
@@ -93,6 +95,11 @@ export function ConceptStudio({ projectId, publicationId, studio }) {
                   )
                 })}
               </div>
+              {recommended?.source === 'plan' && recommended.plannedFormat === 'carousel' && (
+                <p className="mt-2 text-xs text-slate-500" data-testid="format-planned">
+                  {recommended.needsChoice ? recommended.message : 'Planned as a carousel in your content calendar.'}
+                </p>
+              )}
             </section>
 
             {/* 2. compare */}

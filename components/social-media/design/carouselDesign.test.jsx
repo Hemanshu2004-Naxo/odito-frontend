@@ -171,7 +171,20 @@ describe('Concept Studio', () => {
   it('a caption Odito will split into points: the carousel option is enabled and says so', () => {
     renderWithClient(<ConceptStudio projectId="proj-1" publicationId="pub-1" studio={conceptState({ formats: { single: { allowed: true }, carousel: { allowed: true, points: null, source: 'outline', reason: null } } })} />)
     expect(screen.getByTestId('format-carousel')).not.toBeDisabled()
-    expect(screen.getByTestId('format-carousel')).toHaveTextContent('3 to 6 slides with the main points of your caption')
+    expect(screen.getByTestId('format-carousel')).toHaveTextContent('3 to 8 slides with the main points of your caption')
+  })
+
+  it('the picker defaults from the server\'s rule: a post planned as a carousel opens on Carousel (not Single), and says it was planned', () => {
+    const recommended = { recommended: 'carousel', source: 'plan', plannedFormat: 'carousel', current: null, mismatch: false, needsChoice: false, message: null, carousel: { allowed: true, available: true, points: 3, source: 'caption' } }
+    renderWithClient(<ConceptStudio projectId="proj-1" publicationId="pub-1" studio={conceptState({ formats: { single: { allowed: true }, carousel: { allowed: true, points: 3, reason: null }, recommended } })} />)
+    expect(screen.getByTestId('format-carousel')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('format-planned')).toHaveTextContent('Planned as a carousel in your content calendar.')
+  })
+
+  it('no plan and no list: the picker opens on Single image', () => {
+    const recommended = { recommended: 'single', source: 'caption', plannedFormat: null, current: null, mismatch: false, needsChoice: false, message: null, carousel: { allowed: true, available: true, points: null, source: 'outline' } }
+    renderWithClient(<ConceptStudio projectId="proj-1" publicationId="pub-1" studio={conceptState({ formats: { single: { allowed: true }, carousel: { allowed: true, points: null, source: 'outline', reason: null }, recommended } })} />)
+    expect(screen.getByTestId('format-single')).toHaveAttribute('aria-checked', 'true')
   })
 
   it('a caption too short for a carousel: the option says why and is disabled', () => {

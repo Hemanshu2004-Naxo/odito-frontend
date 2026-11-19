@@ -1166,7 +1166,7 @@ export function useGenerateSocialAIDesign(projectId, publicationId) {
     onSuccess: (res) => {
       const generation = res?.data?.generation
       if (generation) {
-        queryClient.setQueryData(socialAIDesignKey(projectId, publicationId), (prev) => ({ status: 'generating', generation, publication: prev?.publication || null }))
+        queryClient.setQueryData(socialAIDesignKey(projectId, publicationId), (prev) => ({ status: 'generating', generation, publication: prev?.publication || null, designFormat: prev?.designFormat || null }))
         followDesignGeneration(queryClient, projectId, publicationId)
       }
     },
