@@ -41,6 +41,12 @@ export function ConfirmSchedulePanel({ post, accountName, pendingAction = null, 
   const PlatformIcon = platform?.icon
   const pending = pendingAction !== null
   const unchanged = date === initial.date && time === initial.time && timezone === initial.timezone
+  // a post that was never scheduled opens with an empty date/time: say so, instead of a silent grey button
+  const missing = [!date && 'date', !time && 'time'].filter(Boolean)
+  const neverScheduled = !initial.date || !initial.time
+  const hint = missing.length
+    ? `Pick a ${missing.join(' and ')} to schedule this post.`
+    : unchanged && !neverScheduled ? 'Change the date, time or timezone to reschedule.' : null
 
   function handleConfirm() {
     if (pending) return
@@ -88,13 +94,16 @@ export function ConfirmSchedulePanel({ post, accountName, pendingAction = null, 
         <button
           type="button"
           onClick={handleConfirm}
-          disabled={pending || unchanged}
-          title={unchanged ? 'Change the date, time or timezone to reschedule' : undefined}
+          disabled={pending || unchanged || missing.length > 0}
+          aria-describedby={hint ? 'schedule-hint' : undefined}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 active:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {pendingAction === 'confirm' && <Loader2 className="h-4 w-4 animate-spin" />}
           {pendingAction === 'confirm' ? 'Confirming…' : 'Confirm schedule'}
         </button>
+        {hint && !pending && (
+          <p id="schedule-hint" data-testid="schedule-hint" className="text-center text-xs text-slate-500">{hint}</p>
+        )}
 
         {/* `onSaveForLater` omitted = the post is not scheduled yet, so there is nothing to "save for later" (Content Approvals). */}
         {onClose && !onSaveForLater && (

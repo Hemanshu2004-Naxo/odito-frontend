@@ -282,6 +282,7 @@ describe('Scheduled Posts — schedule / reschedule / cancel / duplicate / view'
     await waitFor(() => expect(screen.getByLabelText('Date')).toHaveValue('2099-03-10'))
     expect(screen.getByLabelText('Time')).toHaveValue('10:00')
     expect(screen.getByRole('button', { name: 'Confirm schedule' })).toBeDisabled()
+    expect(screen.getByTestId('schedule-hint')).toHaveTextContent('Change the date, time or timezone to reschedule.')
   })
 
   it('RESCHEDULE sends the exact UTC instant + timezone to the scheduler API, then shows the server\'s new time', async () => {
@@ -334,8 +335,10 @@ describe('Scheduled Posts — schedule / reschedule / cancel / duplicate / view'
     await open('a')
     await waitFor(() => expect(screen.getByLabelText('Date')).toHaveValue('2099-03-10'))
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm schedule' }))
-    expect(await screen.findByText('Enter a valid date and time.')).toBeInTheDocument()
+    const confirm = screen.getByRole('button', { name: 'Confirm schedule' })
+    expect(confirm).toBeDisabled()
+    expect(screen.getByTestId('schedule-hint')).toHaveTextContent('Pick a date to schedule this post.')
+    fireEvent.click(confirm)
     expect(api.scheduleSocialPublication).not.toHaveBeenCalled()
   })
 
